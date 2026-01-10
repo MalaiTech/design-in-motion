@@ -10,115 +10,91 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActionSheetIOS,
+  Image,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { colors, commonStyles } from '@/styles/commonStyles';
-import { getProjects, updateProject, deleteProject, ProjectPhase, Project } from '@/utils/storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/IconSymbol';
+import { getProjects, updateProject, deleteProject, Project, ProjectPhase, Artifact } from '@/utils/storage';
+
+const BAUHAUS_COLORS = {
+  background: '#FAFAF7',
+  text: '#111111',
+  textSecondary: '#555555',
+  divider: '#DDDDDD',
+  primary: '#1d6a89',
+  destructive: '#D32F2F',
+};
+
+const phases: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
 
 export default function EditProjectScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams();
+  
   const [project, setProject] = useState<Project | null>(null);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedPhase, setSelectedPhase] = useState<ProjectPhase>('Framing');
-  const [saving, setSaving] = useState(false);
-
-  const phases: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
+  const [title, setTitle] = useState('');
+  const [phase, setPhase] = useState<ProjectPhase>('Framing');
+  const [startDate, setStartDate] = useState(new Date());
+  const [costs, setCosts] = useState('0');
+  const [hours, setHours] = useState('0');
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   useEffect(() => {
     loadProject();
   }, [id]);
 
   const loadProject = async () => {
-    if (!id) {
-      console.error('No project ID provided');
-      return;
-    }
     const projects = await getProjects();
     const foundProject = projects.find(p => p.id === id);
     if (foundProject) {
       setProject(foundProject);
-      setName(foundProject.name);
-      setDescription(foundProject.description);
-      setSelectedPhase(foundProject.phase);
-    } else {
-      console.error('Project not found');
-      Alert.alert('Error', 'Project not found');
-      router.back();
-    }
-  };
-
-  const getPhaseColor = (phase: ProjectPhase): string => {
-    switch (phase) {
-      case 'Framing': return colors.framingPrimary;
-      case 'Exploration': return colors.explorationPrimary;
-      case 'Pilot': return colors.pilotPrimary;
-      case 'Delivery': return colors.deliveryPrimary;
-      case 'Finish': return colors.finishPrimary;
-      default: return colors.text;
-    }
-  };
-
-  const getPhaseSurface = (phase: ProjectPhase): string => {
-    switch (phase) {
-      case 'Framing': return colors.framingSurface;
-      case 'Exploration': return colors.explorationSurface;
-      case 'Pilot': return colors.pilotSurface;
-      case 'Delivery': return colors.deliverySurface;
-      case 'Finish': return colors.finishSurface;
-      default: return colors.background;
+      setTitle(foundProject.title);
+      setPhase(foundProject.phase);
+      setStartDate(new Date(foundProject.startDate));
+      setCosts(foundProject.costs?.toString() || '0');
+      setHours(foundProject.hours?.toString() || '0');
+      setArtifacts(foundProject.artifacts || []);
     }
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Required', 'Please enter a project name');
-      return;
-    }
+    if (!project) return;
 
-    if (!id) {
-      console.error('No project ID');
-      return;
-    }
+    const updatedProject: Project = {
+      ...project,
+      title: title.trim() || 'Untitled Project',
+      phase,
+      startDate: startDate.toISOString(),
+      costs: parseFloat(costs) || 0,
+      hours: parseFloat(hours) || 0,
+      artifacts,
+      updatedDate: new Date().toISOString(),
+    };
 
-    setSaving(true);
-    try {
-      await updateProject(id, {
-        name: name.trim(),
-        description: description.trim(),
-        phase: selectedPhase,
-      });
-      router.back();
-    } catch (error) {
-      console.error('Error updating project:', error);
-      Alert.alert('Error', 'Failed to update project. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+    await updateProject(updatedProject);
+    router.back();
   };
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete Project',
-      'Are you sure you want to delete this project? This action cannot be undone.',
+      'Delete project?',
+      'This will remove the project and its data from this device.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            if (!id) {
-              console.error('No project ID');
-              return;
-            }
-            try {
-              await deleteProject(id);
+            if (project) {
+              await deleteProject(project.id);
               router.back();
-            } catch (error) {
-              console.error('Error deleting project:', error);
-              Alert.alert('Error', 'Failed to delete project. Please try again.');
             }
           },
         },
@@ -126,146 +102,297 @@ export default function EditProjectScreen() {
     );
   };
 
+  const handleAddArtifact = () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Camera', 'Photos', 'Documents', 'Add URL'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) openCamera();
+          else if (buttonIndex === 2) openPhotos();
+          else if (buttonIndex === 3) openDocuments();
+          else if (buttonIndex === 4) setShowUrlInput(true);
+        }
+      );
+    } else {
+      Alert.alert('Add Artifact', 'Choose source', [
+        { text: 'Camera', onPress: openCamera },
+        { text: 'Photos', onPress: openPhotos },
+        { text: 'Documents', onPress: openDocuments },
+        { text: 'Add URL', onPress: () => setShowUrlInput(true) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
+  const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera access is required');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      addArtifact('image', result.assets[0].uri);
+    }
+  };
+
+  const openPhotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Photo library access is required');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      addArtifact('image', result.assets[0].uri);
+    }
+  };
+
+  const openDocuments = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      addArtifact('document', result.assets[0].uri);
+    }
+  };
+
+  const handleUrlSubmit = () => {
+    if (urlInput.trim()) {
+      addArtifact('url', urlInput.trim());
+      setUrlInput('');
+      setShowUrlInput(false);
+    }
+  };
+
+  const addArtifact = (type: 'image' | 'document' | 'url', uri: string) => {
+    const newArtifact: Artifact = {
+      id: Date.now().toString(),
+      type,
+      uri,
+      caption: '',
+    };
+    setArtifacts([...artifacts, newArtifact]);
+  };
+
+  const removeArtifact = (artifactId: string) => {
+    Alert.alert(
+      'Remove artifact?',
+      'Are you sure you want to remove this artifact?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setArtifacts(artifacts.filter(a => a.id !== artifactId));
+          },
+        },
+      ]
+    );
+  };
+
+  const updateArtifactCaption = (artifactId: string, caption: string) => {
+    setArtifacts(artifacts.map(a => 
+      a.id === artifactId ? { ...a, caption } : a
+    ));
+  };
+
   if (!project) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: 'Loading...',
-          }}
-        />
-        <View style={[commonStyles.container, styles.loadingContainer]}>
-          <Text style={commonStyles.textSecondary}>Loading project...</Text>
-        </View>
-      </>
+      <View style={styles.container}>
+        <Text style={styles.text}>Loading...</Text>
+      </View>
     );
   }
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'Edit Project',
-          headerBackTitle: 'Back',
-        }}
-      />
+      <Stack.Screen options={{ title: 'Edit Project', headerBackTitle: 'Back' }} />
       <KeyboardAvoidingView
-        style={commonStyles.container}
+        style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={100}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Helper Text */}
-          <Text style={[commonStyles.textSecondary, styles.helperText]}>
-            Update your project details or move it to a different phase
-          </Text>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.label}>Project title</Text>
+          <TextInput
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Project title"
+            placeholderTextColor={BAUHAUS_COLORS.textSecondary}
+          />
 
-          {/* Project Name */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Project Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Mobile App Redesign"
-              placeholderTextColor={colors.textSecondary}
-              value={name}
-              onChangeText={setName}
-            />
+          <Text style={styles.label}>Phase</Text>
+          <View style={styles.phaseContainer}>
+            {phases.map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[
+                  styles.phaseButton,
+                  phase === p && styles.phaseButtonActive,
+                ]}
+                onPress={() => setPhase(p)}
+              >
+                <Text style={[
+                  styles.phaseButtonText,
+                  phase === p && styles.phaseButtonTextActive,
+                ]}>
+                  {p}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          {/* Description */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Brief overview of your project..."
-              placeholderTextColor={colors.textSecondary}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
+          <Text style={styles.label}>Start Date</Text>
+          <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+            <Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="date"
+              display="default"
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) setStartDate(selectedDate);
+              }}
             />
-          </View>
+          )}
 
-          {/* Phase Selection */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Current Phase</Text>
-            <View style={styles.phaseGrid}>
-              {phases.map((phase) => (
-                <TouchableOpacity
-                  key={phase}
-                  style={[
-                    styles.phaseButton,
-                    selectedPhase === phase && {
-                      backgroundColor: getPhaseSurface(phase),
-                      borderColor: getPhaseColor(phase),
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => setSelectedPhase(phase)}
-                >
-                  <View
-                    style={[
-                      styles.phaseIndicator,
-                      { backgroundColor: getPhaseColor(phase) },
-                    ]}
+          <Text style={styles.label}>Costs</Text>
+          <TextInput
+            style={styles.input}
+            value={costs}
+            onChangeText={setCosts}
+            placeholder="0"
+            keyboardType="decimal-pad"
+            placeholderTextColor={BAUHAUS_COLORS.textSecondary}
+          />
+
+          <Text style={styles.label}>Hours</Text>
+          <TextInput
+            style={styles.input}
+            value={hours}
+            onChangeText={setHours}
+            placeholder="0"
+            keyboardType="decimal-pad"
+            placeholderTextColor={BAUHAUS_COLORS.textSecondary}
+          />
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Artifacts</Text>
+          
+          {artifacts.length > 0 && (
+            <View style={styles.artifactGrid}>
+              {artifacts.map((artifact) => (
+                <View key={artifact.id} style={styles.artifactItem}>
+                  {artifact.type === 'image' ? (
+                    <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
+                  ) : (
+                    <View style={styles.artifactPlaceholder}>
+                      <IconSymbol
+                        ios_icon_name={artifact.type === 'document' ? 'doc.text' : 'link'}
+                        android_material_icon_name={artifact.type === 'document' ? 'description' : 'link'}
+                        size={24}
+                        color={BAUHAUS_COLORS.textSecondary}
+                      />
+                    </View>
+                  )}
+                  <TextInput
+                    style={styles.captionInput}
+                    value={artifact.caption}
+                    onChangeText={(text) => updateArtifactCaption(artifact.id, text)}
+                    placeholder="Caption"
+                    placeholderTextColor={BAUHAUS_COLORS.textSecondary}
                   />
-                  <Text
-                    style={[
-                      styles.phaseButtonText,
-                      selectedPhase === phase && { color: getPhaseColor(phase), fontWeight: '600' },
-                    ]}
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => removeArtifact(artifact.id)}
                   >
-                    {phase}
-                  </Text>
-                </TouchableOpacity>
+                    <Text style={styles.removeButtonText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
+          )}
+
+          <TouchableOpacity style={styles.addArtifactButton} onPress={handleAddArtifact}>
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={20} color={BAUHAUS_COLORS.primary} />
+            <Text style={styles.addArtifactText}>Add artifact</Text>
+          </TouchableOpacity>
+
+          {showUrlInput && (
+            <View style={styles.urlInputContainer}>
+              <TextInput
+                style={styles.input}
+                value={urlInput}
+                onChangeText={setUrlInput}
+                placeholder="Enter URL"
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholderTextColor={BAUHAUS_COLORS.textSecondary}
+              />
+              <View style={styles.urlButtonRow}>
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton]}
+                  onPress={() => {
+                    setUrlInput('');
+                    setShowUrlInput(false);
+                  }}
+                >
+                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={handleUrlSubmit}
+                >
+                  <Text style={styles.primaryButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleSave}>
+            <Text style={styles.primaryButtonText}>Save</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.secondaryButtonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <View style={styles.deleteSection}>
+            <TouchableOpacity
+              style={[styles.button, styles.destructiveButton]}
+              onPress={handleDelete}
+            >
+              <Text style={styles.destructiveButtonText}>Delete Project</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Save Button */}
-          <TouchableOpacity
-            style={[
-              commonStyles.button,
-              styles.saveButton,
-              saving && styles.saveButtonDisabled,
-            ]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <Text style={commonStyles.buttonText}>Saving...</Text>
-            ) : (
-              <>
-                <IconSymbol
-                  ios_icon_name="checkmark"
-                  android_material_icon_name="check"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                <Text style={[commonStyles.buttonText, styles.saveButtonText]}>
-                  Save Changes
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Delete Button */}
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleDelete}
-          >
-            <IconSymbol
-              ios_icon_name="trash"
-              android_material_icon_name="delete"
-              size={20}
-              color={colors.finishPrimary}
-            />
-            <Text style={styles.deleteButtonText}>Delete Project</Text>
-          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -273,95 +400,176 @@ export default function EditProjectScreen() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  container: {
+    flex: 1,
+    backgroundColor: BAUHAUS_COLORS.background,
   },
   scrollView: {
     flex: 1,
   },
-  content: {
+  scrollContent: {
     padding: 20,
     paddingBottom: 40,
-  },
-  helperText: {
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  section: {
-    marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: BAUHAUS_COLORS.text,
+    marginTop: 16,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: 0,
-    padding: 16,
+    borderColor: BAUHAUS_COLORS.divider,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.background,
+    color: BAUHAUS_COLORS.text,
   },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 16,
-  },
-  phaseGrid: {
-    gap: 12,
+  phaseContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   phaseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: 0,
-    backgroundColor: colors.background,
+    borderColor: BAUHAUS_COLORS.divider,
+    backgroundColor: '#FFFFFF',
   },
-  phaseIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 0,
-    marginRight: 12,
+  phaseButtonActive: {
+    backgroundColor: BAUHAUS_COLORS.primary,
+    borderColor: BAUHAUS_COLORS.primary,
   },
   phaseButtonText: {
+    fontSize: 14,
+    color: BAUHAUS_COLORS.text,
+  },
+  phaseButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  dateText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
+    color: BAUHAUS_COLORS.textSecondary,
+    paddingVertical: 8,
   },
-  saveButton: {
+  divider: {
+    height: 1,
+    backgroundColor: BAUHAUS_COLORS.divider,
+    marginVertical: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: BAUHAUS_COLORS.text,
+    marginBottom: 16,
+  },
+  artifactGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  artifactItem: {
+    width: 100,
+  },
+  artifactImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+  },
+  artifactPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captionInput: {
+    marginTop: 4,
+    fontSize: 12,
+    color: BAUHAUS_COLORS.text,
+    borderBottomWidth: 1,
+    borderBottomColor: BAUHAUS_COLORS.divider,
+    paddingVertical: 4,
+  },
+  removeButton: {
+    marginTop: 4,
+    paddingVertical: 4,
+  },
+  removeButtonText: {
+    fontSize: 12,
+    color: BAUHAUS_COLORS.destructive,
+  },
+  addArtifactButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-  },
-  saveButtonText: {
-    marginLeft: 4,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-    padding: 16,
+    padding: 12,
     borderWidth: 1,
-    borderColor: colors.finishPrimary,
-    borderRadius: 0,
+    borderColor: BAUHAUS_COLORS.divider,
+    borderRadius: 8,
+    borderStyle: 'dashed',
+    gap: 8,
   },
-  deleteButtonText: {
+  addArtifactText: {
+    fontSize: 16,
+    color: BAUHAUS_COLORS.primary,
+  },
+  urlInputContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  urlButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  button: {
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  primaryButton: {
+    backgroundColor: BAUHAUS_COLORS.primary,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    color: colors.finishPrimary,
+  },
+  secondaryButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: BAUHAUS_COLORS.divider,
+    flex: 1,
+  },
+  secondaryButtonText: {
+    color: BAUHAUS_COLORS.text,
+    fontSize: 16,
+  },
+  deleteSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: BAUHAUS_COLORS.divider,
+  },
+  destructiveButton: {
+    backgroundColor: BAUHAUS_COLORS.destructive,
+  },
+  destructiveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  text: {
+    fontSize: 16,
+    color: BAUHAUS_COLORS.text,
   },
 });

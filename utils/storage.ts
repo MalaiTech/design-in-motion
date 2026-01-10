@@ -19,6 +19,7 @@ export interface Artifact {
   type: 'image' | 'document' | 'url';
   uri: string;
   name?: string;
+  caption?: string;
 }
 
 const PROJECTS_KEY = '@design_in_motion_projects';
