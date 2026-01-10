@@ -7,8 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { colors, commonStyles } from '@/styles/commonStyles';
 import { Stack, useRouter } from 'expo-router';
+import { colors, commonStyles } from '@/styles/commonStyles';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getProjects, Project, ProjectPhase } from '@/utils/storage';
 
@@ -35,80 +35,74 @@ export default function HomeScreen() {
 
   const getPhaseColor = (phase: ProjectPhase): string => {
     switch (phase) {
-      case 'framing': return colors.phaseFraming;
-      case 'exploration': return colors.phaseExploration;
-      case 'finish': return colors.phaseFinish;
+      case 'Framing': return colors.phaseFraming;
+      case 'Exploration': return colors.phaseExploration;
+      case 'Finish': return colors.phaseFinish;
       default: return colors.textSecondary;
     }
   };
 
   const getPhaseSurface = (phase: ProjectPhase): string => {
     switch (phase) {
-      case 'framing': return colors.surfaceFraming;
-      case 'exploration': return colors.surfaceExploration;
-      case 'pilot': return colors.surfacePilot;
-      case 'delivery': return colors.surfaceDelivery;
-      case 'finish': return colors.surfaceFinish;
+      case 'Framing': return colors.surfaceFraming;
+      case 'Exploration': return colors.surfaceExploration;
+      case 'Pilot': return colors.surfacePilot;
+      case 'Delivery': return colors.surfaceDelivery;
+      case 'Finish': return colors.surfaceFinish;
       default: return colors.background;
     }
   };
 
   if (projects.length === 0) {
     return (
-      <React.Fragment>
-        <Stack.Screen options={{ title: 'Design in Motion' }} />
-        <View style={[commonStyles.container, styles.emptyContainer]}>
-          <Text style={styles.emptyTitle}>No projects yet</Text>
-          <Text style={styles.emptySubtext}>Start a project to begin exploring.</Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => router.push('/(tabs)/(home)/create-project')}
-          >
-            <Text style={styles.primaryButtonText}>Start Project</Text>
-          </TouchableOpacity>
-        </View>
-      </React.Fragment>
+      <View style={[commonStyles.container, styles.emptyContainer]}>
+        <Text style={styles.emptyTitle}>No projects yet</Text>
+        <Text style={styles.emptySubtext}>Start a project to begin exploring.</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push('/(tabs)/(home)/create-project')}
+        >
+          <Text style={styles.primaryButtonText}>Start Project</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   return (
-    <React.Fragment>
-      <Stack.Screen options={{ title: 'Design in Motion' }} />
-      <View style={commonStyles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {projects.map((project) => (
-            <TouchableOpacity
-              key={project.id}
-              style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
-              onPress={() => router.push(`/(tabs)/(home)/edit-project?id=${project.id}`)}
-            >
-              <View style={styles.projectHeader}>
-                <Text style={styles.projectTitle}>{project.title}</Text>
-                <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(project.phase) }]}>
-                  <Text style={styles.phaseText}>{project.phase}</Text>
-                </View>
+    <View style={commonStyles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {projects.map((project) => (
+          <TouchableOpacity
+            key={project.id}
+            style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
+            onPress={() => router.push(`/(tabs)/(home)/edit-project?id=${project.id}`)}
+          >
+            <View style={styles.projectHeader}>
+              <Text style={styles.projectTitle}>{project.title}</Text>
+              <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(project.phase) }]}>
+                <Text style={styles.phaseText}>{project.phase}</Text>
               </View>
-              {project.artifacts && project.artifacts.length > 0 && (
-                <ScrollView horizontal style={styles.artifactStrip} showsHorizontalScrollIndicator={false}>
-                  {project.artifacts.map((artifact, index) => (
-                    <View key={index} style={styles.artifactThumb} />
-                  ))}
-                </ScrollView>
-              )}
-              <Text style={styles.projectDate}>
-                {new Date(project.updatedAt).toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/(tabs)/(home)/create-project')}
-        >
-          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" color="#FFFFFF" size={24} />
-        </TouchableOpacity>
-      </View>
-    </React.Fragment>
+            </View>
+            {project.artifacts && project.artifacts.length > 0 && (
+              <ScrollView horizontal style={styles.artifactStrip} showsHorizontalScrollIndicator={false}>
+                {project.artifacts.map((artifact, index) => (
+                  <View key={index} style={styles.artifactThumb} />
+                ))}
+              </ScrollView>
+            )}
+            <Text style={styles.projectDate}>
+              Updated: {new Date(project.updatedDate).toLocaleDateString()}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/(tabs)/(home)/create-project')}
+      >
+        <IconSymbol ios_icon_name="plus" android_material_icon_name="add" color="#FFFFFF" size={24} />
+      </TouchableOpacity>
+    </View>
   );
 }
 

@@ -35,20 +35,20 @@ export default function HomeScreen() {
 
   const getPhaseColor = (phase: ProjectPhase): string => {
     switch (phase) {
-      case 'framing': return colors.phaseFraming;
-      case 'exploration': return colors.phaseExploration;
-      case 'finish': return colors.phaseFinish;
+      case 'Framing': return colors.phaseFraming;
+      case 'Exploration': return colors.phaseExploration;
+      case 'Finish': return colors.phaseFinish;
       default: return colors.textSecondary;
     }
   };
 
   const getPhaseSurface = (phase: ProjectPhase): string => {
     switch (phase) {
-      case 'framing': return colors.surfaceFraming;
-      case 'exploration': return colors.surfaceExploration;
-      case 'pilot': return colors.surfacePilot;
-      case 'delivery': return colors.surfaceDelivery;
-      case 'finish': return colors.surfaceFinish;
+      case 'Framing': return colors.surfaceFraming;
+      case 'Exploration': return colors.surfaceExploration;
+      case 'Pilot': return colors.surfacePilot;
+      case 'Delivery': return colors.surfaceDelivery;
+      case 'Finish': return colors.surfaceFinish;
       default: return colors.background;
     }
   };
@@ -91,7 +91,7 @@ export default function HomeScreen() {
               </ScrollView>
             )}
             <Text style={styles.projectDate}>
-              {new Date(project.updatedAt).toLocaleDateString()}
+              Updated: {new Date(project.updatedDate).toLocaleDateString()}
             </Text>
           </TouchableOpacity>
         ))}
