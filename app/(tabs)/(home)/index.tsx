@@ -1,323 +1,195 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { IconSymbol } from '@/components/IconSymbol';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { colors, commonStyles } from '@/styles/commonStyles';
+import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getProjects, Project, ProjectPhase } from '@/utils/storage';
-import { IconSymbol } from '@/components/IconSymbol';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filter, setFilter] = useState<ProjectPhase | 'All'>('All');
 
   const loadProjects = useCallback(async () => {
-    const loadedProjects = await getProjects();
-    setProjects(loadedProjects);
+    const data = await getProjects();
+    console.log('Loaded projects:', data);
+    setProjects(data);
   }, []);
 
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
 
-  // Refresh projects when screen comes into focus
   useEffect(() => {
     const unsubscribe = router.subscribe(() => {
       loadProjects();
     });
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    return unsubscribe;
   }, [router, loadProjects]);
-
-  const filteredProjects = filter === 'All' 
-    ? projects 
-    : projects.filter(p => p.phase === filter);
 
   const getPhaseColor = (phase: ProjectPhase): string => {
     switch (phase) {
-      case 'Framing': return colors.framingPrimary;
-      case 'Exploration': return colors.explorationPrimary;
-      case 'Pilot': return colors.pilotPrimary;
-      case 'Delivery': return colors.deliveryPrimary;
-      case 'Finish': return colors.finishPrimary;
-      default: return colors.text;
+      case 'framing': return colors.phaseFraming;
+      case 'exploration': return colors.phaseExploration;
+      case 'finish': return colors.phaseFinish;
+      default: return colors.textSecondary;
     }
   };
 
   const getPhaseSurface = (phase: ProjectPhase): string => {
     switch (phase) {
-      case 'Framing': return colors.framingSurface;
-      case 'Exploration': return colors.explorationSurface;
-      case 'Pilot': return colors.pilotSurface;
-      case 'Delivery': return colors.deliverySurface;
-      case 'Finish': return colors.finishSurface;
+      case 'framing': return colors.surfaceFraming;
+      case 'exploration': return colors.surfaceExploration;
+      case 'pilot': return colors.surfacePilot;
+      case 'delivery': return colors.surfaceDelivery;
+      case 'finish': return colors.surfaceFinish;
       default: return colors.background;
     }
   };
 
-  const phases: Array<ProjectPhase | 'All'> = ['All', 'Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
+  if (projects.length === 0) {
+    return (
+      <View style={[commonStyles.container, styles.emptyContainer]}>
+        <Text style={styles.emptyTitle}>No projects yet</Text>
+        <Text style={styles.emptySubtext}>Start a project to begin exploring.</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push('/(tabs)/(home)/create-project')}
+        >
+          <Text style={styles.primaryButtonText}>Start Project</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
-    <View style={[commonStyles.container, styles.container]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={commonStyles.title}>Projects</Text>
-        <Text style={commonStyles.textSecondary}>
-          {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-        </Text>
-      </View>
-
-      {/* Phase Filter */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-      >
-        {phases.map((phase) => (
+    <View style={commonStyles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {projects.map((project) => (
           <TouchableOpacity
-            key={phase}
-            style={[
-              styles.filterButton,
-              filter === phase && styles.filterButtonActive,
-              filter === phase && phase !== 'All' && {
-                backgroundColor: getPhaseColor(phase as ProjectPhase),
-              },
-            ]}
-            onPress={() => setFilter(phase)}
+            key={project.id}
+            style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
+            onPress={() => router.push(`/(tabs)/(home)/edit-project?id=${project.id}`)}
           >
-            <Text
-              style={[
-                styles.filterButtonText,
-                filter === phase && styles.filterButtonTextActive,
-              ]}
-            >
-              {phase}
+            <View style={styles.projectHeader}>
+              <Text style={styles.projectTitle}>{project.title}</Text>
+              <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(project.phase) }]}>
+                <Text style={styles.phaseText}>{project.phase}</Text>
+              </View>
+            </View>
+            {project.artifacts && project.artifacts.length > 0 && (
+              <ScrollView horizontal style={styles.artifactStrip} showsHorizontalScrollIndicator={false}>
+                {project.artifacts.map((artifact, index) => (
+                  <View key={index} style={styles.artifactThumb} />
+                ))}
+              </ScrollView>
+            )}
+            <Text style={styles.projectDate}>
+              {new Date(project.updatedAt).toLocaleDateString()}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
-
-      {/* Projects List */}
-      <ScrollView 
-        style={styles.projectsList}
-        contentContainerStyle={styles.projectsListContent}
-        showsVerticalScrollIndicator={false}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/(tabs)/(home)/create-project')}
       >
-        {filteredProjects.length === 0 ? (
-          <View style={styles.emptyState}>
-            <IconSymbol 
-              ios_icon_name="folder" 
-              android_material_icon_name="folder" 
-              size={64} 
-              color={colors.textSecondary} 
-            />
-            <Text style={[commonStyles.title, styles.emptyTitle]}>
-              {filter === 'All' ? 'No Projects Yet' : `No ${filter} Projects`}
-            </Text>
-            <Text style={[commonStyles.textSecondary, styles.emptyText]}>
-              {filter === 'All' 
-                ? 'Start your first project to begin your creative journey' 
-                : `Create a project in the ${filter} phase`}
-            </Text>
-          </View>
-        ) : (
-          filteredProjects.map((project) => (
-            <TouchableOpacity
-              key={project.id}
-              style={[
-                styles.projectCard,
-                { borderLeftColor: getPhaseColor(project.phase), borderLeftWidth: 4 },
-              ]}
-              onPress={() => router.push(`/(tabs)/(home)/edit-project?id=${project.id}`)}
-            >
-              {/* Phase Badge */}
-              <View style={[styles.phaseBadge, { backgroundColor: getPhaseSurface(project.phase) }]}>
-                <Text style={[styles.phaseText, { color: getPhaseColor(project.phase) }]}>
-                  {project.phase}
-                </Text>
-              </View>
-
-              {/* Project Info */}
-              <Text style={styles.projectName}>{project.name}</Text>
-              {project.description ? (
-                <Text style={styles.projectDescription} numberOfLines={2}>
-                  {project.description}
-                </Text>
-              ) : null}
-
-              {/* Artifact Strip (Placeholder) */}
-              <View style={styles.artifactStrip}>
-                {[1, 2, 3, 4, 5].map((_, index) => (
-                  <View 
-                    key={index} 
-                    style={[
-                      styles.artifactPlaceholder,
-                      { backgroundColor: getPhaseSurface(project.phase) },
-                    ]} 
-                  />
-                ))}
-              </View>
-
-              {/* Updated Date */}
-              <Text style={styles.updatedDate}>
-                Updated {new Date(project.updatedAt).toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-
-      {/* Create Project Button */}
-      <View style={styles.createButtonContainer}>
-        <TouchableOpacity
-          style={[commonStyles.button, styles.createButton]}
-          onPress={() => router.push('/(tabs)/(home)/create-project')}
-        >
-          <IconSymbol 
-            ios_icon_name="plus" 
-            android_material_icon_name="add" 
-            size={20} 
-            color="#FFFFFF" 
-          />
-          <Text style={[commonStyles.buttonText, styles.createButtonText]}>
-            Start a Project
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <IconSymbol ios_icon_name="plus" android_material_icon_name="add" color="#FFFFFF" size={24} />
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: Platform.OS === 'android' ? 48 : 0,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  filterContainer: {
-    maxHeight: 50,
-    marginBottom: 16,
-  },
-  filterContent: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 0,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    backgroundColor: colors.background,
-  },
-  filterButtonActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text,
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  filterButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  projectsList: {
-    flex: 1,
-  },
-  projectsListContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 120, // Space for floating tab bar + create button
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
+  emptyContainer: {
     justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 40,
+    alignItems: 'center',
+    padding: 32,
   },
   emptyTitle: {
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.text,
     marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginBottom: 32,
     textAlign: 'center',
   },
-  emptyText: {
-    textAlign: 'center',
-    lineHeight: 22,
+  primaryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 0,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 100,
   },
   projectCard: {
-    backgroundColor: colors.background,
-    borderRadius: 0,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.divider,
+    borderRadius: 0,
   },
-  phaseBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  projectHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
+  projectTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    flex: 1,
+  },
+  phaseIndicator: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 0,
+  },
   phaseText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  projectName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  projectDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 12,
   },
   artifactStrip: {
-    flexDirection: 'row',
-    gap: 8,
     marginBottom: 12,
   },
-  artifactPlaceholder: {
-    width: 48,
-    height: 48,
+  artifactThumb: {
+    width: 60,
+    height: 60,
+    backgroundColor: colors.divider,
+    marginRight: 8,
     borderRadius: 0,
-    borderWidth: 1,
-    borderColor: colors.divider,
   },
-  updatedDate: {
+  projectDate: {
     fontSize: 12,
     color: colors.textSecondary,
   },
-  createButtonContainer: {
+  fab: {
     position: 'absolute',
-    bottom: 80, // Above floating tab bar
-    left: 20,
-    right: 20,
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    bottom: 100,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 0,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
-    gap: 8,
-  },
-  createButtonText: {
-    marginLeft: 4,
+    alignItems: 'center',
   },
 });

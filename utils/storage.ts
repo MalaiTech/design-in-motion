@@ -1,35 +1,31 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Project phases
-export type ProjectPhase = 'Framing' | 'Exploration' | 'Pilot' | 'Delivery' | 'Finish';
+export type ProjectPhase = 'framing' | 'exploration' | 'pilot' | 'delivery' | 'finish';
 
-// Project interface
 export interface Project {
   id: string;
-  name: string;
+  title: string;
   description: string;
   phase: ProjectPhase;
+  artifacts: string[];
   createdAt: string;
   updatedAt: string;
-  artifacts: string[]; // Array of artifact URLs/paths (placeholder for now)
 }
 
-const PROJECTS_KEY = '@design_in_motion_projects';
+const PROJECTS_KEY = '@design_in_motion:projects';
 
-// Get all projects
-export const getProjects = async (): Promise<Project[]> => {
+export async function getProjects(): Promise<Project[]> {
   try {
-    const jsonValue = await AsyncStorage.getItem(PROJECTS_KEY);
-    return jsonValue != null ? JSON.parse(jsonValue) : [];
-  } catch (e) {
-    console.error('Error loading projects:', e);
+    const data = await AsyncStorage.getItem(PROJECTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error loading projects:', error);
     return [];
   }
-};
+}
 
-// Save a new project
-export const saveProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> => {
+export async function saveProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
   try {
     const projects = await getProjects();
     const newProject: Project = {
@@ -40,15 +36,13 @@ export const saveProject = async (project: Omit<Project, 'id' | 'createdAt' | 'u
     };
     projects.push(newProject);
     await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-    return newProject;
-  } catch (e) {
-    console.error('Error saving project:', e);
-    throw e;
+  } catch (error) {
+    console.error('Error saving project:', error);
+    throw error;
   }
-};
+}
 
-// Update an existing project
-export const updateProject = async (id: string, updates: Partial<Project>): Promise<void> => {
+export async function updateProject(id: string, updates: Partial<Project>): Promise<void> {
   try {
     const projects = await getProjects();
     const index = projects.findIndex(p => p.id === id);
@@ -60,20 +54,19 @@ export const updateProject = async (id: string, updates: Partial<Project>): Prom
       };
       await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     }
-  } catch (e) {
-    console.error('Error updating project:', e);
-    throw e;
+  } catch (error) {
+    console.error('Error updating project:', error);
+    throw error;
   }
-};
+}
 
-// Delete a project
-export const deleteProject = async (id: string): Promise<void> => {
+export async function deleteProject(id: string): Promise<void> {
   try {
     const projects = await getProjects();
     const filtered = projects.filter(p => p.id !== id);
     await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(filtered));
-  } catch (e) {
-    console.error('Error deleting project:', e);
-    throw e;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    throw error;
   }
-};
+}

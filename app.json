@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Design in Motion",
-    "slug": "design-in-motion",
+    "name": "Design In Motion",
+    "slug": "Design In Motion",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
@@ -44,5 +44,5 @@
       "router": {}
     }
   },
-  "scheme": "designinmotion"
+  "scheme": "Design In Motion"
 }
