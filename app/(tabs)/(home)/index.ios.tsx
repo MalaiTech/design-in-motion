@@ -71,7 +71,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             key={project.id}
             style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
-            onPress={() => router.push(`/(tabs)/(home)/edit-project?id=${project.id}`)}
+            onPress={() => router.push(`/(tabs)/(home)/project-overview?id=${project.id}`)}
           >
             <View style={styles.projectHeader}>
               <Text style={styles.projectTitle}>{project.title}</Text>

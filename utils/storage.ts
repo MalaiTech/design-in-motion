@@ -3,6 +3,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ProjectPhase = 'Framing' | 'Exploration' | 'Pilot' | 'Delivery' | 'Finish';
 
+export interface Artifact {
+  id: string;
+  type: 'image' | 'document' | 'url';
+  uri: string;
+  name?: string;
+  caption?: string;
+}
+
+export interface Decision {
+  id: string;
+  summary: string;
+  rationale: string;
+  artifacts: string[];
+  phase?: ProjectPhase;
+  timestamp: string;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -12,14 +29,7 @@ export interface Project {
   updatedDate: string;
   startDate: string;
   artifacts: Artifact[];
-}
-
-export interface Artifact {
-  id: string;
-  type: 'image' | 'document' | 'url';
-  uri: string;
-  name?: string;
-  caption?: string;
+  decisions?: Decision[];
 }
 
 const PROJECTS_KEY = '@design_in_motion_projects';
