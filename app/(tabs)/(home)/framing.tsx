@@ -96,10 +96,10 @@ export default function FramingScreen() {
           saveChanges();
         }
       };
-    }, [loadProject])
+    }, [loadProject, saveChanges])
   );
 
-  const saveChanges = async () => {
+  const saveChanges = useCallback(async () => {
     if (!project) return;
     
     const updatedProject: Project = {
@@ -115,7 +115,7 @@ export default function FramingScreen() {
     
     await updateProject(updatedProject);
     hasUnsavedChanges.current = false;
-  };
+  }, [project, opportunityOrigin, purpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
 
   const markAsChanged = () => {
     hasUnsavedChanges.current = true;

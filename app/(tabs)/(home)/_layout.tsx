@@ -34,6 +34,27 @@ export default function HomeLayout() {
           title: 'Project Overview'
         }}
       />
+      <Stack.Screen
+        name="framing"
+        options={{
+          headerShown: true,
+          title: 'Framing'
+        }}
+      />
+      <Stack.Screen
+        name="exploration-loops"
+        options={{
+          headerShown: true,
+          title: 'Exploration Loops'
+        }}
+      />
+      <Stack.Screen
+        name="exploration-loop"
+        options={{
+          headerShown: true,
+          title: 'Exploration Loop'
+        }}
+      />
     </Stack>
   );
 }

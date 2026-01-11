@@ -17,12 +17,7 @@ import { Stack, useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { saveProject, Artifact } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
-
-// Conditionally import DocumentPicker only on native platforms
-let DocumentPicker: any = null;
-if (Platform.OS !== 'web') {
-  DocumentPicker = require('expo-document-picker');
-}
+import * as DocumentPicker from 'expo-document-picker';
 
 export default function CreateProjectScreen() {
   const router = useRouter();
@@ -117,7 +112,7 @@ export default function CreateProjectScreen() {
   };
 
   const openDocuments = async () => {
-    if (Platform.OS === 'web' || !DocumentPicker) {
+    if (Platform.OS === 'web') {
       Alert.alert('Not Available', 'Document picker is not available on web.');
       return;
     }

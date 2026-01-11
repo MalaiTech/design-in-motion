@@ -50,8 +50,11 @@ export default function ExplorationLoopsScreen() {
   );
 
   const handleCreateLoop = () => {
-    // TODO: Navigate to create/edit loop screen
-    Alert.alert('Coming Soon', 'Loop creation will be implemented next.');
+    router.push(`/exploration-loop?projectId=${projectId}`);
+  };
+
+  const handleOpenLoop = (loopId: string) => {
+    router.push(`/exploration-loop?projectId=${projectId}&loopId=${loopId}`);
   };
 
   const handleDeleteLoop = async (loopId: string) => {
@@ -107,15 +110,15 @@ export default function ExplorationLoopsScreen() {
       <TouchableOpacity
         key={loop.id}
         style={styles.loopCard}
-        onPress={() => {
-          // TODO: Navigate to loop detail screen
-          Alert.alert('Coming Soon', 'Loop detail view will be implemented next.');
-        }}
+        onPress={() => handleOpenLoop(loop.id)}
       >
         <View style={styles.loopHeader}>
-          <Text style={styles.loopQuestion}>{loop.question}</Text>
+          <Text style={styles.loopQuestion}>{loop.question || 'Untitled Exploration'}</Text>
           <TouchableOpacity
-            onPress={() => handleDeleteLoop(loop.id)}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeleteLoop(loop.id);
+            }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <IconSymbol 
@@ -212,9 +215,9 @@ export default function ExplorationLoopsScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <>
+            <React.Fragment>
               {loops.map(loop => renderLoopCard(loop))}
-            </>
+            </React.Fragment>
           )}
         </ScrollView>
         

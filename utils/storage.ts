@@ -44,12 +44,69 @@ export interface FramingDecision {
   timestamp: string;
 }
 
+export interface ExploreItem {
+  id: string;
+  text: string;
+  isFavorite: boolean;
+}
+
+export interface BuildItem {
+  id: string;
+  text: string;
+  isFavorite: boolean;
+}
+
+export interface CheckItem {
+  id: string;
+  text: string;
+  isFavorite: boolean;
+}
+
+export interface AdaptItem {
+  id: string;
+  text: string;
+  isFavorite: boolean;
+}
+
+export interface ExplorationDecision {
+  id: string;
+  summary: string;
+  timestamp: string;
+}
+
 export interface ExplorationLoop {
   id: string;
   question: string;
   status: 'active' | 'paused' | 'completed';
   updatedDate: string;
   artifactIds: string[];
+  
+  // Explore section
+  exploreItems: ExploreItem[];
+  exploreArtifactIds: string[];
+  
+  // Build section
+  buildItems: BuildItem[];
+  buildArtifactIds: string[];
+  
+  // Check section
+  checkItems: CheckItem[];
+  
+  // Adapt section
+  adaptItems: AdaptItem[];
+  
+  // Exploration decisions
+  explorationDecisions: ExplorationDecision[];
+  
+  // Next exploration questions
+  nextExplorationQuestions: ExplorationQuestion[];
+  
+  // Time and costs
+  timeSpent: number;
+  costs: number;
+  
+  // Invoices and receipts
+  invoicesArtifactIds: string[];
 }
 
 export interface Project {
