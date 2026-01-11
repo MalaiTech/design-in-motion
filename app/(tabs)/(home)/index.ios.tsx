@@ -7,9 +7,10 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { colors, commonStyles } from '@/styles/commonStyles';
-import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
 import { getProjects, Project, ProjectPhase } from '@/utils/storage';
 
 export default function HomeScreen() {
@@ -22,16 +23,11 @@ export default function HomeScreen() {
     setProjects(data);
   }, []);
 
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
-
-  useEffect(() => {
-    const unsubscribe = router.subscribe(() => {
+  useFocusEffect(
+    useCallback(() => {
       loadProjects();
-    });
-    return unsubscribe;
-  }, [router, loadProjects]);
+    }, [loadProjects])
+  );
 
   const getPhaseColor = (phase: ProjectPhase): string => {
     switch (phase) {
