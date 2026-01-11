@@ -346,7 +346,10 @@ export default function ProjectOverviewScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Project Tools</Text>
             <View style={styles.toolsList}>
-              <TouchableOpacity style={styles.toolItem}>
+              <TouchableOpacity 
+                style={styles.toolItem}
+                onPress={() => router.push(`/(tabs)/(home)/framing?id=${project.id}`)}
+              >
                 <Text style={styles.toolItemText}>Framing</Text>
                 <IconSymbol 
                   ios_icon_name="chevron.right" 

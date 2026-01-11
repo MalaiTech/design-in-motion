@@ -20,6 +20,30 @@ export interface Decision {
   timestamp: string;
 }
 
+export interface CertaintyItem {
+  id: string;
+  text: string;
+  category: 'known' | 'assumed' | 'unknown';
+}
+
+export interface DesignSpaceItem {
+  id: string;
+  text: string;
+}
+
+export interface ExplorationQuestion {
+  id: string;
+  text: string;
+  isFavorite: boolean;
+}
+
+export interface FramingDecision {
+  id: string;
+  summary: string;
+  artifacts: string[];
+  timestamp: string;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -30,6 +54,14 @@ export interface Project {
   startDate: string;
   artifacts: Artifact[];
   decisions?: Decision[];
+  
+  // Framing fields
+  opportunityOrigin?: string;
+  purpose?: string;
+  certaintyItems?: CertaintyItem[];
+  designSpaceItems?: DesignSpaceItem[];
+  explorationQuestions?: ExplorationQuestion[];
+  framingDecisions?: FramingDecision[];
 }
 
 const PROJECTS_KEY = '@design_in_motion_projects';
