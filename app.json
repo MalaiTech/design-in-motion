@@ -41,7 +41,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "backendUrl": "https://un2ktywfpsumfhm7gwd254bkw5em39kt.app.specular.dev"
     }
   },
   "scheme": "Design In Motion"
