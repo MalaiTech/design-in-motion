@@ -380,6 +380,19 @@ export default function FramingScreen() {
     return certaintyItems.filter(item => item.category === category);
   };
 
+  const getCertaintyHelperText = (category: CertaintyCategory) => {
+    switch (category) {
+      case 'known':
+        return 'Facts or insights which you are confident';
+      case 'assumed':
+        return 'Things you believe are true, but are not confirmed';
+      case 'unknown':
+        return 'Thinks you don&apos;t understand or still need to learn';
+      default:
+        return '';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Stack.Screen 
@@ -401,7 +414,7 @@ export default function FramingScreen() {
           {/* 1. Opportunity Origin */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Opportunity Origin</Text>
-            <Text style={styles.helperText}>Where did this project come from?</Text>
+            <Text style={styles.helperText}>What triggered this project?</Text>
             <TextInput
               style={styles.textArea}
               placeholder="Describe the origin of this opportunity..."
@@ -419,7 +432,7 @@ export default function FramingScreen() {
           {/* 2. Purpose */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Purpose</Text>
-            <Text style={styles.helperText}>What are you trying to achieve?</Text>
+            <Text style={styles.helperText}>What are we trying to acomplish and who will benefit?</Text>
             <TextInput
               style={styles.textArea}
               placeholder="Describe the purpose of this project..."
@@ -493,7 +506,6 @@ export default function FramingScreen() {
           {/* 4. Level of Certainty */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Level of Certainty</Text>
-            <Text style={styles.helperText}>What do you know, assume, or need to discover?</Text>
             
             {/* Segmented Control */}
             <View style={styles.segmentedControl}>
@@ -542,6 +554,9 @@ export default function FramingScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            
+            {/* Helper text for selected category */}
+            <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
             
             {/* List for selected category */}
             <View style={styles.listContainer}>
@@ -606,7 +621,7 @@ export default function FramingScreen() {
           {/* 5. Design Space and Constraints */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Design Space and Constraints</Text>
-            <Text style={styles.helperText}>What are the boundaries and possibilities?</Text>
+            <Text style={styles.helperText}>What limits or bounderies must be respected? (e.g. time, budget, technology, ethics)</Text>
             
             <View style={styles.listContainer}>
               {designSpaceItems.map((item) => (
@@ -670,7 +685,7 @@ export default function FramingScreen() {
           {/* 6. Exploration Questions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Questions</Text>
-            <Text style={styles.helperText}>What questions need to be answered?</Text>
+            <Text style={styles.helperText}>What are the first things we ned to learn?</Text>
             
             <View style={styles.listContainer}>
               {explorationQuestions.map((question) => (
@@ -742,7 +757,7 @@ export default function FramingScreen() {
           {/* 7. Framing Decisions & Changes */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Framing Decisions & Changes</Text>
-            <Text style={styles.helperText}>Track key decisions made during framing</Text>
+            <Text style={styles.helperText}>Note important changes and decisions</Text>
             
             <TouchableOpacity 
               style={styles.addDecisionButton}
@@ -1071,7 +1086,7 @@ const styles = StyleSheet.create({
   segmentedControl: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   segmentButton: {
     flex: 1,
