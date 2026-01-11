@@ -359,7 +359,10 @@ export default function ProjectOverviewScreen() {
                 />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.toolItem}>
+              <TouchableOpacity 
+                style={styles.toolItem}
+                onPress={() => router.push(`/(tabs)/(home)/exploration-loops?id=${project.id}`)}
+              >
                 <Text style={styles.toolItemText}>Exploration Loops</Text>
                 <IconSymbol 
                   ios_icon_name="chevron.right" 

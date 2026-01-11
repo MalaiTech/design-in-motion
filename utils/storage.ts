@@ -44,6 +44,14 @@ export interface FramingDecision {
   timestamp: string;
 }
 
+export interface ExplorationLoop {
+  id: string;
+  question: string;
+  status: 'active' | 'paused' | 'completed';
+  updatedDate: string;
+  artifactIds: string[];
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -62,6 +70,9 @@ export interface Project {
   designSpaceItems?: DesignSpaceItem[];
   explorationQuestions?: ExplorationQuestion[];
   framingDecisions?: FramingDecision[];
+  
+  // Exploration Loops
+  explorationLoops?: ExplorationLoop[];
 }
 
 const PROJECTS_KEY = '@design_in_motion_projects';
