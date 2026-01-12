@@ -170,7 +170,6 @@ export default function ExplorationLoopsScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: '', headerShown: true }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -180,13 +179,6 @@ export default function ExplorationLoopsScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: '',
-          headerShown: true,
-        }} 
-      />
-      
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

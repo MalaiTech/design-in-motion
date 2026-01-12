@@ -478,7 +478,6 @@ export default function TimelineScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: '', headerShown: true }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -488,13 +487,6 @@ export default function TimelineScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: '',
-          headerShown: true,
-        }} 
-      />
-      
       {timelineEvents.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateTitle}>No activity yet</Text>

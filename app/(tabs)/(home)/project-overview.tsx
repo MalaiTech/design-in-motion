@@ -13,7 +13,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -237,7 +237,6 @@ export default function ProjectOverviewScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: '', headerShown: true }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -249,21 +248,6 @@ export default function ProjectOverviewScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: '',
-          headerShown: true,
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.push(`/(tabs)/(home)/edit-project?id=${project.id}`)}
-              style={styles.headerButton}
-            >
-              <Text style={styles.headerButtonText}>Edit</Text>
-            </TouchableOpacity>
-          ),
-        }} 
-      />
-      
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -596,14 +580,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: colors.textSecondary,
-  },
-  headerButton: {
-    marginRight: 16,
-  },
-  headerButtonText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: '600',
   },
   header: {
     marginBottom: 24,
