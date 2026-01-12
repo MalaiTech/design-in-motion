@@ -1,14 +1,15 @@
+
 {
   "expo": {
     "name": "Design In Motion",
     "slug": "Design In Motion",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natively-dark.png",
+    "icon": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/natively-dark.png",
+      "image": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAFAF7"
     },
@@ -21,14 +22,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/natively-dark.png",
+        "foregroundImage": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
         "backgroundColor": "#FAFAF7"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.designinmotion.app"
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
+      "favicon": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
       "bundler": "metro"
     },
     "plugins": [
