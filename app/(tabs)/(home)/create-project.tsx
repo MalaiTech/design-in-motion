@@ -106,8 +106,13 @@ export default function CreateProjectScreen() {
       allowsMultipleSelection: true,
     });
 
-    if (!result.canceled) {
-      result.assets.forEach(asset => addArtifact('image', asset.uri));
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      console.log('Selected photos:', result.assets.length);
+      // Add all selected photos
+      result.assets.forEach(asset => {
+        console.log('Adding photo:', asset.uri);
+        addArtifact('image', asset.uri);
+      });
     }
   };
 
@@ -158,7 +163,8 @@ export default function CreateProjectScreen() {
       uri,
       name,
     };
-    setArtifacts([...artifacts, newArtifact]);
+    console.log('Adding artifact:', newArtifact);
+    setArtifacts(prev => [...prev, newArtifact]);
   };
 
   const removeArtifact = (id: string) => {
@@ -201,6 +207,16 @@ export default function CreateProjectScreen() {
           title: '',
           headerStyle: { backgroundColor: '#FAFAF7' },
           headerTintColor: '#111111',
+          headerTitle: () => (
+            <View style={styles.headerContainer}>
+              <Image 
+                source={require('@/assets/images/a01ea08f-54b3-4fdb-aa75-b084bc2b1f09.png')} 
+                style={styles.headerIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.headerTitleText}>Start designing your new Project</Text>
+            </View>
+          ),
         }}
       />
       <KeyboardAvoidingView
@@ -213,16 +229,6 @@ export default function CreateProjectScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header with Icon and Title */}
-          <View style={styles.header}>
-            <Image 
-              source={require('@/assets/images/a01ea08f-54b3-4fdb-aa75-b084bc2b1f09.png')} 
-              style={styles.appIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.headerTitle}>Start designing your new Project</Text>
-          </View>
-
           {/* Project Title */}
           <View style={styles.section}>
             <Text style={styles.helper}>You can rename this later.</Text>
@@ -285,10 +291,10 @@ export default function CreateProjectScreen() {
               </View>
             )}
 
-            {/* Grid of Artifacts */}
+            {/* Grid of Artifacts - 4 columns */}
             {artifacts.length > 0 && (
               <View style={styles.artifactsGrid}>
-                {artifacts.map((artifact) => (
+                {artifacts.map((artifact, index) => (
                   <View key={artifact.id} style={styles.gridItem}>
                     {artifact.type === 'image' && (
                       <Image source={{ uri: artifact.uri }} style={styles.gridThumbnail} />
@@ -298,7 +304,7 @@ export default function CreateProjectScreen() {
                         <IconSymbol 
                           ios_icon_name="doc.fill" 
                           android_material_icon_name="description" 
-                          size={32} 
+                          size={24} 
                           color="#555555" 
                         />
                         <Text style={styles.documentLabel}>PDF</Text>
@@ -309,7 +315,7 @@ export default function CreateProjectScreen() {
                         <IconSymbol 
                           ios_icon_name="link" 
                           android_material_icon_name="link" 
-                          size={32} 
+                          size={24} 
                           color="#555555" 
                         />
                         <Text style={styles.documentLabel}>URL</Text>
@@ -322,7 +328,7 @@ export default function CreateProjectScreen() {
                       <IconSymbol 
                         ios_icon_name="xmark.circle.fill" 
                         android_material_icon_name="cancel" 
-                        size={24} 
+                        size={20} 
                         color="#D32F2F" 
                       />
                     </TouchableOpacity>
@@ -364,27 +370,28 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+    paddingTop: 12,
     paddingBottom: 140,
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
-    gap: 16,
+    gap: 12,
+    paddingRight: 60,
   },
-  appIcon: {
-    width: 48,
-    height: 48,
+  headerIcon: {
+    width: 32,
+    height: 32,
   },
-  headerTitle: {
+  headerTitleText: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '600',
     color: '#111111',
-    lineHeight: 28,
+    lineHeight: 20,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 28,
   },
   label: {
     fontSize: 16,
@@ -463,34 +470,34 @@ const styles = StyleSheet.create({
   artifactsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
     marginTop: 16,
   },
   gridItem: {
     position: 'relative',
-    width: 100,
-    height: 100,
+    width: '23%',
+    aspectRatio: 1,
   },
   gridThumbnail: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: '#EEEEEE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   documentLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#555555',
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 2,
   },
   deleteButton: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    top: -6,
+    right: -6,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
