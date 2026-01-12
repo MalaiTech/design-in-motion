@@ -5,11 +5,11 @@
     "slug": "Design In Motion",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
+    "icon": "./assets/images/Icon-Devine.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
+      "image": "./assets/images/Icon-Devine.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAFAF7"
     },
@@ -22,14 +22,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
+        "foregroundImage": "./assets/images/Icon-Devine.png",
         "backgroundColor": "#FAFAF7"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.designinmotion.app"
     },
     "web": {
-      "favicon": "./assets/images/0c0ad32b-3b50-4041-82f4-13529e247f6e.png",
+      "favicon": "./assets/images/Icon-Devine.png",
       "bundler": "metro"
     },
     "plugins": [
