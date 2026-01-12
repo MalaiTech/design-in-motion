@@ -26,7 +26,7 @@ export default function HomeScreen() {
 
   const loadProjects = useCallback(async () => {
     const data = await getProjects();
-    console.log('Loaded projects:', data);
+    console.log('Loaded projects:', data.length);
     setProjects(data);
   }, []);
 
@@ -89,17 +89,21 @@ export default function HomeScreen() {
     }
 
     // Get favorite artifacts (excluding URLs)
+    // Check both isFavorite property and caption === 'favorite' for backwards compatibility
     const favorites = project.artifacts.filter(
-      artifact => artifact.isFavorite && artifact.type !== 'url'
+      artifact => (artifact.isFavorite || artifact.caption === 'favorite') && artifact.type !== 'url'
     );
 
     // If there are favorites, show only those
     if (favorites.length > 0) {
+      console.log('Showing', favorites.length, 'favorite artifacts for project:', project.title);
       return favorites;
     }
 
     // Otherwise, show all artifacts except URLs
-    return project.artifacts.filter(artifact => artifact.type !== 'url');
+    const allNonUrl = project.artifacts.filter(artifact => artifact.type !== 'url');
+    console.log('Showing', allNonUrl.length, 'non-URL artifacts for project:', project.title);
+    return allNonUrl;
   };
 
   const handleFilterApply = (statuses: ProjectPhase[], sort: SortOption, direction: SortDirection) => {
@@ -207,7 +211,14 @@ export default function HomeScreen() {
                           height={80}
                         />
                       ) : (
-                        <View style={styles.placeholderThumb} />
+                        <View style={styles.placeholderThumb}>
+                          <IconSymbol
+                            ios_icon_name="doc.text"
+                            android_material_icon_name="description"
+                            size={24}
+                            color={colors.textSecondary}
+                          />
+                        </View>
                       )}
                     </View>
                   ))}
@@ -360,7 +371,11 @@ const styles = StyleSheet.create({
   placeholderThumb: {
     width: '100%',
     height: '100%',
-    backgroundColor: colors.divider,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.divider,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fab: {
     position: 'absolute',
