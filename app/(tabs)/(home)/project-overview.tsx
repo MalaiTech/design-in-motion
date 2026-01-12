@@ -13,6 +13,7 @@ import {
   Image,
   Alert,
   Linking,
+  useColorScheme,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -34,6 +35,7 @@ export default function ProjectOverviewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const projectId = params.id as string;
+  const colorScheme = useColorScheme();
 
   const [project, setProject] = useState<Project | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -109,7 +111,7 @@ export default function ProjectOverviewScreen() {
 
   const { totalCosts, totalHours } = calculateTotals();
 
-  // Artifact management
+  // Artifact management - UPDATED to support multiple photo selection
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project) return;
     
@@ -162,9 +164,11 @@ export default function ProjectOverviewScreen() {
           Alert.alert('Permission Required', 'Photo library permission is needed.');
           return;
         }
+        // UPDATED: Enable multiple selection
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
+          allowsMultipleSelection: true, // Enable multiple selection
         });
       } else {
         result = await DocumentPicker.getDocumentAsync({
@@ -174,18 +178,20 @@ export default function ProjectOverviewScreen() {
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
+        // UPDATED: Process all selected assets
+        const newArtifacts: Artifact[] = result.assets.map((asset, index) => {
+          const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
+          
+          return {
+            id: `${Date.now()}-${index}`,
+            type: isPDF ? 'document' : 'image',
+            uri: asset.uri,
+            name: asset.name || 'Untitled',
+            isFavorite: false,
+          };
+        });
         
-        const newArtifact: Artifact = {
-          id: Date.now().toString(),
-          type: isPDF ? 'document' : 'image',
-          uri: asset.uri,
-          name: asset.name || 'Untitled',
-          isFavorite: false,
-        };
-        
-        const updatedArtifacts = [...project.artifacts, newArtifact];
+        const updatedArtifacts = [...project.artifacts, ...newArtifacts];
         const updatedProject = {
           ...project,
           artifacts: updatedArtifacts,
@@ -376,13 +382,20 @@ export default function ProjectOverviewScreen() {
   const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite);
   const displayArtifacts = favoriteArtifacts.length > 0 ? favoriteArtifacts : project.artifacts;
 
+  // Determine background color based on color scheme
+  const isDark = colorScheme === 'dark';
+  const screenBackgroundColor = colors.background; // #FAFAF7 in light mode
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: screenBackgroundColor }]}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          style={{ backgroundColor: screenBackgroundColor }}
+        >
           {/* Project Title - NOT editable */}
           <View style={styles.section}>
             <Text style={styles.projectTitle}>{project.title}</Text>
@@ -426,7 +439,7 @@ export default function ProjectOverviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Visuals (Artifacts) - Grid layout with + icon on the right */}
+          {/* Visuals (Artifacts) - Grid layout with + icon on the right - UPDATED to 4 columns */}
           <View style={styles.section}>
             <View style={styles.visualsHeader}>
               <Text style={styles.sectionTitle}>Visuals</Text>
@@ -736,7 +749,7 @@ export default function ProjectOverviewScreen() {
                 size={24} 
                 color={colors.text} 
               />
-              <Text style={styles.overlayOptionText}>Photos</Text>
+              <Text style={styles.overlayOptionText}>Photos (Multiple)</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -988,10 +1001,10 @@ const styles = StyleSheet.create({
   artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   artifactGridItem: {
-    width: '31%',
+    width: '23%', // UPDATED: Changed from 31% to 23% to fit 4 columns (4 * 23% + 3 * 8px gap = ~100%)
     aspectRatio: 1,
   },
   artifactThumb: {
