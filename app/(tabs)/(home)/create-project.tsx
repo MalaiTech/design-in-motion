@@ -27,7 +27,7 @@ export default function CreateProjectScreen() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlValue, setUrlValue] = useState('');
 
-  const handleAddArtifact = () => {
+  const handleAddVisuals = () => {
     const options = Platform.OS === 'web' 
       ? ['Cancel', 'Photos', 'Add URL']
       : ['Cancel', 'Camera', 'Photos', 'Documents', 'Add URL'];
@@ -67,7 +67,7 @@ export default function CreateProjectScreen() {
             { text: 'Cancel', style: 'cancel' as const },
           ];
 
-      Alert.alert('Add Artifact', 'Choose source', alertOptions);
+      Alert.alert('Add Visuals', 'Choose source', alertOptions);
     }
   };
 
@@ -213,9 +213,18 @@ export default function CreateProjectScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Header with Icon and Title */}
+          <View style={styles.header}>
+            <Image 
+              source={require('@/assets/images/a01ea08f-54b3-4fdb-aa75-b084bc2b1f09.png')} 
+              style={styles.appIcon}
+              resizeMode="contain"
+            />
+            <Text style={styles.headerTitle}>Start designing your new Project</Text>
+          </View>
+
           {/* Project Title */}
           <View style={styles.section}>
-            <Text style={styles.label}>Project title</Text>
             <Text style={styles.helper}>You can rename this later.</Text>
             <TextInput
               style={styles.input}
@@ -228,19 +237,19 @@ export default function CreateProjectScreen() {
 
           {/* Visual Starting Points */}
           <View style={styles.section}>
-            <Text style={styles.label}>Visual Starting Points</Text>
+            <Text style={styles.label}>Add Visuals (optional)</Text>
             <Text style={styles.helper}>
               Add photos, sketches, links, or documents to begin shaping the project.
             </Text>
             
-            <TouchableOpacity style={styles.addButton} onPress={handleAddArtifact}>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddVisuals}>
               <IconSymbol 
                 ios_icon_name="plus.circle" 
                 android_material_icon_name="add-circle" 
                 size={20} 
                 color="#1d6a89" 
               />
-              <Text style={styles.addButtonText}>Add Artifact</Text>
+              <Text style={styles.addButtonText}>Add Visuals</Text>
             </TouchableOpacity>
 
             {/* URL Input for Android/Web */}
@@ -276,49 +285,44 @@ export default function CreateProjectScreen() {
               </View>
             )}
 
+            {/* Grid of Artifacts */}
             {artifacts.length > 0 && (
-              <View style={styles.artifactsContainer}>
+              <View style={styles.artifactsGrid}>
                 {artifacts.map((artifact) => (
-                  <View key={artifact.id} style={styles.artifactItem}>
+                  <View key={artifact.id} style={styles.gridItem}>
                     {artifact.type === 'image' && (
-                      <Image source={{ uri: artifact.uri }} style={styles.thumbnail} />
+                      <Image source={{ uri: artifact.uri }} style={styles.gridThumbnail} />
                     )}
                     {artifact.type === 'document' && (
-                      <View style={styles.documentThumb}>
+                      <View style={styles.gridThumbnail}>
                         <IconSymbol 
-                          ios_icon_name="doc" 
+                          ios_icon_name="doc.fill" 
                           android_material_icon_name="description" 
-                          size={24} 
+                          size={32} 
                           color="#555555" 
                         />
-                        {artifact.name && (
-                          <Text style={styles.documentName} numberOfLines={1}>
-                            {artifact.name}
-                          </Text>
-                        )}
+                        <Text style={styles.documentLabel}>PDF</Text>
                       </View>
                     )}
                     {artifact.type === 'url' && (
-                      <View style={styles.documentThumb}>
+                      <View style={styles.gridThumbnail}>
                         <IconSymbol 
                           ios_icon_name="link" 
                           android_material_icon_name="link" 
-                          size={24} 
+                          size={32} 
                           color="#555555" 
                         />
-                        <Text style={styles.documentName} numberOfLines={2}>
-                          {artifact.uri}
-                        </Text>
+                        <Text style={styles.documentLabel}>URL</Text>
                       </View>
                     )}
                     <TouchableOpacity
-                      style={styles.removeButton}
+                      style={styles.deleteButton}
                       onPress={() => removeArtifact(artifact.id)}
                     >
                       <IconSymbol 
                         ios_icon_name="xmark.circle.fill" 
                         android_material_icon_name="cancel" 
-                        size={20} 
+                        size={24} 
                         color="#D32F2F" 
                       />
                     </TouchableOpacity>
@@ -361,6 +365,23 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 140,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 32,
+    gap: 16,
+  },
+  appIcon: {
+    width: 48,
+    height: 48,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111111',
+    lineHeight: 28,
   },
   section: {
     marginBottom: 32,
@@ -439,42 +460,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  artifactsContainer: {
+  artifactsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     marginTop: 16,
   },
-  artifactItem: {
+  gridItem: {
     position: 'relative',
+    width: 100,
+    height: 100,
   },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#EEEEEE',
-  },
-  documentThumb: {
-    width: 80,
-    height: 80,
+  gridThumbnail: {
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
     backgroundColor: '#EEEEEE',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 4,
   },
-  documentName: {
-    fontSize: 9,
+  documentLabel: {
+    fontSize: 11,
     color: '#555555',
-    textAlign: 'center',
+    fontWeight: '500',
     marginTop: 4,
   },
-  removeButton: {
+  deleteButton: {
     position: 'absolute',
     top: -8,
     right: -8,
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   actions: {
     position: 'absolute',
