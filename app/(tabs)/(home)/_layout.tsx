@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { Stack, useLocalSearchParams, usePathname } from 'expo-router';
 import FloatingTabBar, { TabBarItem } from '@/components/FloatingTabBar';
 import { Dimensions } from 'react-native';
+import { colors } from '@/styles/commonStyles';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -45,6 +46,11 @@ export default function HomeLayout() {
     },
   ];
 
+  // Common header style for all screens
+  const headerStyle = {
+    backgroundColor: colors.background, // #FAFAF7
+  };
+
   return (
     <>
       <Stack>
@@ -60,7 +66,8 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Start a Project',
-            presentation: 'modal'
+            presentation: 'modal',
+            headerStyle,
           }}
         />
         <Stack.Screen
@@ -68,42 +75,48 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Edit Project',
-            presentation: 'modal'
+            presentation: 'modal',
+            headerStyle,
           }}
         />
         <Stack.Screen
           name="project-overview"
           options={{
             headerShown: true,
-            title: 'Project Overview'
+            title: 'Project Overview',
+            headerStyle,
           }}
         />
         <Stack.Screen
           name="framing"
           options={{
             headerShown: true,
-            title: 'Framing'
+            title: 'Framing',
+            headerStyle,
           }}
         />
         <Stack.Screen
           name="exploration-loops"
           options={{
             headerShown: true,
-            title: 'Exploration Loops'
+            title: 'Exploration Loops',
+            headerStyle,
           }}
         />
         <Stack.Screen
           name="exploration-loop"
           options={{
             headerShown: true,
-            title: 'Exploration Loop'
+            title: 'Exploration Loop',
+            headerStyle,
           }}
         />
         <Stack.Screen
           name="timeline"
           options={{
             headerShown: true,
-            title: 'Timeline'
+            title: 'Timeline',
+            headerStyle,
           }}
         />
       </Stack>
