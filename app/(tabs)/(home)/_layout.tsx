@@ -46,9 +46,15 @@ export default function HomeLayout() {
     },
   ];
 
-  // Common header style for all screens
+  // Common header style for specified screens
   const headerStyle = {
     backgroundColor: colors.background, // #FAFAF7
+  };
+
+  const headerTitleStyle = {
+    color: '#111111', // Black text for title
+    fontSize: 17,
+    fontWeight: '600' as const,
   };
 
   return (
@@ -84,7 +90,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Project Overview',
+            headerBackTitle: '', // Remove back button text
             headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button
           }}
         />
         <Stack.Screen
@@ -92,7 +101,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Framing',
+            headerBackTitle: '', // Remove back button text
             headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button
           }}
         />
         <Stack.Screen
@@ -100,7 +112,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loops',
+            headerBackTitle: '', // Remove back button text
             headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button
           }}
         />
         <Stack.Screen
@@ -108,7 +123,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loop',
+            headerBackTitle: '', // Remove back button text
             headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button
           }}
         />
         <Stack.Screen
@@ -116,7 +134,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Timeline',
+            headerBackTitle: '', // Remove back button text
             headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button
           }}
         />
       </Stack>
