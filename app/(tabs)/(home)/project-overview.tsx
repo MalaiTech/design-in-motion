@@ -28,6 +28,7 @@ import {
 } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 
 export default function ProjectOverviewScreen() {
   const router = useRouter();
@@ -247,19 +248,35 @@ export default function ProjectOverviewScreen() {
     setProject(updatedProject);
   };
 
-  const handleOpenArtifact = (artifact: Artifact) => {
-    if (artifact.type === 'url') {
-      Linking.openURL(artifact.uri).catch(() => {
-        Alert.alert('Error', 'Could not open URL');
-      });
-    } else if (artifact.type === 'document') {
-      // Open document with external app
-      Linking.openURL(artifact.uri).catch(() => {
-        Alert.alert('Error', 'Could not open document');
-      });
-    } else {
-      setSelectedArtifact(artifact);
-      setShowArtifactViewer(true);
+  const handleOpenArtifact = async (artifact: Artifact) => {
+    try {
+      if (artifact.type === 'url') {
+        // For web URLs, use Linking.openURL to open in browser
+        const canOpen = await Linking.canOpenURL(artifact.uri);
+        if (canOpen) {
+          await Linking.openURL(artifact.uri);
+        } else {
+          Alert.alert('Error', 'Cannot open this URL');
+        }
+      } else if (artifact.type === 'document') {
+        // For local documents, use Sharing to open with system apps
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(artifact.uri, {
+            dialogTitle: 'Open with...',
+            UTI: 'public.item',
+          });
+        } else {
+          Alert.alert('Not Available', 'File sharing is not available on this device');
+        }
+      } else {
+        // For images, show in viewer
+        setSelectedArtifact(artifact);
+        setShowArtifactViewer(true);
+      }
+    } catch (error) {
+      console.error('Error opening artifact:', error);
+      Alert.alert('Error', 'Could not open this file');
     }
   };
 
