@@ -198,7 +198,7 @@ export default function CreateProjectScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Start Project',
+          title: '',
           headerStyle: { backgroundColor: '#FAFAF7' },
           headerTintColor: '#111111',
         }}

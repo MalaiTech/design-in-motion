@@ -553,7 +553,7 @@ export default function ExplorationLoopScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: isNewLoop ? 'New Exploration' : 'Exploration Loop', headerShown: true }} />
+        <Stack.Screen options={{ title: '', headerShown: true }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -565,7 +565,7 @@ export default function ExplorationLoopScreen() {
     <View style={styles.container}>
       <Stack.Screen 
         options={{ 
-          title: isNewLoop ? 'New Exploration' : 'Exploration Loop',
+          title: '',
           headerShown: true,
         }} 
       />

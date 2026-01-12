@@ -368,7 +368,7 @@ export default function FramingScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: 'Framing', headerShown: true }} />
+        <Stack.Screen options={{ title: '', headerShown: true }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -397,7 +397,7 @@ export default function FramingScreen() {
     <View style={styles.container}>
       <Stack.Screen 
         options={{ 
-          title: 'Framing',
+          title: '',
           headerShown: true,
         }} 
       />

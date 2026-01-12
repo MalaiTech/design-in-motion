@@ -225,7 +225,7 @@ export default function EditProjectScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Edit Project', headerBackTitle: 'Back' }} />
+      <Stack.Screen options={{ title: '', headerBackTitle: 'Back' }} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

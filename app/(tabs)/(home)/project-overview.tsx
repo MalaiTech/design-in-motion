@@ -237,7 +237,7 @@ export default function ProjectOverviewScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: 'Project Overview', headerShown: true }} />
+        <Stack.Screen options={{ title: '', headerShown: true }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -251,7 +251,7 @@ export default function ProjectOverviewScreen() {
     <View style={styles.container}>
       <Stack.Screen 
         options={{ 
-          title: 'Project Overview',
+          title: '',
           headerShown: true,
           headerRight: () => (
             <TouchableOpacity

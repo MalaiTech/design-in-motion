@@ -9,14 +9,14 @@ export default function HomeLayout() {
         name="index"
         options={{
           headerShown: false,
-          title: 'Projects'
+          title: ''
         }}
       />
       <Stack.Screen
         name="create-project"
         options={{
           headerShown: true,
-          title: 'Start Project',
+          title: '',
           presentation: 'modal'
         }}
       />
@@ -24,42 +24,42 @@ export default function HomeLayout() {
         name="edit-project"
         options={{
           headerShown: true,
-          title: 'Edit Project'
+          title: ''
         }}
       />
       <Stack.Screen
         name="project-overview"
         options={{
           headerShown: true,
-          title: 'Project Overview'
+          title: ''
         }}
       />
       <Stack.Screen
         name="framing"
         options={{
           headerShown: true,
-          title: 'Framing'
+          title: ''
         }}
       />
       <Stack.Screen
         name="exploration-loops"
         options={{
           headerShown: true,
-          title: 'Exploration Loops'
+          title: ''
         }}
       />
       <Stack.Screen
         name="exploration-loop"
         options={{
           headerShown: true,
-          title: 'Exploration Loop'
+          title: ''
         }}
       />
       <Stack.Screen
         name="timeline"
         options={{
           headerShown: true,
-          title: 'Timeline'
+          title: ''
         }}
       />
     </Stack>
