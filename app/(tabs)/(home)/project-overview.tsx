@@ -28,9 +28,6 @@ import {
 } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import PDFThumbnail from '@/components/PDFThumbnail.native';
-import FloatingTabBar, { TabBarItem } from '@/components/FloatingTabBar';
 
 export default function ProjectOverviewScreen() {
   const router = useRouter();
@@ -40,13 +37,8 @@ export default function ProjectOverviewScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   
-  // Edit states
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showPhaseMenu, setShowPhaseMenu] = useState(false);
-  
   // Overlays
+  const [showPhaseMenu, setShowPhaseMenu] = useState(false);
   const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
@@ -62,7 +54,6 @@ export default function ProjectOverviewScreen() {
     const found = projects.find(p => p.id === projectId);
     if (found) {
       setProject(found);
-      setEditedTitle(found.title);
       const storedDecisions = (found as any).decisions || [];
       setDecisions(storedDecisions);
     } else {
@@ -87,38 +78,6 @@ export default function ProjectOverviewScreen() {
       case 'Delivery': return colors.textSecondary;
       default: return colors.textSecondary;
     }
-  };
-
-  const handleSaveTitle = async () => {
-    if (!project || !editedTitle.trim()) {
-      setIsEditingTitle(false);
-      return;
-    }
-    
-    const updatedProject = {
-      ...project,
-      title: editedTitle.trim(),
-      updatedDate: new Date().toISOString(),
-    };
-    
-    await updateProject(updatedProject);
-    setProject(updatedProject);
-    setIsEditingTitle(false);
-  };
-
-  const handleDateChange = async (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    
-    if (!project || !selectedDate) return;
-    
-    const updatedProject = {
-      ...project,
-      startDate: selectedDate.toISOString(),
-      updatedDate: new Date().toISOString(),
-    };
-    
-    await updateProject(updatedProject);
-    setProject(updatedProject);
   };
 
   const handlePhaseChange = async (newPhase: ProjectPhase) => {
@@ -215,9 +174,11 @@ export default function ProjectOverviewScreen() {
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
+        
         const newArtifact: Artifact = {
           id: Date.now().toString(),
-          type: type === 'document' ? 'document' : 'image',
+          type: isPDF ? 'document' : 'image',
           uri: asset.uri,
           name: asset.name || 'Untitled',
           isFavorite: false,
@@ -261,7 +222,6 @@ export default function ProjectOverviewScreen() {
             
             await updateProject(updatedProject);
             setProject(updatedProject);
-            setShowArtifactViewer(false);
           }
         }
       ]
@@ -273,7 +233,7 @@ export default function ProjectOverviewScreen() {
     
     const updatedArtifacts = project.artifacts.map(a => 
       a.id === artifactId 
-        ? { ...a, isFavorite: !a.isFavorite, caption: !a.isFavorite ? 'favorite' : undefined } 
+        ? { ...a, isFavorite: !a.isFavorite } 
         : a
     );
     
@@ -291,6 +251,11 @@ export default function ProjectOverviewScreen() {
     if (artifact.type === 'url') {
       Linking.openURL(artifact.uri).catch(() => {
         Alert.alert('Error', 'Could not open URL');
+      });
+    } else if (artifact.type === 'document') {
+      // Open document with external app
+      Linking.openURL(artifact.uri).catch(() => {
+        Alert.alert('Error', 'Could not open document');
       });
     } else {
       setSelectedArtifact(artifact);
@@ -391,36 +356,8 @@ export default function ProjectOverviewScreen() {
   const phases: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
   
   // Filter artifacts: show favorites if any exist, otherwise show all
-  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite || a.caption === 'favorite');
+  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite);
   const displayArtifacts = favoriteArtifacts.length > 0 ? favoriteArtifacts : project.artifacts;
-
-  // Project-specific floating tabs
-  const projectTabs: TabBarItem[] = [
-    {
-      name: 'framing',
-      route: (id?: string) => `/(tabs)/(home)/framing?id=${id || projectId}` as any,
-      icon: 'dashboard',
-      label: 'Framing',
-    },
-    {
-      name: 'exploration',
-      route: (id?: string) => `/(tabs)/(home)/exploration-loops?id=${id || projectId}` as any,
-      icon: 'refresh',
-      label: 'Exploration',
-    },
-    {
-      name: 'timeline',
-      route: (id?: string) => `/(tabs)/(home)/timeline?id=${id || projectId}` as any,
-      icon: 'calendar-today',
-      label: 'Timeline',
-    },
-    {
-      name: 'export',
-      route: (id?: string) => `/(tabs)/(home)/project-overview?id=${id || projectId}` as any,
-      icon: 'download',
-      label: 'Export',
-    },
-  ];
 
   return (
     <View style={styles.container}>
@@ -429,54 +366,25 @@ export default function ProjectOverviewScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Project Title - Editable */}
+          {/* Project Title - NOT editable */}
           <View style={styles.section}>
-            <Text style={styles.fieldLabel}>Project title</Text>
-            <View style={styles.titleContainer}>
-              {isEditingTitle ? (
-                <TextInput
-                  style={styles.titleInput}
-                  value={editedTitle}
-                  onChangeText={setEditedTitle}
-                  onBlur={handleSaveTitle}
-                  autoFocus
-                  placeholder="Enter project title"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              ) : (
-                <React.Fragment>
-                  <Text style={styles.projectTitle}>{project.title}</Text>
-                  <TouchableOpacity onPress={() => setIsEditingTitle(true)}>
-                    <IconSymbol 
-                      ios_icon_name="pencil" 
-                      android_material_icon_name="edit" 
-                      size={20} 
-                      color={colors.textSecondary} 
-                    />
-                  </TouchableOpacity>
-                </React.Fragment>
-              )}
-            </View>
+            <Text style={styles.projectTitle}>{project.title}</Text>
           </View>
 
-          {/* Starting Date & Totals in one section */}
+          {/* Start Date, Total Costs and Total Hours in one line - NOT editable */}
           <View style={styles.section}>
-            <TouchableOpacity 
-              style={styles.dateRow}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.secondaryLabel}>Starting date</Text>
-              <Text style={styles.secondaryValue}>
-                {new Date(project.startDate).toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-            
-            <View style={styles.totalsRow}>
-              <View style={styles.totalItem}>
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.secondaryLabel}>Start date</Text>
+                <Text style={styles.secondaryValue}>
+                  {new Date(project.startDate).toLocaleDateString()}
+                </Text>
+              </View>
+              <View style={styles.infoItem}>
                 <Text style={styles.secondaryLabel}>Total Costs</Text>
                 <Text style={styles.secondaryValue}>${totalCosts.toFixed(2)}</Text>
               </View>
-              <View style={styles.totalItem}>
+              <View style={styles.infoItem}>
                 <Text style={styles.secondaryLabel}>Total Hours</Text>
                 <Text style={styles.secondaryValue}>{totalHours}h</Text>
               </View>
@@ -501,9 +409,10 @@ export default function ProjectOverviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Visuals (Artifacts) - No title */}
+          {/* Visuals (Artifacts) - Grid layout with + icon on the right */}
           <View style={styles.section}>
             <View style={styles.visualsHeader}>
+              <Text style={styles.sectionTitle}>Visuals</Text>
               <TouchableOpacity 
                 style={styles.addButton}
                 onPress={() => setShowArtifactOverlay(true)}
@@ -518,16 +427,16 @@ export default function ProjectOverviewScreen() {
             </View>
             
             {displayArtifacts.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactStrip}>
+              <View style={styles.artifactGrid}>
                 {displayArtifacts.map((artifact) => (
-                  <View key={artifact.id} style={styles.artifactContainer}>
+                  <View key={artifact.id} style={styles.artifactGridItem}>
                     <TouchableOpacity
                       style={styles.artifactThumb}
                       onPress={() => handleOpenArtifact(artifact)}
                     >
                       {artifact.type === 'image' ? (
                         <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                      ) : artifact.type === 'document' && artifact.uri.toLowerCase().endsWith('.pdf') ? (
+                      ) : artifact.type === 'document' ? (
                         <View style={styles.artifactDoc}>
                           <IconSymbol 
                             ios_icon_name="doc" 
@@ -535,6 +444,7 @@ export default function ProjectOverviewScreen() {
                             size={32} 
                             color={colors.textSecondary} 
                           />
+                          <Text style={styles.artifactLabel}>PDF</Text>
                         </View>
                       ) : artifact.type === 'url' ? (
                         <View style={styles.artifactDoc}>
@@ -544,41 +454,39 @@ export default function ProjectOverviewScreen() {
                             size={32} 
                             color={colors.textSecondary} 
                           />
+                          <Text style={styles.artifactLabel}>URL</Text>
                         </View>
-                      ) : (
-                        <View style={styles.artifactDoc}>
+                      ) : null}
+                      
+                      {/* Favorite and Delete icons in right upper corner */}
+                      <View style={styles.artifactOverlayActions}>
+                        <TouchableOpacity 
+                          style={styles.artifactActionButton}
+                          onPress={() => handleToggleArtifactFavorite(artifact.id)}
+                        >
                           <IconSymbol 
-                            ios_icon_name="doc" 
-                            android_material_icon_name="description" 
-                            size={32} 
-                            color={colors.textSecondary} 
+                            ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
+                            android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
+                            size={18} 
+                            color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
                           />
-                        </View>
-                      )}
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.artifactActionButton}
+                          onPress={() => handleDeleteArtifact(artifact.id)}
+                        >
+                          <IconSymbol 
+                            ios_icon_name="trash" 
+                            android_material_icon_name="delete" 
+                            size={18} 
+                            color="#FFFFFF" 
+                          />
+                        </TouchableOpacity>
+                      </View>
                     </TouchableOpacity>
-                    
-                    {/* Favorite and Delete buttons below thumbnail */}
-                    <View style={styles.artifactActions}>
-                      <TouchableOpacity onPress={() => handleToggleArtifactFavorite(artifact.id)}>
-                        <IconSymbol 
-                          ios_icon_name={(artifact.isFavorite || artifact.caption === 'favorite') ? "star.fill" : "star"} 
-                          android_material_icon_name={(artifact.isFavorite || artifact.caption === 'favorite') ? "star" : "star-border"} 
-                          size={20} 
-                          color={(artifact.isFavorite || artifact.caption === 'favorite') ? "#FFD700" : colors.textSecondary} 
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDeleteArtifact(artifact.id)}>
-                        <IconSymbol 
-                          ios_icon_name="trash" 
-                          android_material_icon_name="delete" 
-                          size={20} 
-                          color={colors.phaseFinish} 
-                        />
-                      </TouchableOpacity>
-                    </View>
                   </View>
                 ))}
-              </ScrollView>
+              </View>
             )}
           </View>
 
@@ -592,8 +500,8 @@ export default function ProjectOverviewScreen() {
               >
                 <View style={styles.toolItemLeft}>
                   <IconSymbol 
-                    ios_icon_name="square.grid.2x2" 
-                    android_material_icon_name="dashboard" 
+                    ios_icon_name="rectangle.and.pencil.and.ellipsis" 
+                    android_material_icon_name="edit" 
                     size={20} 
                     color={colors.phaseFraming} 
                   />
@@ -613,7 +521,7 @@ export default function ProjectOverviewScreen() {
               >
                 <View style={styles.toolItemLeft}>
                   <IconSymbol 
-                    ios_icon_name="arrow.triangle.2.circlepath" 
+                    ios_icon_name="arrow.triangle.2.circlepath.camera" 
                     android_material_icon_name="refresh" 
                     size={20} 
                     color={colors.phaseExploration} 
@@ -725,19 +633,6 @@ export default function ProjectOverviewScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Floating Tab Bar for Project Navigation */}
-      <FloatingTabBar tabs={projectTabs} projectId={projectId} />
-
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={new Date(project.startDate)}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
 
       {/* Phase Menu Modal */}
       <Modal
@@ -990,7 +885,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 120,
+    paddingBottom: 40,
   },
   emptyContainer: {
     flex: 1,
@@ -1020,53 +915,28 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 8,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    gap: 12,
-  },
   projectTitle: {
-    flex: 1,
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: colors.text,
   },
-  titleInput: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-    padding: 0,
-  },
-  dateRow: {
+  infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  infoItem: {
+    flex: 1,
   },
   secondaryLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
+    marginBottom: 4,
   },
   secondaryValue: {
     fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
-  },
-  totalsRow: {
-    flexDirection: 'row',
-    gap: 24,
-  },
-  totalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   phaseSelector: {
     flexDirection: 'row',
@@ -1091,22 +961,27 @@ const styles = StyleSheet.create({
   },
   visualsHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   addButton: {
     padding: 4,
   },
-  artifactStrip: {
+  artifactGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  artifactContainer: {
-    marginRight: 12,
+  artifactGridItem: {
+    width: '31%',
+    aspectRatio: 1,
   },
   artifactThumb: {
-    width: 100,
-    height: 100,
+    width: '100%',
+    height: '100%',
     backgroundColor: colors.divider,
+    position: 'relative',
   },
   artifactImage: {
     width: '100%',
@@ -1119,10 +994,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  artifactActions: {
+  artifactLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  artifactOverlayActions: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
+    gap: 4,
+  },
+  artifactActionButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    padding: 4,
   },
   toolsList: {
     backgroundColor: '#FFFFFF',
