@@ -7,6 +7,7 @@ export const colors = {
   textSecondary: '#555555',
   divider: '#DDDDDD',
   primary: '#1d6a89',
+  primaryButton: '#1d6a89',
   
   // Phase colors
   phaseFraming: '#1E4DD8',
