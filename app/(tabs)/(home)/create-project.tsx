@@ -19,6 +19,15 @@ import { saveProject, Artifact } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 
+const BAUHAUS_COLORS = {
+  background: '#FAFAF7',
+  text: '#111111',
+  textSecondary: '#555555',
+  divider: '#DDDDDD',
+  primary: '#1d6a89',
+  cancelBackground: '#EEEEEE',
+};
+
 export default function CreateProjectScreen() {
   const router = useRouter();
   const [title, setTitle] = useState('');
@@ -363,7 +372,7 @@ export default function CreateProjectScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAF7',
+    backgroundColor: BAUHAUS_COLORS.background,
   },
   scrollView: {
     flex: 1,
@@ -371,7 +380,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingTop: 12,
-    paddingBottom: 140,
+    paddingBottom: 180,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -506,17 +515,17 @@ const styles = StyleSheet.create({
   },
   actions: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 40,
     left: 0,
     right: 0,
     padding: 20,
-    backgroundColor: '#FAFAF7',
+    backgroundColor: BAUHAUS_COLORS.background,
     borderTopWidth: 1,
-    borderTopColor: '#DDDDDD',
+    borderTopColor: BAUHAUS_COLORS.divider,
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: '#1d6a89',
+    backgroundColor: BAUHAUS_COLORS.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -527,12 +536,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
+    backgroundColor: BAUHAUS_COLORS.cancelBackground,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#555555',
+    color: BAUHAUS_COLORS.text,
     fontSize: 16,
     fontWeight: '500',
   },

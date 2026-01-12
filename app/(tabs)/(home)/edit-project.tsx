@@ -22,6 +22,7 @@ const BAUHAUS_COLORS = {
   divider: '#DDDDDD',
   primary: '#1d6a89',
   destructive: '#D32F2F',
+  cancelBackground: '#EEEEEE',
 };
 
 export default function EditProjectScreen() {
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 40,
     left: 0,
     right: 0,
     padding: 20,
@@ -261,13 +262,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
+    backgroundColor: BAUHAUS_COLORS.cancelBackground,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 12,
   },
   secondaryButtonText: {
-    color: BAUHAUS_COLORS.textSecondary,
+    color: BAUHAUS_COLORS.text,
     fontSize: 16,
     fontWeight: '500',
   },
