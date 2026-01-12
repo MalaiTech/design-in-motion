@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -85,6 +84,13 @@ export default function EditProjectScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
+        <Stack.Screen
+          options={{
+            title: '',
+            headerStyle: { backgroundColor: '#FAFAF7' },
+            headerTintColor: '#111111',
+          }}
+        />
         <Text style={styles.text}>Loading...</Text>
       </View>
     );
@@ -114,7 +120,7 @@ export default function EditProjectScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={100}
       >
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
           {/* Project Title */}
           <View style={styles.section}>
             <Text style={styles.label}>Project Name</Text>
@@ -148,7 +154,7 @@ export default function EditProjectScreen() {
               />
             )}
           </View>
-        </ScrollView>
+        </View>
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -182,13 +188,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BAUHAUS_COLORS.background,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  content: {
     padding: 20,
     paddingTop: 12,
-    paddingBottom: 200,
   },
   headerContainer: {
     flexDirection: 'row',

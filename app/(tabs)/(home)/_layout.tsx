@@ -67,7 +67,8 @@ export default function HomeLayout() {
           name="edit-project"
           options={{
             headerShown: true,
-            title: 'Edit Project'
+            title: 'Edit Project',
+            presentation: 'modal'
           }}
         />
         <Stack.Screen
