@@ -13,13 +13,15 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { ProjectPhase } from '@/utils/storage';
 
 export type SortOption = 'startDate' | 'updatedDate' | 'status';
+export type SortDirection = 'asc' | 'desc';
 
 interface FilterSortModalProps {
   visible: boolean;
   onClose: () => void;
   selectedStatuses: ProjectPhase[];
   sortOption: SortOption;
-  onApply: (statuses: ProjectPhase[], sort: SortOption) => void;
+  sortDirection: SortDirection;
+  onApply: (statuses: ProjectPhase[], sort: SortOption, direction: SortDirection) => void;
 }
 
 const statusOptions: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
@@ -29,10 +31,12 @@ export default function FilterSortModal({
   onClose,
   selectedStatuses,
   sortOption,
+  sortDirection,
   onApply,
 }: FilterSortModalProps) {
   const [tempStatuses, setTempStatuses] = useState<ProjectPhase[]>(selectedStatuses);
   const [tempSort, setTempSort] = useState<SortOption>(sortOption);
+  const [tempDirection, setTempDirection] = useState<SortDirection>(sortDirection);
 
   const toggleStatus = (status: ProjectPhase) => {
     if (tempStatuses.includes(status)) {
@@ -42,14 +46,39 @@ export default function FilterSortModal({
     }
   };
 
+  const handleSortSelect = (option: SortOption) => {
+    if (tempSort === option) {
+      // Toggle direction if same option selected
+      setTempDirection(tempDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new option with default direction
+      setTempSort(option);
+      setTempDirection(option === 'startDate' || option === 'updatedDate' ? 'desc' : 'asc');
+    }
+  };
+
   const handleApply = () => {
-    onApply(tempStatuses, tempSort);
+    onApply(tempStatuses, tempSort, tempDirection);
     onClose();
   };
 
   const handleReset = () => {
     setTempStatuses([]);
     setTempSort('startDate');
+    setTempDirection('desc');
+  };
+
+  const getSortLabel = (option: SortOption): string => {
+    switch (option) {
+      case 'startDate':
+        return 'Starting Date';
+      case 'updatedDate':
+        return 'Latest Update';
+      case 'status':
+        return 'Status';
+      default:
+        return '';
+    }
   };
 
   return (
@@ -108,24 +137,53 @@ export default function FilterSortModal({
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Sort by</Text>
+              <Text style={styles.sectionSubtitle}>Tap to toggle ascending/descending</Text>
               {[
-                { value: 'startDate' as SortOption, label: 'Starting Date (Newest to Oldest)' },
-                { value: 'updatedDate' as SortOption, label: 'Latest Update' },
-                { value: 'status' as SortOption, label: 'Status' },
-              ].map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={styles.radioRow}
-                  onPress={() => setTempSort(option.value)}
-                >
-                  <View style={styles.radio}>
-                    {tempSort === option.value && (
-                      <View style={styles.radioInner} />
+                { value: 'startDate' as SortOption },
+                { value: 'updatedDate' as SortOption },
+                { value: 'status' as SortOption },
+              ].map((option) => {
+                const isSelected = tempSort === option.value;
+                const showAsc = isSelected && tempDirection === 'asc';
+                const showDesc = isSelected && tempDirection === 'desc';
+                
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={styles.sortRow}
+                    onPress={() => handleSortSelect(option.value)}
+                  >
+                    <View style={styles.sortLeft}>
+                      <View style={styles.radio}>
+                        {isSelected && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
+                      <Text style={styles.radioLabel}>{getSortLabel(option.value)}</Text>
+                    </View>
+                    {isSelected && (
+                      <View style={styles.directionIndicator}>
+                        {showDesc && (
+                          <IconSymbol
+                            ios_icon_name="arrow.down"
+                            android_material_icon_name="arrow-downward"
+                            size={20}
+                            color={colors.text}
+                          />
+                        )}
+                        {showAsc && (
+                          <IconSymbol
+                            ios_icon_name="arrow.up"
+                            android_material_icon_name="arrow-upward"
+                            size={20}
+                            color={colors.text}
+                          />
+                        )}
+                      </View>
                     )}
-                  </View>
-                  <Text style={styles.radioLabel}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
 
@@ -212,10 +270,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
-  radioRow: {
+  sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
+  },
+  sortLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   radio: {
     width: 24,
@@ -236,6 +300,9 @@ const styles = StyleSheet.create({
   radioLabel: {
     fontSize: 16,
     color: colors.text,
+  },
+  directionIndicator: {
+    marginLeft: 8,
   },
   footer: {
     flexDirection: 'row',

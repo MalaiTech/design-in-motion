@@ -13,7 +13,8 @@ import { colors, commonStyles } from '@/styles/commonStyles';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useState, useCallback } from 'react';
 import { getProjects, Project, ProjectPhase } from '@/utils/storage';
-import FilterSortModal, { SortOption } from '@/components/FilterSortModal';
+import FilterSortModal, { SortOption, SortDirection } from '@/components/FilterSortModal';
+import PDFThumbnail from '@/components/PDFThumbnail';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedStatuses, setSelectedStatuses] = useState<ProjectPhase[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('startDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const loadProjects = useCallback(async () => {
     const data = await getProjects();
@@ -64,13 +66,18 @@ export default function HomeScreen() {
 
     // Apply sorting
     const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
       if (sortOption === 'startDate') {
-        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+        comparison = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
       } else if (sortOption === 'updatedDate') {
-        return new Date(b.updatedDate).getTime() - new Date(a.updatedDate).getTime();
+        comparison = new Date(a.updatedDate).getTime() - new Date(b.updatedDate).getTime();
       } else {
-        return a.phase.localeCompare(b.phase);
+        comparison = a.phase.localeCompare(b.phase);
       }
+      
+      // Apply direction
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
 
     return sorted;
@@ -95,9 +102,10 @@ export default function HomeScreen() {
     return project.artifacts.filter(artifact => artifact.type !== 'url');
   };
 
-  const handleFilterApply = (statuses: ProjectPhase[], sort: SortOption) => {
+  const handleFilterApply = (statuses: ProjectPhase[], sort: SortOption, direction: SortDirection) => {
     setSelectedStatuses(statuses);
     setSortOption(sort);
+    setSortDirection(direction);
   };
 
   const formatDate = (dateString: string): string => {
@@ -193,14 +201,11 @@ export default function HomeScreen() {
                           resizeMode="cover"
                         />
                       ) : artifact.type === 'document' && artifact.uri ? (
-                        <View style={styles.documentPreview}>
-                          <IconSymbol
-                            ios_icon_name="doc.fill"
-                            android_material_icon_name="description"
-                            size={32}
-                            color={colors.textSecondary}
-                          />
-                        </View>
+                        <PDFThumbnail
+                          uri={artifact.uri}
+                          width={80}
+                          height={80}
+                        />
                       ) : (
                         <View style={styles.placeholderThumb} />
                       )}
@@ -225,6 +230,7 @@ export default function HomeScreen() {
         onClose={() => setFilterModalVisible(false)}
         selectedStatuses={selectedStatuses}
         sortOption={sortOption}
+        sortDirection={sortDirection}
         onApply={handleFilterApply}
       />
     </View>
@@ -237,22 +243,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
     paddingHorizontal: 16,
-    paddingTop: 48,
+    paddingTop: 60,
     paddingBottom: 16,
   },
   appIcon: {
-    width: 48,
-    height: 48,
+    width: 84,
+    height: 84,
     marginRight: 12,
   },
   headerTextContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 25,
     fontWeight: '600',
     color: colors.text,
-    lineHeight: 22,
+    lineHeight: 30,
   },
   headerSubtitle: {
     fontSize: 12,
@@ -350,15 +356,6 @@ const styles = StyleSheet.create({
   artifactImage: {
     width: '100%',
     height: '100%',
-  },
-  documentPreview: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.divider,
   },
   placeholderThumb: {
     width: '100%',
