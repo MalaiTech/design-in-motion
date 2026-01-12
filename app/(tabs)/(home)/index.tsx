@@ -117,6 +117,11 @@ export default function HomeScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const handleEditProject = (projectId: string, event: any) => {
+    event.stopPropagation();
+    router.push(`/(tabs)/(home)/edit-project?id=${projectId}`);
+  };
+
   const filteredProjects = getFilteredAndSortedProjects();
 
   if (projects.length === 0) {
@@ -184,14 +189,25 @@ export default function HomeScreen() {
             >
               <View style={styles.projectHeader}>
                 <Text style={styles.projectTitle}>{project.title}</Text>
-                <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(project.phase) }]}>
-                  <Text style={styles.phaseText}>{project.phase}</Text>
-                </View>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={(e) => handleEditProject(project.id, e)}
+                >
+                  <IconSymbol
+                    ios_icon_name="pencil"
+                    android_material_icon_name="edit"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
 
-              <View style={styles.projectDates}>
-                <Text style={styles.dateText}>Start: {formatDate(project.startDate)}</Text>
-                <Text style={styles.dateText}>Updated: {formatDate(project.updatedDate)}</Text>
+              <View style={styles.projectMeta}>
+                <Text style={styles.metaText}>Start: {formatDate(project.startDate)}</Text>
+                <Text style={styles.metaSeparator}>•</Text>
+                <Text style={styles.metaText}>Updated: {formatDate(project.updatedDate)}</Text>
+                <Text style={styles.metaSeparator}>•</Text>
+                <Text style={styles.metaText}>{project.phase}</Text>
               </View>
 
               {displayArtifacts.length > 0 && (
@@ -324,7 +340,7 @@ const styles = StyleSheet.create({
   projectHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   projectTitle: {
@@ -334,25 +350,23 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  phaseIndicator: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 0,
+  editButton: {
+    padding: 4,
   },
-  phaseText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  projectDates: {
+  projectMeta: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
     marginBottom: 16,
+    flexWrap: 'wrap',
   },
-  dateText: {
+  metaText: {
     fontSize: 11,
     color: colors.textSecondary,
+  },
+  metaSeparator: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginHorizontal: 8,
   },
   artifactStrip: {
     marginTop: 4,
