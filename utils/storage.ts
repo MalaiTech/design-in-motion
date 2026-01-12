@@ -9,6 +9,7 @@ export interface Artifact {
   uri: string;
   name?: string;
   caption?: string;
+  isFavorite?: boolean;
 }
 
 export interface Decision {

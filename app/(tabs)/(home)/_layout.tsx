@@ -8,7 +8,7 @@ export default function HomeLayout() {
       <Stack.Screen
         name="index"
         options={{
-          headerShown: Platform.OS === 'ios',
+          headerShown: false,
           title: 'Projects'
         }}
       />
@@ -53,6 +53,13 @@ export default function HomeLayout() {
         options={{
           headerShown: true,
           title: 'Exploration Loop'
+        }}
+      />
+      <Stack.Screen
+        name="timeline"
+        options={{
+          headerShown: true,
+          title: 'Timeline'
         }}
       />
     </Stack>

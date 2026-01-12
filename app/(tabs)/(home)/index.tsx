@@ -6,16 +6,21 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { colors, commonStyles } from '@/styles/commonStyles';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useState, useCallback } from 'react';
 import { getProjects, Project, ProjectPhase } from '@/utils/storage';
+import FilterSortModal, { SortOption } from '@/components/FilterSortModal';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState<ProjectPhase[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('startDate');
 
   const loadProjects = useCallback(async () => {
     const data = await getProjects();
@@ -49,61 +54,220 @@ export default function HomeScreen() {
     }
   };
 
+  const getFilteredAndSortedProjects = (): Project[] => {
+    let filtered = projects;
+
+    // Apply status filter
+    if (selectedStatuses.length > 0) {
+      filtered = projects.filter(project => selectedStatuses.includes(project.phase));
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortOption === 'startDate') {
+        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      } else if (sortOption === 'updatedDate') {
+        return new Date(b.updatedDate).getTime() - new Date(a.updatedDate).getTime();
+      } else {
+        return a.phase.localeCompare(b.phase);
+      }
+    });
+
+    return sorted;
+  };
+
+  const getDisplayArtifacts = (project: Project) => {
+    if (!project.artifacts || project.artifacts.length === 0) {
+      return [];
+    }
+
+    // Get favorite artifacts (excluding URLs)
+    const favorites = project.artifacts.filter(
+      artifact => artifact.isFavorite && artifact.type !== 'url'
+    );
+
+    // If there are favorites, show only those
+    if (favorites.length > 0) {
+      return favorites;
+    }
+
+    // Otherwise, show all artifacts except URLs
+    return project.artifacts.filter(artifact => artifact.type !== 'url');
+  };
+
+  const handleFilterApply = (statuses: ProjectPhase[], sort: SortOption) => {
+    setSelectedStatuses(statuses);
+    setSortOption(sort);
+  };
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const filteredProjects = getFilteredAndSortedProjects();
+
   if (projects.length === 0) {
     return (
       <View style={[commonStyles.container, styles.emptyContainer]}>
-        <Text style={styles.emptyTitle}>No projects yet</Text>
-        <Text style={styles.emptySubtext}>Start a project to begin exploring.</Text>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => router.push('/(tabs)/(home)/create-project')}
-        >
-          <Text style={styles.primaryButtonText}>Start Project</Text>
-        </TouchableOpacity>
+        <View style={styles.customHeader}>
+          <Image
+            source={require('@/assets/images/a01ea08f-54b3-4fdb-aa75-b084bc2b1f09.png')}
+            style={styles.appIcon}
+            resizeMode="contain"
+          />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Design in Motion</Text>
+            <Text style={styles.headerSubtitle}>An explorative development process</Text>
+          </View>
+        </View>
+        <View style={styles.emptyContent}>
+          <Text style={styles.emptyTitle}>No projects yet</Text>
+          <Text style={styles.emptySubtext}>Start a project to begin exploring.</Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => router.push('/(tabs)/(home)/create-project')}
+          >
+            <Text style={styles.primaryButtonText}>Start Project</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={commonStyles.container}>
+      <View style={styles.customHeader}>
+        <Image
+          source={require('@/assets/images/a01ea08f-54b3-4fdb-aa75-b084bc2b1f09.png')}
+          style={styles.appIcon}
+          resizeMode="contain"
+        />
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>Design in Motion</Text>
+          <Text style={styles.headerSubtitle}>An explorative development process</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setFilterModalVisible(true)}
+        >
+          <IconSymbol
+            ios_icon_name="line.3.horizontal.decrease.circle"
+            android_material_icon_name="filter-list"
+            size={24}
+            color={colors.text}
+          />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {projects.map((project) => (
-          <TouchableOpacity
-            key={project.id}
-            style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
-            onPress={() => router.push(`/(tabs)/(home)/project-overview?id=${project.id}`)}
-          >
-            <View style={styles.projectHeader}>
-              <Text style={styles.projectTitle}>{project.title}</Text>
-              <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(project.phase) }]}>
-                <Text style={styles.phaseText}>{project.phase}</Text>
+        {filteredProjects.map((project) => {
+          const displayArtifacts = getDisplayArtifacts(project);
+          
+          return (
+            <TouchableOpacity
+              key={project.id}
+              style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
+              onPress={() => router.push(`/(tabs)/(home)/project-overview?id=${project.id}`)}
+            >
+              <View style={styles.projectHeader}>
+                <Text style={styles.projectTitle}>{project.title}</Text>
+                <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(project.phase) }]}>
+                  <Text style={styles.phaseText}>{project.phase}</Text>
+                </View>
               </View>
-            </View>
-            {project.artifacts && project.artifacts.length > 0 && (
-              <ScrollView horizontal style={styles.artifactStrip} showsHorizontalScrollIndicator={false}>
-                {project.artifacts.map((artifact, index) => (
-                  <View key={index} style={styles.artifactThumb} />
-                ))}
-              </ScrollView>
-            )}
-            <Text style={styles.projectDate}>
-              Updated: {new Date(project.updatedDate).toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
-        ))}
+
+              <View style={styles.projectDates}>
+                <Text style={styles.dateText}>Start: {formatDate(project.startDate)}</Text>
+                <Text style={styles.dateText}>Updated: {formatDate(project.updatedDate)}</Text>
+              </View>
+
+              {displayArtifacts.length > 0 && (
+                <ScrollView horizontal style={styles.artifactStrip} showsHorizontalScrollIndicator={false}>
+                  {displayArtifacts.map((artifact) => (
+                    <View key={artifact.id} style={styles.artifactThumb}>
+                      {artifact.type === 'image' && artifact.uri ? (
+                        <Image
+                          source={{ uri: artifact.uri }}
+                          style={styles.artifactImage}
+                          resizeMode="cover"
+                        />
+                      ) : artifact.type === 'document' && artifact.uri ? (
+                        <View style={styles.documentPreview}>
+                          <IconSymbol
+                            ios_icon_name="doc.fill"
+                            android_material_icon_name="description"
+                            size={32}
+                            color={colors.textSecondary}
+                          />
+                        </View>
+                      ) : (
+                        <View style={styles.placeholderThumb} />
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
+
       <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push('/(tabs)/(home)/create-project')}
       >
         <IconSymbol ios_icon_name="plus" android_material_icon_name="add" color="#FFFFFF" size={24} />
       </TouchableOpacity>
+
+      <FilterSortModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        selectedStatuses={selectedStatuses}
+        sortOption={sortOption}
+        onApply={handleFilterApply}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 16,
+  },
+  appIcon: {
+    width: 48,
+    height: 48,
+    marginRight: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    lineHeight: 22,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  filterButton: {
+    padding: 8,
+  },
   emptyContainer: {
+    flex: 1,
+  },
+  emptyContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
@@ -136,7 +300,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   projectCard: {
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
     borderRadius: 0,
   },
@@ -151,6 +315,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     flex: 1,
+    marginRight: 12,
   },
   phaseIndicator: {
     paddingHorizontal: 12,
@@ -163,19 +328,42 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
   },
+  projectDates: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  dateText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
   artifactStrip: {
-    marginBottom: 12,
+    marginTop: 4,
   },
   artifactThumb: {
-    width: 60,
-    height: 60,
-    backgroundColor: colors.divider,
-    marginRight: 8,
+    width: 80,
+    height: 80,
+    marginRight: 12,
     borderRadius: 0,
+    overflow: 'hidden',
   },
-  projectDate: {
-    fontSize: 12,
-    color: colors.textSecondary,
+  artifactImage: {
+    width: '100%',
+    height: '100%',
+  },
+  documentPreview: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  placeholderThumb: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.divider,
   },
   fab: {
     position: 'absolute',
