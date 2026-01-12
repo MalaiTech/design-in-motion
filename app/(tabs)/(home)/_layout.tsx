@@ -89,9 +89,10 @@ export default function HomeLayout() {
           name="project-overview"
           options={{
             headerShown: true,
-            title: '', // No title for Project Overview
+            title: 'Project Overview',
             headerBackTitle: '', // Remove back button text, show only chevron
             headerStyle,
+            headerTitleStyle,
             headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
