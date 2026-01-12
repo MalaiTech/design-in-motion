@@ -131,6 +131,10 @@ export default function EditProjectScreen() {
               onChangeText={setTitle}
               placeholder="Enter project name"
               placeholderTextColor={BAUHAUS_COLORS.textSecondary}
+              multiline
+              numberOfLines={3}
+              maxLength={150}
+              textAlignVertical="top"
             />
           </View>
 
@@ -227,6 +231,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: BAUHAUS_COLORS.text,
+    minHeight: 72,
   },
   dateButton: {
     backgroundColor: '#FFFFFF',

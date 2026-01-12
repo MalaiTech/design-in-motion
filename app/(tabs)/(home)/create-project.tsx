@@ -247,6 +247,10 @@ export default function CreateProjectScreen() {
               onChangeText={setTitle}
               placeholder="Enter project title"
               placeholderTextColor="#999999"
+              multiline
+              numberOfLines={3}
+              maxLength={150}
+              textAlignVertical="top"
             />
           </View>
 
@@ -426,6 +430,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#111111',
+    minHeight: 72,
   },
   addButton: {
     flexDirection: 'row',
