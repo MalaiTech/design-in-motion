@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -40,11 +39,9 @@ export default function EditProjectScreen() {
   }, [id]);
 
   const loadProject = async () => {
-    console.log('Loading project with id:', id);
     const projects = await getProjects();
     const foundProject = projects.find(p => p.id === id);
     if (foundProject) {
-      console.log('Project loaded:', foundProject.title);
       setProject(foundProject);
       setTitle(foundProject.title);
       setStartDate(new Date(foundProject.startDate));
@@ -54,7 +51,6 @@ export default function EditProjectScreen() {
   const handleSave = async () => {
     if (!project) return;
 
-    console.log('Saving project changes:', title);
     const updatedProject: Project = {
       ...project,
       title: title.trim() || 'Untitled Project',
@@ -63,12 +59,10 @@ export default function EditProjectScreen() {
     };
 
     await updateProject(updatedProject);
-    console.log('Project updated successfully');
     router.back();
   };
 
   const handleDelete = () => {
-    console.log('User tapped Delete Project button');
     Alert.alert(
       'Delete Project',
       'This will permanently delete the project and all its data. This action cannot be undone.',
@@ -79,9 +73,7 @@ export default function EditProjectScreen() {
           style: 'destructive',
           onPress: async () => {
             if (project) {
-              console.log('Deleting project:', project.title);
               await deleteProject(project.id);
-              console.log('Project deleted successfully');
               router.back();
             }
           },
@@ -127,13 +119,9 @@ export default function EditProjectScreen() {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={100}
       >
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.content}>
           {/* Project Title */}
           <View style={styles.section}>
             <Text style={styles.label}>Project Name</Text>
@@ -155,10 +143,7 @@ export default function EditProjectScreen() {
             <Text style={styles.label}>Start Date</Text>
             <TouchableOpacity 
               style={styles.dateButton}
-              onPress={() => {
-                console.log('User tapped date picker');
-                setShowDatePicker(true);
-              }}
+              onPress={() => setShowDatePicker(true)}
             >
               <Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text>
             </TouchableOpacity>
@@ -169,31 +154,22 @@ export default function EditProjectScreen() {
                 display="default"
                 onChange={(event, selectedDate) => {
                   setShowDatePicker(false);
-                  if (selectedDate) {
-                    console.log('Date changed to:', selectedDate.toLocaleDateString());
-                    setStartDate(selectedDate);
-                  }
+                  if (selectedDate) setStartDate(selectedDate);
                 }}
               />
             )}
           </View>
-        </ScrollView>
+        </View>
 
         {/* Actions */}
         <View style={styles.actions}>
-          <TouchableOpacity 
-            style={styles.primaryButton} 
-            onPress={handleSave}
-          >
+          <TouchableOpacity style={styles.primaryButton} onPress={handleSave}>
             <Text style={styles.primaryButtonText}>Save Changes</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => {
-              console.log('User tapped Cancel button');
-              router.back();
-            }}
+            onPress={() => router.back()}
           >
             <Text style={styles.secondaryButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -217,13 +193,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BAUHAUS_COLORS.background,
   },
-  scrollView: {
-    flex: 1,
-  },
   content: {
     padding: 20,
     paddingTop: 12,
-    paddingBottom: 280,
   },
   headerContainer: {
     flexDirection: 'row',

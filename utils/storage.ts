@@ -78,7 +78,7 @@ export interface ExplorationDecision {
 export interface ExplorationLoop {
   id: string;
   question: string;
-  status: 'draft' | 'active' | 'paused' | 'completed';
+  status: 'active' | 'paused' | 'completed';
   updatedDate: string;
   artifactIds: string[];
   
@@ -174,7 +174,7 @@ export const deleteProject = async (projectId: string): Promise<void> => {
   try {
     const projects = await getProjects();
     const filtered = projects.filter(p => p.id !== projectId);
-    await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(filtered));
   } catch (error) {
     console.error('Error deleting project:', error);
     throw error;

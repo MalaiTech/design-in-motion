@@ -18,14 +18,13 @@ export type SortDirection = 'asc' | 'desc';
 interface FilterSortModalProps {
   visible: boolean;
   onClose: () => void;
-  selectedStatuses: (ProjectPhase | string)[];
+  selectedStatuses: ProjectPhase[];
   sortOption: SortOption;
   sortDirection: SortDirection;
-  onApply: (statuses: (ProjectPhase | string)[], sort: SortOption, direction: SortDirection) => void;
+  onApply: (statuses: ProjectPhase[], sort: SortOption, direction: SortDirection) => void;
 }
 
-const projectStatusOptions: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
-const loopStatusOptions = ['draft', 'active', 'paused', 'completed'];
+const statusOptions: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
 
 export default function FilterSortModal({
   visible,
@@ -35,17 +34,11 @@ export default function FilterSortModal({
   sortDirection,
   onApply,
 }: FilterSortModalProps) {
-  const [tempStatuses, setTempStatuses] = useState<(ProjectPhase | string)[]>(selectedStatuses);
+  const [tempStatuses, setTempStatuses] = useState<ProjectPhase[]>(selectedStatuses);
   const [tempSort, setTempSort] = useState<SortOption>(sortOption);
   const [tempDirection, setTempDirection] = useState<SortDirection>(sortDirection);
 
-  // Determine if we're filtering projects or loops based on the status values
-  const isLoopFilter = selectedStatuses.length === 0 || 
-    selectedStatuses.some(s => loopStatusOptions.includes(s as string));
-  
-  const statusOptions = isLoopFilter ? loopStatusOptions : projectStatusOptions;
-
-  const toggleStatus = (status: ProjectPhase | string) => {
+  const toggleStatus = (status: ProjectPhase) => {
     if (tempStatuses.includes(status)) {
       setTempStatuses(tempStatuses.filter(s => s !== status));
     } else {
@@ -86,10 +79,6 @@ export default function FilterSortModal({
       default:
         return '';
     }
-  };
-
-  const getStatusLabel = (status: string): string => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   return (
@@ -141,7 +130,7 @@ export default function FilterSortModal({
                       />
                     )}
                   </View>
-                  <Text style={styles.checkboxLabel}>{getStatusLabel(status)}</Text>
+                  <Text style={styles.checkboxLabel}>{status}</Text>
                 </TouchableOpacity>
               ))}
             </View>
