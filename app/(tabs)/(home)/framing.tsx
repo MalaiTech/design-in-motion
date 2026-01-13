@@ -13,7 +13,6 @@ import {
   Image,
   Alert,
   Dimensions,
-  Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -31,7 +30,6 @@ import {
 } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as Sharing from 'expo-sharing';
 
 type CertaintyCategory = 'known' | 'assumed' | 'unknown';
 
@@ -61,7 +59,6 @@ export default function FramingScreen() {
   const [editingCertaintyId, setEditingCertaintyId] = useState<string | null>(null);
   const [editingDesignSpaceId, setEditingDesignSpaceId] = useState<string | null>(null);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
-  const [editingDecisionId, setEditingDecisionId] = useState<string | null>(null);
   
   // New item inputs
   const [newCertaintyText, setNewCertaintyText] = useState('');
@@ -70,7 +67,6 @@ export default function FramingScreen() {
   
   // Decision overlay
   const [decisionSummary, setDecisionSummary] = useState('');
-  const [decisionRationale, setDecisionRationale] = useState('');
   
   const hasUnsavedChanges = useRef(false);
 
@@ -92,6 +88,17 @@ export default function FramingScreen() {
     }
   }, [projectId, router]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadProject();
+      return () => {
+        if (hasUnsavedChanges.current) {
+          saveChanges();
+        }
+      };
+    }, [loadProject, saveChanges])
+  );
+
   const saveChanges = useCallback(async () => {
     if (!project) return;
     
@@ -110,22 +117,11 @@ export default function FramingScreen() {
     hasUnsavedChanges.current = false;
   }, [project, opportunityOrigin, purpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProject();
-      return () => {
-        if (hasUnsavedChanges.current) {
-          saveChanges();
-        }
-      };
-    }, [loadProject, saveChanges])
-  );
-
   const markAsChanged = () => {
     hasUnsavedChanges.current = true;
   };
 
-  // Artifact management - UPDATED to support multiple photo selection
+  // Artifact management
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project) return;
     
@@ -140,8 +136,7 @@ export default function FramingScreen() {
                 id: Date.now().toString(),
                 type: 'url',
                 uri: url.trim(),
-                name: 'URL Link',
-                isFavorite: false,
+                name: 'URL Artifact',
               };
               
               const updatedArtifacts = [...project.artifacts, newArtifact];
@@ -178,11 +173,9 @@ export default function FramingScreen() {
           Alert.alert('Permission Required', 'Photo library permission is needed.');
           return;
         }
-        // UPDATED: Enable multiple selection
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
-          allowsMultipleSelection: true, // Enable multiple selection
         });
       } else {
         result = await DocumentPicker.getDocumentAsync({
@@ -192,20 +185,15 @@ export default function FramingScreen() {
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // UPDATED: Process all selected assets
-        const newArtifacts: Artifact[] = result.assets.map((asset, index) => {
-          const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
-          
-          return {
-            id: `${Date.now()}-${index}`,
-            type: isPDF ? 'document' : 'image',
-            uri: asset.uri,
-            name: asset.name || 'Untitled',
-            isFavorite: false,
-          };
-        });
+        const asset = result.assets[0];
+        const newArtifact: Artifact = {
+          id: Date.now().toString(),
+          type: type === 'document' ? 'document' : 'image',
+          uri: asset.uri,
+          name: asset.name || 'Untitled',
+        };
         
-        const updatedArtifacts = [...project.artifacts, ...newArtifacts];
+        const updatedArtifacts = [...project.artifacts, newArtifact];
         const updatedProject = {
           ...project,
           artifacts: updatedArtifacts,
@@ -254,7 +242,7 @@ export default function FramingScreen() {
     if (!project) return;
     
     const updatedArtifacts = project.artifacts.map(a => 
-      a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
+      a.id === artifactId ? { ...a, caption: a.caption === 'favorite' ? undefined : 'favorite' } : a
     );
     
     const updatedProject = {
@@ -265,38 +253,6 @@ export default function FramingScreen() {
     
     await updateProject(updatedProject);
     setProject(updatedProject);
-  };
-
-  const handleOpenArtifact = async (artifact: Artifact) => {
-    try {
-      if (artifact.type === 'url') {
-        // For web URLs, use Linking.openURL to open in browser
-        const canOpen = await Linking.canOpenURL(artifact.uri);
-        if (canOpen) {
-          await Linking.openURL(artifact.uri);
-        } else {
-          Alert.alert('Error', 'Cannot open this URL');
-        }
-      } else if (artifact.type === 'document') {
-        // For local documents, use Sharing to open with system apps
-        const isAvailable = await Sharing.isAvailableAsync();
-        if (isAvailable) {
-          await Sharing.shareAsync(artifact.uri, {
-            dialogTitle: 'Open with...',
-            UTI: 'public.item',
-          });
-        } else {
-          Alert.alert('Not Available', 'File sharing is not available on this device');
-        }
-      } else {
-        // For images, show in viewer
-        setSelectedArtifact(artifact);
-        setShowArtifactViewer(true);
-      }
-    } catch (error) {
-      console.error('Error opening artifact:', error);
-      Alert.alert('Error', 'Could not open this file');
-    }
   };
 
   // Certainty items
@@ -389,65 +345,24 @@ export default function FramingScreen() {
     markAsChanged();
   };
 
-  // Framing decisions - UPDATED to match Project Overview approach
+  // Framing decisions
   const handleSaveDecision = async () => {
     if (!decisionSummary.trim()) {
       Alert.alert('Required', 'Please enter a decision summary.');
       return;
     }
     
-    let updatedDecisions: FramingDecision[];
+    const newDecision: FramingDecision = {
+      id: Date.now().toString(),
+      summary: decisionSummary.trim(),
+      artifacts: [],
+      timestamp: new Date().toISOString(),
+    };
     
-    if (editingDecisionId) {
-      // Edit existing decision
-      updatedDecisions = framingDecisions.map(d => 
-        d.id === editingDecisionId 
-          ? { ...d, summary: decisionSummary.trim(), rationale: decisionRationale.trim() } as any
-          : d
-      );
-    } else {
-      // Add new decision
-      const newDecision: any = {
-        id: Date.now().toString(),
-        summary: decisionSummary.trim(),
-        rationale: decisionRationale.trim(),
-        artifacts: [],
-        timestamp: new Date().toISOString(),
-      };
-      updatedDecisions = [...framingDecisions, newDecision];
-    }
-    
-    setFramingDecisions(updatedDecisions);
+    setFramingDecisions([...framingDecisions, newDecision]);
     setDecisionSummary('');
-    setDecisionRationale('');
-    setEditingDecisionId(null);
     setShowDecisionOverlay(false);
     markAsChanged();
-  };
-
-  const handleEditDecision = (decision: any) => {
-    setDecisionSummary(decision.summary);
-    setDecisionRationale(decision.rationale || '');
-    setEditingDecisionId(decision.id);
-    setShowDecisionOverlay(true);
-  };
-
-  const handleDeleteDecision = async (decisionId: string) => {
-    Alert.alert(
-      'Delete Decision',
-      'Are you sure you want to delete this decision?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setFramingDecisions(framingDecisions.filter(d => d.id !== decisionId));
-            markAsChanged();
-          }
-        }
-      ]
-    );
   };
 
   if (!project) {
@@ -524,7 +439,7 @@ export default function FramingScreen() {
             />
           </View>
 
-          {/* 3. Artifacts (Visuals) - UPDATED to 4 columns grid */}
+          {/* 3. Artifacts (Visuals) */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <TouchableOpacity 
@@ -542,66 +457,41 @@ export default function FramingScreen() {
             </View>
             
             {project.artifacts.length > 0 && (
-              <View style={styles.artifactGrid}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactStrip}>
                 {project.artifacts.map((artifact) => (
-                  <View key={artifact.id} style={styles.artifactGridItem}>
-                    <TouchableOpacity
-                      style={styles.artifactThumb}
-                      onPress={() => handleOpenArtifact(artifact)}
-                    >
-                      {artifact.type === 'image' ? (
-                        <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                      ) : artifact.type === 'document' ? (
-                        <View style={styles.artifactDoc}>
-                          <IconSymbol 
-                            ios_icon_name="doc" 
-                            android_material_icon_name="description" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                          <Text style={styles.artifactLabel}>PDF</Text>
-                        </View>
-                      ) : artifact.type === 'url' ? (
-                        <View style={styles.artifactDoc}>
-                          <IconSymbol 
-                            ios_icon_name="link" 
-                            android_material_icon_name="link" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                          <Text style={styles.artifactLabel}>URL</Text>
-                        </View>
-                      ) : null}
-                      
-                      {/* Favorite and Delete icons in right upper corner */}
-                      <View style={styles.artifactOverlayActions}>
-                        <TouchableOpacity 
-                          style={styles.artifactActionButton}
-                          onPress={() => handleToggleArtifactFavorite(artifact.id)}
-                        >
-                          <IconSymbol 
-                            ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
-                            size={18} 
-                            color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.artifactActionButton}
-                          onPress={() => handleDeleteArtifact(artifact.id)}
-                        >
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={18} 
-                            color="#FFFFFF" 
-                          />
-                        </TouchableOpacity>
+                  <TouchableOpacity
+                    key={artifact.id}
+                    style={styles.artifactThumb}
+                    onPress={() => {
+                      setSelectedArtifact(artifact);
+                      setShowArtifactViewer(true);
+                    }}
+                  >
+                    {artifact.type === 'image' ? (
+                      <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
+                    ) : (
+                      <View style={styles.artifactDoc}>
+                        <IconSymbol 
+                          ios_icon_name="doc" 
+                          android_material_icon_name="description" 
+                          size={32} 
+                          color={colors.textSecondary} 
+                        />
                       </View>
-                    </TouchableOpacity>
-                  </View>
+                    )}
+                    {artifact.caption === 'favorite' && (
+                      <View style={styles.favoriteBadge}>
+                        <IconSymbol 
+                          ios_icon_name="star.fill" 
+                          android_material_icon_name="star" 
+                          size={16} 
+                          color="#FFD700" 
+                        />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             )}
           </View>
 
@@ -784,10 +674,10 @@ export default function FramingScreen() {
             </View>
           </View>
 
-          {/* 6. Exploration Questions - UPDATED helper text */}
+          {/* 6. Exploration Questions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Questions</Text>
-            <Text style={styles.helperText}>What are the first things we need to learn?</Text>
+            <Text style={styles.helperText}>What are the first things we ned to learn?</Text>
             
             <View style={styles.listContainer}>
               {explorationQuestions.map((question) => (
@@ -856,56 +746,35 @@ export default function FramingScreen() {
             </View>
           </View>
 
-          {/* 7. Framing Decisions & Changes - UPDATED to match Project Overview */}
+          {/* 7. Framing Decisions & Changes */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Framing Decisions & Changes</Text>
-              <TouchableOpacity onPress={() => setShowDecisionOverlay(true)}>
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={24} 
-                  color={colors.phaseFraming} 
-                />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionTitle}>Framing Decisions & Changes</Text>
             <Text style={styles.helperText}>Note important changes and decisions</Text>
             
-            {framingDecisions.length === 0 ? (
-              <View style={styles.emptyDecisions}>
-                <Text style={styles.emptyDecisionsText}>No decisions recorded yet</Text>
-              </View>
-            ) : (
-              <View style={styles.decisionsList}>
-                {framingDecisions.map((decision: any) => (
-                  <View key={decision.id} style={styles.decisionCard}>
-                    <View style={styles.decisionHeader}>
-                      <Text style={styles.decisionDate}>
+            <TouchableOpacity 
+              style={styles.addDecisionButton}
+              onPress={() => setShowDecisionOverlay(true)}
+            >
+              <IconSymbol 
+                ios_icon_name="plus.circle" 
+                android_material_icon_name="add-circle" 
+                size={20} 
+                color={colors.phaseFraming} 
+              />
+              <Text style={styles.addDecisionText}>Add Decision</Text>
+            </TouchableOpacity>
+            
+            {framingDecisions.length > 0 && (
+              <View style={styles.decisionsTimeline}>
+                {framingDecisions.map((decision) => (
+                  <View key={decision.id} style={styles.decisionItem}>
+                    <View style={styles.decisionDot} />
+                    <View style={styles.decisionContent}>
+                      <Text style={styles.decisionSummary}>{decision.summary}</Text>
+                      <Text style={styles.decisionTimestamp}>
                         {new Date(decision.timestamp).toLocaleDateString()}
                       </Text>
-                      <View style={styles.decisionActions}>
-                        <TouchableOpacity onPress={() => handleEditDecision(decision)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteDecision(decision.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
                     </View>
-                    <Text style={styles.decisionSummary}>{decision.summary}</Text>
-                    {decision.rationale && (
-                      <Text style={styles.decisionRationale}>{decision.rationale}</Text>
-                    )}
                   </View>
                 ))}
               </View>
@@ -952,7 +821,7 @@ export default function FramingScreen() {
                 size={24} 
                 color={colors.text} 
               />
-              <Text style={styles.overlayOptionText}>Photos (Multiple)</Text>
+              <Text style={styles.overlayOptionText}>Photos</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -1015,10 +884,10 @@ export default function FramingScreen() {
                 style={styles.artifactViewerAction}
               >
                 <IconSymbol 
-                  ios_icon_name={selectedArtifact?.isFavorite ? "star.fill" : "star"} 
-                  android_material_icon_name={selectedArtifact?.isFavorite ? "star" : "star-border"} 
+                  ios_icon_name={selectedArtifact?.caption === 'favorite' ? "star.fill" : "star"} 
+                  android_material_icon_name={selectedArtifact?.caption === 'favorite' ? "star" : "star-border"} 
                   size={28} 
-                  color={selectedArtifact?.isFavorite ? "#FFD700" : "#FFFFFF"} 
+                  color={selectedArtifact?.caption === 'favorite' ? "#FFD700" : "#FFFFFF"} 
                 />
               </TouchableOpacity>
               
@@ -1058,17 +927,12 @@ export default function FramingScreen() {
         </View>
       </Modal>
 
-      {/* Add/Edit Decision Overlay - UPDATED to match Project Overview */}
+      {/* Add Decision Overlay */}
       <Modal
         visible={showDecisionOverlay}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setShowDecisionOverlay(false);
-          setEditingDecisionId(null);
-          setDecisionSummary('');
-          setDecisionRationale('');
-        }}
+        onRequestClose={() => setShowDecisionOverlay(false)}
       >
         <KeyboardAvoidingView 
           style={styles.overlayBackground}
@@ -1077,34 +941,18 @@ export default function FramingScreen() {
           <TouchableOpacity 
             style={{ flex: 1 }}
             activeOpacity={1}
-            onPress={() => {
-              setShowDecisionOverlay(false);
-              setEditingDecisionId(null);
-              setDecisionSummary('');
-              setDecisionRationale('');
-            }}
+            onPress={() => setShowDecisionOverlay(false)}
           >
             <View style={styles.decisionOverlay}>
-              <Text style={styles.overlayTitle}>
-                {editingDecisionId ? 'Edit Decision' : 'Add Decision'}
-              </Text>
+              <Text style={styles.overlayTitle}>Add Decision</Text>
               
-              <Text style={styles.inputLabel}>Decision Summary</Text>
+              <Text style={styles.inputLabel}>Decision / Change Summary</Text>
               <TextInput
-                style={styles.input}
-                placeholder="What was decided?"
+                style={[styles.input, styles.textArea]}
+                placeholder="What was decided or changed?"
                 placeholderTextColor={colors.textSecondary}
                 value={decisionSummary}
                 onChangeText={setDecisionSummary}
-              />
-              
-              <Text style={styles.inputLabel}>Rationale</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Why was this decision made?"
-                placeholderTextColor={colors.textSecondary}
-                value={decisionRationale}
-                onChangeText={setDecisionRationale}
                 multiline
                 numberOfLines={4}
               />
@@ -1114,8 +962,6 @@ export default function FramingScreen() {
                   style={styles.decisionCancelButton}
                   onPress={() => {
                     setDecisionSummary('');
-                    setDecisionRationale('');
-                    setEditingDecisionId(null);
                     setShowDecisionOverlay(false);
                   }}
                 >
@@ -1199,20 +1045,15 @@ const styles = StyleSheet.create({
     color: colors.phaseFraming,
     fontWeight: '600',
   },
-  artifactGrid: {
+  artifactStrip: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
     marginTop: 12,
   },
-  artifactGridItem: {
-    width: '23%', // UPDATED: 4 columns (4 * 23% + 3 * 8px gap = ~100%)
-    aspectRatio: 1,
-  },
   artifactThumb: {
-    width: '100%',
-    height: '100%',
+    width: 100,
+    height: 100,
     backgroundColor: colors.divider,
+    marginRight: 8,
     position: 'relative',
   },
   artifactImage: {
@@ -1226,21 +1067,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  artifactLabel: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  artifactOverlayActions: {
+  favoriteBadge: {
     position: 'absolute',
     top: 4,
     right: 4,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  artifactActionButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 12,
     padding: 4,
   },
@@ -1309,51 +1140,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
-  emptyDecisions: {
-    padding: 24,
-    backgroundColor: '#FFFFFF',
+  addDecisionButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.divider,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    gap: 8,
   },
-  emptyDecisionsText: {
-    fontSize: 14,
-    color: colors.textSecondary,
+  addDecisionText: {
+    fontSize: 16,
+    color: colors.phaseFraming,
+    fontWeight: '600',
   },
-  decisionsList: {
-    gap: 12,
-  },
-  decisionCard: {
+  decisionsTimeline: {
+    marginTop: 16,
     backgroundColor: '#FFFFFF',
     padding: 16,
-    borderWidth: 1,
-    borderColor: colors.divider,
   },
-  decisionHeader: {
+  decisionItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  decisionDate: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: '500',
+  decisionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.phaseFraming,
+    marginTop: 4,
+    marginRight: 12,
   },
-  decisionActions: {
-    flexDirection: 'row',
-    gap: 12,
+  decisionContent: {
+    flex: 1,
   },
   decisionSummary: {
     fontSize: 16,
-    fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
   },
-  decisionRationale: {
-    fontSize: 14,
+  decisionTimestamp: {
+    fontSize: 12,
     color: colors.textSecondary,
-    lineHeight: 20,
   },
   overlayBackground: {
     flex: 1,
