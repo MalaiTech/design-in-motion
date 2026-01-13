@@ -14,6 +14,7 @@ import {
   Alert,
   Dimensions,
   Linking,
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -72,9 +73,15 @@ export default function FramingScreen() {
   const [decisionSummary, setDecisionSummary] = useState('');
   const [decisionRationale, setDecisionRationale] = useState('');
   
+  // Refs for edit inputs
+  const certaintyInputRef = useRef<TextInput>(null);
+  const designSpaceInputRef = useRef<TextInput>(null);
+  const questionInputRef = useRef<TextInput>(null);
+  
   const hasUnsavedChanges = useRef(false);
 
   const loadProject = useCallback(async () => {
+    console.log('Framing: Loading project', projectId);
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
     if (found) {
@@ -95,6 +102,7 @@ export default function FramingScreen() {
   const saveChanges = useCallback(async () => {
     if (!project) return;
     
+    console.log('Framing: Saving changes');
     const updatedProject: Project = {
       ...project,
       opportunityOrigin,
@@ -107,6 +115,7 @@ export default function FramingScreen() {
     };
     
     await updateProject(updatedProject);
+    setProject(updatedProject);
     hasUnsavedChanges.current = false;
   }, [project, opportunityOrigin, purpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
 
@@ -299,10 +308,11 @@ export default function FramingScreen() {
     }
   };
 
-  // Certainty items
+  // Certainty items - FIXED: Prevent keyboard from dismissing
   const handleAddCertaintyItem = () => {
     if (!newCertaintyText.trim()) return;
     
+    console.log('Adding certainty item:', newCertaintyText);
     const newItem: CertaintyItem = {
       id: Date.now().toString(),
       text: newCertaintyText.trim(),
@@ -315,11 +325,13 @@ export default function FramingScreen() {
   };
 
   const handleDeleteCertaintyItem = (id: string) => {
+    console.log('Deleting certainty item:', id);
     setCertaintyItems(certaintyItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditCertaintyItem = (id: string, newText: string) => {
+    console.log('Editing certainty item:', id, newText);
     setCertaintyItems(certaintyItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -327,10 +339,16 @@ export default function FramingScreen() {
     markAsChanged();
   };
 
-  // Design space items
+  const handleStartEditCertainty = (id: string) => {
+    console.log('Starting edit certainty:', id);
+    setEditingCertaintyId(id);
+  };
+
+  // Design space items - FIXED: Prevent keyboard from dismissing
   const handleAddDesignSpaceItem = () => {
     if (!newDesignSpaceText.trim()) return;
     
+    console.log('Adding design space item:', newDesignSpaceText);
     const newItem: DesignSpaceItem = {
       id: Date.now().toString(),
       text: newDesignSpaceText.trim(),
@@ -342,11 +360,13 @@ export default function FramingScreen() {
   };
 
   const handleDeleteDesignSpaceItem = (id: string) => {
+    console.log('Deleting design space item:', id);
     setDesignSpaceItems(designSpaceItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditDesignSpaceItem = (id: string, newText: string) => {
+    console.log('Editing design space item:', id, newText);
     setDesignSpaceItems(designSpaceItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -354,10 +374,16 @@ export default function FramingScreen() {
     markAsChanged();
   };
 
-  // Exploration questions
+  const handleStartEditDesignSpace = (id: string) => {
+    console.log('Starting edit design space:', id);
+    setEditingDesignSpaceId(id);
+  };
+
+  // Exploration questions - FIXED: Save immediately when favoriting
   const handleAddExplorationQuestion = () => {
     if (!newQuestionText.trim()) return;
     
+    console.log('Adding exploration question:', newQuestionText);
     const newQuestion: ExplorationQuestion = {
       id: Date.now().toString(),
       text: newQuestionText.trim(),
@@ -370,11 +396,13 @@ export default function FramingScreen() {
   };
 
   const handleDeleteExplorationQuestion = (id: string) => {
+    console.log('Deleting exploration question:', id);
     setExplorationQuestions(explorationQuestions.filter(q => q.id !== id));
     markAsChanged();
   };
 
   const handleEditExplorationQuestion = (id: string, newText: string) => {
+    console.log('Editing exploration question:', id, newText);
     setExplorationQuestions(explorationQuestions.map(q => 
       q.id === id ? { ...q, text: newText } : q
     ));
@@ -382,11 +410,33 @@ export default function FramingScreen() {
     markAsChanged();
   };
 
-  const handleToggleQuestionFavorite = (id: string) => {
-    setExplorationQuestions(explorationQuestions.map(q => 
+  const handleStartEditQuestion = (id: string) => {
+    console.log('Starting edit question:', id);
+    setEditingQuestionId(id);
+  };
+
+  // FIXED: Save immediately when toggling favorite
+  const handleToggleQuestionFavorite = async (id: string) => {
+    if (!project) return;
+    
+    console.log('Toggling question favorite:', id);
+    const updatedQuestions = explorationQuestions.map(q => 
       q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
-    ));
-    markAsChanged();
+    );
+    
+    // Update state
+    setExplorationQuestions(updatedQuestions);
+    
+    // Save immediately to storage
+    const updatedProject: Project = {
+      ...project,
+      explorationQuestions: updatedQuestions,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
+    setProject(updatedProject);
+    hasUnsavedChanges.current = false;
   };
 
   // Framing decisions - UPDATED to match Project Overview approach
@@ -398,6 +448,7 @@ export default function FramingScreen() {
     
     if (!project) return;
     
+    console.log('Saving decision:', decisionSummary);
     let updatedDecisions: FramingDecision[];
     
     if (editingDecisionId) {
@@ -441,6 +492,7 @@ export default function FramingScreen() {
   };
 
   const handleEditDecision = (decision: any) => {
+    console.log('Editing decision:', decision.id);
     setDecisionSummary(decision.summary);
     setDecisionRationale(decision.rationale || '');
     setEditingDecisionId(decision.id);
@@ -457,6 +509,7 @@ export default function FramingScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            console.log('Deleting decision:', decisionId);
             setFramingDecisions(framingDecisions.filter(d => d.id !== decisionId));
             markAsChanged();
           }
@@ -502,6 +555,7 @@ export default function FramingScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {/* 1. Opportunity Origin */}
           <View style={styles.section}>
@@ -518,6 +572,8 @@ export default function FramingScreen() {
               }}
               multiline
               numberOfLines={4}
+              returnKeyType="default"
+              blurOnSubmit={false}
             />
           </View>
 
@@ -536,6 +592,8 @@ export default function FramingScreen() {
               }}
               multiline
               numberOfLines={4}
+              returnKeyType="default"
+              blurOnSubmit={false}
             />
           </View>
 
@@ -675,23 +733,31 @@ export default function FramingScreen() {
             {/* Helper text for selected category */}
             <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
             
-            {/* List for selected category */}
+            {/* List for selected category - FIXED: Prevent keyboard dismissal */}
             <View style={styles.listContainer}>
               {getCertaintyItemsByCategory(selectedCertaintyCategory).map((item) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingCertaintyId === item.id ? (
                     <TextInput
+                      ref={certaintyInputRef}
                       style={styles.listItemInput}
                       value={item.text}
-                      onChangeText={(text) => handleEditCertaintyItem(item.id, text)}
-                      onBlur={() => setEditingCertaintyId(null)}
+                      onChangeText={(text) => {
+                        setCertaintyItems(certaintyItems.map(i => 
+                          i.id === item.id ? { ...i, text } : i
+                        ));
+                      }}
+                      onSubmitEditing={() => handleEditCertaintyItem(item.id, item.text)}
+                      onBlur={() => handleEditCertaintyItem(item.id, item.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
                     />
                   ) : (
-                    <>
+                    <React.Fragment>
                       <Text style={styles.listItemText}>{item.text}</Text>
                       <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => setEditingCertaintyId(item.id)}>
+                        <TouchableOpacity onPress={() => handleStartEditCertainty(item.id)}>
                           <IconSymbol 
                             ios_icon_name="pencil" 
                             android_material_icon_name="edit" 
@@ -708,7 +774,7 @@ export default function FramingScreen() {
                           />
                         </TouchableOpacity>
                       </View>
-                    </>
+                    </React.Fragment>
                   )}
                 </View>
               ))}
@@ -722,6 +788,7 @@ export default function FramingScreen() {
                   value={newCertaintyText}
                   onChangeText={setNewCertaintyText}
                   onSubmitEditing={handleAddCertaintyItem}
+                  returnKeyType="done"
                 />
                 <TouchableOpacity onPress={handleAddCertaintyItem}>
                   <IconSymbol 
@@ -740,22 +807,31 @@ export default function FramingScreen() {
             <Text style={styles.sectionTitle}>Design Space and Constraints</Text>
             <Text style={styles.helperText}>What limits or bounderies must be respected? (e.g. time, budget, technology, ethics)</Text>
             
+            {/* FIXED: Prevent keyboard dismissal */}
             <View style={styles.listContainer}>
               {designSpaceItems.map((item) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingDesignSpaceId === item.id ? (
                     <TextInput
+                      ref={designSpaceInputRef}
                       style={styles.listItemInput}
                       value={item.text}
-                      onChangeText={(text) => handleEditDesignSpaceItem(item.id, text)}
-                      onBlur={() => setEditingDesignSpaceId(null)}
+                      onChangeText={(text) => {
+                        setDesignSpaceItems(designSpaceItems.map(i => 
+                          i.id === item.id ? { ...i, text } : i
+                        ));
+                      }}
+                      onSubmitEditing={() => handleEditDesignSpaceItem(item.id, item.text)}
+                      onBlur={() => handleEditDesignSpaceItem(item.id, item.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
                     />
                   ) : (
-                    <>
+                    <React.Fragment>
                       <Text style={styles.listItemText}>{item.text}</Text>
                       <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => setEditingDesignSpaceId(item.id)}>
+                        <TouchableOpacity onPress={() => handleStartEditDesignSpace(item.id)}>
                           <IconSymbol 
                             ios_icon_name="pencil" 
                             android_material_icon_name="edit" 
@@ -772,7 +848,7 @@ export default function FramingScreen() {
                           />
                         </TouchableOpacity>
                       </View>
-                    </>
+                    </React.Fragment>
                   )}
                 </View>
               ))}
@@ -786,6 +862,7 @@ export default function FramingScreen() {
                   value={newDesignSpaceText}
                   onChangeText={setNewDesignSpaceText}
                   onSubmitEditing={handleAddDesignSpaceItem}
+                  returnKeyType="done"
                 />
                 <TouchableOpacity onPress={handleAddDesignSpaceItem}>
                   <IconSymbol 
@@ -799,7 +876,7 @@ export default function FramingScreen() {
             </View>
           </View>
 
-          {/* 6. Exploration Questions - UPDATED helper text */}
+          {/* 6. Exploration Questions - FIXED: Prevent keyboard dismissal and save favorite immediately */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Questions</Text>
             <Text style={styles.helperText}>What are the first things we need to learn?</Text>
@@ -809,14 +886,22 @@ export default function FramingScreen() {
                 <View key={question.id} style={styles.listItem}>
                   {editingQuestionId === question.id ? (
                     <TextInput
+                      ref={questionInputRef}
                       style={styles.listItemInput}
                       value={question.text}
-                      onChangeText={(text) => handleEditExplorationQuestion(question.id, text)}
-                      onBlur={() => setEditingQuestionId(null)}
+                      onChangeText={(text) => {
+                        setExplorationQuestions(explorationQuestions.map(q => 
+                          q.id === question.id ? { ...q, text } : q
+                        ));
+                      }}
+                      onSubmitEditing={() => handleEditExplorationQuestion(question.id, question.text)}
+                      onBlur={() => handleEditExplorationQuestion(question.id, question.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
                     />
                   ) : (
-                    <>
+                    <React.Fragment>
                       <Text style={styles.listItemText}>{question.text}</Text>
                       <View style={styles.listItemActions}>
                         <TouchableOpacity onPress={() => handleToggleQuestionFavorite(question.id)}>
@@ -827,7 +912,7 @@ export default function FramingScreen() {
                             color={question.isFavorite ? "#FFD700" : colors.textSecondary} 
                           />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingQuestionId(question.id)}>
+                        <TouchableOpacity onPress={() => handleStartEditQuestion(question.id)}>
                           <IconSymbol 
                             ios_icon_name="pencil" 
                             android_material_icon_name="edit" 
@@ -844,7 +929,7 @@ export default function FramingScreen() {
                           />
                         </TouchableOpacity>
                       </View>
-                    </>
+                    </React.Fragment>
                   )}
                 </View>
               ))}
@@ -858,6 +943,7 @@ export default function FramingScreen() {
                   value={newQuestionText}
                   onChangeText={setNewQuestionText}
                   onSubmitEditing={handleAddExplorationQuestion}
+                  returnKeyType="done"
                 />
                 <TouchableOpacity onPress={handleAddExplorationQuestion}>
                   <IconSymbol 
@@ -1085,6 +1171,7 @@ export default function FramingScreen() {
                 placeholderTextColor={colors.textSecondary}
                 value={decisionSummary}
                 onChangeText={setDecisionSummary}
+                returnKeyType="next"
               />
               
               <Text style={styles.inputLabel}>Rationale</Text>
@@ -1096,6 +1183,8 @@ export default function FramingScreen() {
                 onChangeText={setDecisionRationale}
                 multiline
                 numberOfLines={4}
+                returnKeyType="default"
+                blurOnSubmit={false}
               />
               
               <View style={styles.decisionButtons}>
