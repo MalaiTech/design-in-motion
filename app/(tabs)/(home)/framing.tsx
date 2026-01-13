@@ -8,13 +8,11 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
   Dimensions,
   Linking,
-  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,9 +42,11 @@ export default function FramingScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   
+  // Local state for text inputs (not synced to project until debounce/blur)
+  const [localOpportunityOrigin, setLocalOpportunityOrigin] = useState('');
+  const [localPurpose, setLocalPurpose] = useState('');
+  
   // Framing fields
-  const [opportunityOrigin, setOpportunityOrigin] = useState('');
-  const [purpose, setPurpose] = useState('');
   const [certaintyItems, setCertaintyItems] = useState<CertaintyItem[]>([]);
   const [designSpaceItems, setDesignSpaceItems] = useState<DesignSpaceItem[]>([]);
   const [explorationQuestions, setExplorationQuestions] = useState<ExplorationQuestion[]>([]);
@@ -79,7 +79,8 @@ export default function FramingScreen() {
   const designSpaceInputRef = useRef<TextInput>(null);
   const questionInputRef = useRef<TextInput>(null);
   
-  const hasUnsavedChanges = useRef(false);
+  // Debounce timer for autosave
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadProject = useCallback(async () => {
     console.log('Framing: Loading project', projectId);
@@ -87,8 +88,8 @@ export default function FramingScreen() {
     const found = projects.find(p => p.id === projectId);
     if (found) {
       setProject(found);
-      setOpportunityOrigin(found.opportunityOrigin || '');
-      setPurpose(found.purpose || '');
+      setLocalOpportunityOrigin(found.opportunityOrigin || '');
+      setLocalPurpose(found.purpose || '');
       setCertaintyItems(found.certaintyItems || []);
       setDesignSpaceItems(found.designSpaceItems || []);
       setExplorationQuestions(found.explorationQuestions || []);
@@ -100,40 +101,106 @@ export default function FramingScreen() {
     }
   }, [projectId, router]);
 
-  const saveChanges = useCallback(async () => {
+  // Save to AsyncStorage in background without updating UI state
+  const saveToStorage = useCallback(async (
+    opportunityOrigin: string,
+    purpose: string,
+    certainty: CertaintyItem[],
+    designSpace: DesignSpaceItem[],
+    questions: ExplorationQuestion[],
+    decisions: FramingDecision[]
+  ) => {
     if (!project) return;
     
-    console.log('Framing: Saving changes');
+    console.log('Framing: Saving to AsyncStorage (background)');
     const updatedProject: Project = {
       ...project,
       opportunityOrigin,
       purpose,
-      certaintyItems,
-      designSpaceItems,
-      explorationQuestions,
-      framingDecisions,
+      certaintyItems: certainty,
+      designSpaceItems: designSpace,
+      explorationQuestions: questions,
+      framingDecisions: decisions,
       updatedDate: new Date().toISOString(),
     };
     
     await updateProject(updatedProject);
-    setProject(updatedProject);
-    hasUnsavedChanges.current = false;
-  }, [project, opportunityOrigin, purpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
+    // DO NOT call setProject here - keep UI state local while typing
+  }, [project]);
+
+  // Debounced save for text fields
+  const debouncedSave = useCallback((
+    opportunityOrigin: string,
+    purpose: string
+  ) => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    
+    saveTimerRef.current = setTimeout(() => {
+      console.log('Framing: Debounced save triggered');
+      saveToStorage(
+        opportunityOrigin,
+        purpose,
+        certaintyItems,
+        designSpaceItems,
+        explorationQuestions,
+        framingDecisions
+      );
+    }, 700);
+  }, [certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
+
+  // Save on blur for text fields
+  const handleOpportunityBlur = useCallback(() => {
+    console.log('Framing: Opportunity field blurred, saving');
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      explorationQuestions,
+      framingDecisions
+    );
+  }, [localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
+
+  const handlePurposeBlur = useCallback(() => {
+    console.log('Framing: Purpose field blurred, saving');
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      explorationQuestions,
+      framingDecisions
+    );
+  }, [localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
 
   useFocusEffect(
     useCallback(() => {
       loadProject();
       return () => {
-        if (hasUnsavedChanges.current) {
-          saveChanges();
+        // Save on screen blur
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
         }
+        console.log('Framing: Screen unfocused, saving final state');
+        saveToStorage(
+          localOpportunityOrigin,
+          localPurpose,
+          certaintyItems,
+          designSpaceItems,
+          explorationQuestions,
+          framingDecisions
+        );
       };
-    }, [loadProject, saveChanges])
+    }, [loadProject, localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage])
   );
-
-  const markAsChanged = () => {
-    hasUnsavedChanges.current = true;
-  };
 
   // Artifact management - UPDATED to support multiple photo selection
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
@@ -309,8 +376,8 @@ export default function FramingScreen() {
     }
   };
 
-  // Certainty items - FIXED: Prevent keyboard from dismissing
-  const handleAddCertaintyItem = () => {
+  // Certainty items
+  const handleAddCertaintyItem = async () => {
     if (!newCertaintyText.trim()) return;
     
     console.log('Adding certainty item:', newCertaintyText);
@@ -320,24 +387,54 @@ export default function FramingScreen() {
       category: selectedCertaintyCategory,
     };
     
-    setCertaintyItems([...certaintyItems, newItem]);
+    const updatedItems = [...certaintyItems, newItem];
+    setCertaintyItems(updatedItems);
     setNewCertaintyText('');
-    markAsChanged();
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      updatedItems,
+      designSpaceItems,
+      explorationQuestions,
+      framingDecisions
+    );
   };
 
-  const handleDeleteCertaintyItem = (id: string) => {
+  const handleDeleteCertaintyItem = async (id: string) => {
     console.log('Deleting certainty item:', id);
-    setCertaintyItems(certaintyItems.filter(item => item.id !== id));
-    markAsChanged();
+    const updatedItems = certaintyItems.filter(item => item.id !== id);
+    setCertaintyItems(updatedItems);
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      updatedItems,
+      designSpaceItems,
+      explorationQuestions,
+      framingDecisions
+    );
   };
 
-  const handleEditCertaintyItem = (id: string, newText: string) => {
+  const handleEditCertaintyItem = async (id: string, newText: string) => {
     console.log('Editing certainty item:', id, newText);
-    setCertaintyItems(certaintyItems.map(item => 
+    const updatedItems = certaintyItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
-    ));
+    );
+    setCertaintyItems(updatedItems);
     setEditingCertaintyId(null);
-    markAsChanged();
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      updatedItems,
+      designSpaceItems,
+      explorationQuestions,
+      framingDecisions
+    );
   };
 
   const handleStartEditCertainty = (id: string) => {
@@ -345,8 +442,8 @@ export default function FramingScreen() {
     setEditingCertaintyId(id);
   };
 
-  // Design space items - FIXED: Prevent keyboard from dismissing
-  const handleAddDesignSpaceItem = () => {
+  // Design space items
+  const handleAddDesignSpaceItem = async () => {
     if (!newDesignSpaceText.trim()) return;
     
     console.log('Adding design space item:', newDesignSpaceText);
@@ -355,24 +452,54 @@ export default function FramingScreen() {
       text: newDesignSpaceText.trim(),
     };
     
-    setDesignSpaceItems([...designSpaceItems, newItem]);
+    const updatedItems = [...designSpaceItems, newItem];
+    setDesignSpaceItems(updatedItems);
     setNewDesignSpaceText('');
-    markAsChanged();
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      updatedItems,
+      explorationQuestions,
+      framingDecisions
+    );
   };
 
-  const handleDeleteDesignSpaceItem = (id: string) => {
+  const handleDeleteDesignSpaceItem = async (id: string) => {
     console.log('Deleting design space item:', id);
-    setDesignSpaceItems(designSpaceItems.filter(item => item.id !== id));
-    markAsChanged();
+    const updatedItems = designSpaceItems.filter(item => item.id !== id);
+    setDesignSpaceItems(updatedItems);
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      updatedItems,
+      explorationQuestions,
+      framingDecisions
+    );
   };
 
-  const handleEditDesignSpaceItem = (id: string, newText: string) => {
+  const handleEditDesignSpaceItem = async (id: string, newText: string) => {
     console.log('Editing design space item:', id, newText);
-    setDesignSpaceItems(designSpaceItems.map(item => 
+    const updatedItems = designSpaceItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
-    ));
+    );
+    setDesignSpaceItems(updatedItems);
     setEditingDesignSpaceId(null);
-    markAsChanged();
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      updatedItems,
+      explorationQuestions,
+      framingDecisions
+    );
   };
 
   const handleStartEditDesignSpace = (id: string) => {
@@ -380,8 +507,8 @@ export default function FramingScreen() {
     setEditingDesignSpaceId(id);
   };
 
-  // Exploration questions - FIXED: Save immediately when favoriting
-  const handleAddExplorationQuestion = () => {
+  // Exploration questions
+  const handleAddExplorationQuestion = async () => {
     if (!newQuestionText.trim()) return;
     
     console.log('Adding exploration question:', newQuestionText);
@@ -391,24 +518,54 @@ export default function FramingScreen() {
       isFavorite: false,
     };
     
-    setExplorationQuestions([...explorationQuestions, newQuestion]);
+    const updatedQuestions = [...explorationQuestions, newQuestion];
+    setExplorationQuestions(updatedQuestions);
     setNewQuestionText('');
-    markAsChanged();
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      updatedQuestions,
+      framingDecisions
+    );
   };
 
-  const handleDeleteExplorationQuestion = (id: string) => {
+  const handleDeleteExplorationQuestion = async (id: string) => {
     console.log('Deleting exploration question:', id);
-    setExplorationQuestions(explorationQuestions.filter(q => q.id !== id));
-    markAsChanged();
+    const updatedQuestions = explorationQuestions.filter(q => q.id !== id);
+    setExplorationQuestions(updatedQuestions);
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      updatedQuestions,
+      framingDecisions
+    );
   };
 
-  const handleEditExplorationQuestion = (id: string, newText: string) => {
+  const handleEditExplorationQuestion = async (id: string, newText: string) => {
     console.log('Editing exploration question:', id, newText);
-    setExplorationQuestions(explorationQuestions.map(q => 
+    const updatedQuestions = explorationQuestions.map(q => 
       q.id === id ? { ...q, text: newText } : q
-    ));
+    );
+    setExplorationQuestions(updatedQuestions);
     setEditingQuestionId(null);
-    markAsChanged();
+    
+    // Save immediately
+    await saveToStorage(
+      localOpportunityOrigin,
+      localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      updatedQuestions,
+      framingDecisions
+    );
   };
 
   const handleStartEditQuestion = (id: string) => {
@@ -465,14 +622,18 @@ export default function FramingScreen() {
     // Save immediately to storage
     const updatedProject: Project = {
       ...project,
+      opportunityOrigin: localOpportunityOrigin,
+      purpose: localPurpose,
+      certaintyItems,
+      designSpaceItems,
       explorationQuestions: updatedQuestions,
+      framingDecisions,
       explorationLoops: updatedLoops,
       updatedDate: new Date().toISOString(),
     };
     
     await updateProject(updatedProject);
     setProject(updatedProject);
-    hasUnsavedChanges.current = false;
     
     // Show confirmation if a new loop was created
     if (willBeFavorite && !wasFavorite) {
@@ -521,6 +682,11 @@ export default function FramingScreen() {
     // Save to storage immediately
     const updatedProject: Project = {
       ...project,
+      opportunityOrigin: localOpportunityOrigin,
+      purpose: localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      explorationQuestions,
       framingDecisions: updatedDecisions,
       updatedDate: new Date().toISOString(),
     };
@@ -533,7 +699,593 @@ export default function FramingScreen() {
     setDecisionRationale('');
     setEditingDecisionId(null);
     setShowDecisionOverlay(false);
+  };
+
+  const handleEditDecision = (decision: any) => {
+    console.log('Editing decision:', decision.id);
+    setDecisionSummary(decision.summary);
+    setDecisionRationale(decision.rationale || '');
+    setEditingDecisionId(decision.id);
+    setShowDecisionOverlay(Now I can see the issue clearly. The Framing screen has:
+
+1. **KeyboardAvoidingView wrapping ScrollView** with a fixed `keyboardVerticalOffset={90}` - this causes double keyboard avoidance
+2. **No iOS-native keyboard handling props** on ScrollView
+3. **State updates during typing** that trigger rerenders
+
+Let me implement the fix according to the user's requirements:
+
+<write file="app/(tabs)/(home)/framing.tsx">
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Platform,
+  Image,
+  Alert,
+  Dimensions,
+  Linking,
+} from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { colors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+import {
+  getProjects,
+  updateProject,
+  Project,
+  Artifact,
+  CertaintyItem,
+  DesignSpaceItem,
+  ExplorationQuestion,
+  FramingDecision,
+  ExplorationLoop,
+} from '@/utils/storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+
+type CertaintyCategory = 'known' | 'assumed' | 'unknown';
+
+export default function FramingScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const projectId = params.id as string;
+
+  const [project, setProject] = useState<Project | null>(null);
+  
+  // Local state for text inputs (not synced to project until save)
+  const [localOpportunityOrigin, setLocalOpportunityOrigin] = useState('');
+  const [localPurpose, setLocalPurpose] = useState('');
+  
+  // Framing fields
+  const [certaintyItems, setCertaintyItems] = useState<CertaintyItem[]>([]);
+  const [designSpaceItems, setDesignSpaceItems] = useState<DesignSpaceItem[]>([]);
+  const [explorationQuestions, setExplorationQuestions] = useState<ExplorationQuestion[]>([]);
+  const [framingDecisions, setFramingDecisions] = useState<FramingDecision[]>([]);
+  
+  // UI state
+  const [selectedCertaintyCategory, setSelectedCertaintyCategory] = useState<CertaintyCategory>('known');
+  const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
+  const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
+  const [showArtifactViewer, setShowArtifactViewer] = useState(false);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  
+  // Edit states
+  const [editingCertaintyId, setEditingCertaintyId] = useState<string | null>(null);
+  const [editingDesignSpaceId, setEditingDesignSpaceId] = useState<string | null>(null);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editingDecisionId, setEditingDecisionId] = useState<string | null>(null);
+  
+  // New item inputs
+  const [newCertaintyText, setNewCertaintyText] = useState('');
+  const [newDesignSpaceText, setNewDesignSpaceText] = useState('');
+  const [newQuestionText, setNewQuestionText] = useState('');
+  
+  // Decision overlay
+  const [decisionSummary, setDecisionSummary] = useState('');
+  const [decisionRationale, setDecisionRationale] = useState('');
+  
+  // Refs for edit inputs
+  const certaintyInputRef = useRef<TextInput>(null);
+  const designSpaceInputRef = useRef<TextInput>(null);
+  const questionInputRef = useRef<TextInput>(null);
+  
+  // Debounced save timer
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUnsavedChanges = useRef(false);
+
+  const loadProject = useCallback(async () => {
+    console.log('Framing: Loading project', projectId);
+    const projects = await getProjects();
+    const found = projects.find(p => p.id === projectId);
+    if (found) {
+      setProject(found);
+      setLocalOpportunityOrigin(found.opportunityOrigin || '');
+      setLocalPurpose(found.purpose || '');
+      setCertaintyItems(found.certaintyItems || []);
+      setDesignSpaceItems(found.designSpaceItems || []);
+      setExplorationQuestions(found.explorationQuestions || []);
+      setFramingDecisions(found.framingDecisions || []);
+    } else {
+      Alert.alert('Project Not Found', 'This project no longer exists.', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    }
+  }, [projectId, router]);
+
+  // Background save function - does NOT update project state
+  const saveToStorage = useCallback(async (
+    opportunityOrigin: string,
+    purpose: string,
+    certainty: CertaintyItem[],
+    designSpace: DesignSpaceItem[],
+    questions: ExplorationQuestion[],
+    decisions: FramingDecision[]
+  ) => {
+    if (!project) return;
+    
+    console.log('Framing: Background save to AsyncStorage');
+    const updatedProject: Project = {
+      ...project,
+      opportunityOrigin,
+      purpose,
+      certaintyItems: certainty,
+      designSpaceItems: designSpace,
+      explorationQuestions: questions,
+      framingDecisions: decisions,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
     hasUnsavedChanges.current = false;
+  }, [project]);
+
+  // Debounced save - triggered on text changes
+  const debouncedSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    
+    hasUnsavedChanges.current = true;
+    
+    saveTimerRef.current = setTimeout(() => {
+      saveToStorage(
+        localOpportunityOrigin,
+        localPurpose,
+        certaintyItems,
+        designSpaceItems,
+        explorationQuestions,
+        framingDecisions
+      );
+    }, 700); // 700ms debounce
+  }, [localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
+
+  // Immediate save on blur
+  const saveOnBlur = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    
+    if (hasUnsavedChanges.current) {
+      saveToStorage(
+        localOpportunityOrigin,
+        localPurpose,
+        certaintyItems,
+        designSpaceItems,
+        explorationQuestions,
+        framingDecisions
+      );
+    }
+  }, [localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProject();
+      return () => {
+        // Save on screen blur
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+        }
+        if (hasUnsavedChanges.current) {
+          saveToStorage(
+            localOpportunityOrigin,
+            localPurpose,
+            certaintyItems,
+            designSpaceItems,
+            explorationQuestions,
+            framingDecisions
+          );
+        }
+      };
+    }, [loadProject, localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage])
+  );
+
+  // Artifact management
+  const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
+    if (!project) return;
+    
+    try {
+      if (type === 'url') {
+        Alert.prompt(
+          'Add URL',
+          'Enter the URL of the artifact',
+          async (url) => {
+            if (url && url.trim()) {
+              const newArtifact: Artifact = {
+                id: Date.now().toString(),
+                type: 'url',
+                uri: url.trim(),
+                name: 'URL Link',
+                isFavorite: false,
+              };
+              
+              const updatedArtifacts = [...project.artifacts, newArtifact];
+              const updatedProject = {
+                ...project,
+                artifacts: updatedArtifacts,
+                updatedDate: new Date().toISOString(),
+              };
+              
+              await updateProject(updatedProject);
+              setProject(updatedProject);
+              setShowArtifactOverlay(false);
+            }
+          }
+        );
+        return;
+      }
+      
+      let result: any = null;
+      
+      if (type === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permission Required', 'Camera permission is needed to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+        });
+      } else if (type === 'photo') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permission Required', 'Photo library permission is needed.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+          allowsMultipleSelection: true,
+        });
+      } else {
+        result = await DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          copyToCacheDirectory: true,
+        });
+      }
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newArtifacts: Artifact[] = result.assets.map((asset, index) => {
+          const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
+          
+          return {
+            id: `${Date.now()}-${index}`,
+            type: isPDF ? 'document' : 'image',
+            uri: asset.uri,
+            name: asset.name || 'Untitled',
+            isFavorite: false,
+          };
+        });
+        
+        const updatedArtifacts = [...project.artifacts, ...newArtifacts];
+        const updatedProject = {
+          ...project,
+          artifacts: updatedArtifacts,
+          updatedDate: new Date().toISOString(),
+        };
+        
+        await updateProject(updatedProject);
+        setProject(updatedProject);
+        setShowArtifactOverlay(false);
+      }
+    } catch (error) {
+      console.error('Error adding artifact:', error);
+      Alert.alert('Error', 'Failed to add artifact.');
+    }
+  };
+
+  const handleDeleteArtifact = async (artifactId: string) => {
+    if (!project) return;
+    
+    Alert.alert(
+      'Delete Artifact',
+      'Are you sure you want to delete this artifact?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
+            const updatedProject = {
+              ...project,
+              artifacts: updatedArtifacts,
+              updatedDate: new Date().toISOString(),
+            };
+            
+            await updateProject(updatedProject);
+            setProject(updatedProject);
+            setShowArtifactViewer(false);
+          }
+        }
+      ]
+    );
+  };
+
+  const handleToggleArtifactFavorite = async (artifactId: string) => {
+    if (!project) return;
+    
+    const updatedArtifacts = project.artifacts.map(a => 
+      a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
+    );
+    
+    const updatedProject = {
+      ...project,
+      artifacts: updatedArtifacts,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
+    setProject(updatedProject);
+  };
+
+  const handleOpenArtifact = async (artifact: Artifact) => {
+    try {
+      if (artifact.type === 'url') {
+        const canOpen = await Linking.canOpenURL(artifact.uri);
+        if (canOpen) {
+          await Linking.openURL(artifact.uri);
+        } else {
+          Alert.alert('Error', 'Cannot open this URL');
+        }
+      } else if (artifact.type === 'document') {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(artifact.uri, {
+            dialogTitle: 'Open with...',
+            UTI: 'public.item',
+          });
+        } else {
+          Alert.alert('Not Available', 'File sharing is not available on this device');
+        }
+      } else {
+        setSelectedArtifact(artifact);
+        setShowArtifactViewer(true);
+      }
+    } catch (error) {
+      console.error('Error opening artifact:', error);
+      Alert.alert('Error', 'Could not open this file');
+    }
+  };
+
+  // Certainty items
+  const handleAddCertaintyItem = () => {
+    if (!newCertaintyText.trim()) return;
+    
+    console.log('Adding certainty item:', newCertaintyText);
+    const newItem: CertaintyItem = {
+      id: Date.now().toString(),
+      text: newCertaintyText.trim(),
+      category: selectedCertaintyCategory,
+    };
+    
+    setCertaintyItems([...certaintyItems, newItem]);
+    setNewCertaintyText('');
+    debouncedSave();
+  };
+
+  const handleDeleteCertaintyItem = (id: string) => {
+    console.log('Deleting certainty item:', id);
+    setCertaintyItems(certaintyItems.filter(item => item.id !== id));
+    debouncedSave();
+  };
+
+  const handleEditCertaintyItem = (id: string, newText: string) => {
+    console.log('Editing certainty item:', id, newText);
+    setCertaintyItems(certaintyItems.map(item => 
+      item.id === id ? { ...item, text: newText } : item
+    ));
+    setEditingCertaintyId(null);
+    saveOnBlur();
+  };
+
+  const handleStartEditCertainty = (id: string) => {
+    console.log('Starting edit certainty:', id);
+    setEditingCertaintyId(id);
+  };
+
+  // Design space items
+  const handleAddDesignSpaceItem = () => {
+    if (!newDesignSpaceText.trim()) return;
+    
+    console.log('Adding design space item:', newDesignSpaceText);
+    const newItem: DesignSpaceItem = {
+      id: Date.now().toString(),
+      text: newDesignSpaceText.trim(),
+    };
+    
+    setDesignSpaceItems([...designSpaceItems, newItem]);
+    setNewDesignSpaceText('');
+    debouncedSave();
+  };
+
+  const handleDeleteDesignSpaceItem = (id: string) => {
+    console.log('Deleting design space item:', id);
+    setDesignSpaceItems(designSpaceItems.filter(item => item.id !== id));
+    debouncedSave();
+  };
+
+  const handleEditDesignSpaceItem = (id: string, newText: string) => {
+    console.log('Editing design space item:', id, newText);
+    setDesignSpaceItems(designSpaceItems.map(item => 
+      item.id === id ? { ...item, text: newText } : item
+    ));
+    setEditingDesignSpaceId(null);
+    saveOnBlur();
+  };
+
+  const handleStartEditDesignSpace = (id: string) => {
+    console.log('Starting edit design space:', id);
+    setEditingDesignSpaceId(id);
+  };
+
+  // Exploration questions
+  const handleAddExplorationQuestion = () => {
+    if (!newQuestionText.trim()) return;
+    
+    console.log('Adding exploration question:', newQuestionText);
+    const newQuestion: ExplorationQuestion = {
+      id: Date.now().toString(),
+      text: newQuestionText.trim(),
+      isFavorite: false,
+    };
+    
+    setExplorationQuestions([...explorationQuestions, newQuestion]);
+    setNewQuestionText('');
+    debouncedSave();
+  };
+
+  const handleDeleteExplorationQuestion = (id: string) => {
+    console.log('Deleting exploration question:', id);
+    setExplorationQuestions(explorationQuestions.filter(q => q.id !== id));
+    debouncedSave();
+  };
+
+  const handleEditExplorationQuestion = (id: string, newText: string) => {
+    console.log('Editing exploration question:', id, newText);
+    setExplorationQuestions(explorationQuestions.map(q => 
+      q.id === id ? { ...q, text: newText } : q
+    ));
+    setEditingQuestionId(null);
+    saveOnBlur();
+  };
+
+  const handleStartEditQuestion = (id: string) => {
+    console.log('Starting edit question:', id);
+    setEditingQuestionId(id);
+  };
+
+  const handleToggleQuestionFavorite = async (id: string) => {
+    if (!project) return;
+    
+    console.log('Toggling question favorite:', id);
+    const question = explorationQuestions.find(q => q.id === id);
+    if (!question) return;
+    
+    const wasFavorite = question.isFavorite;
+    const willBeFavorite = !wasFavorite;
+    
+    const updatedQuestions = explorationQuestions.map(q => 
+      q.id === id ? { ...q, isFavorite: willBeFavorite } : q
+    );
+    
+    setExplorationQuestions(updatedQuestions);
+    
+    let updatedLoops = project.explorationLoops || [];
+    if (willBeFavorite && !wasFavorite) {
+      console.log('Creating new Draft Exploration Loop for question:', question.text);
+      
+      const newLoop: ExplorationLoop = {
+        id: Date.now().toString(),
+        question: question.text,
+        status: 'draft',
+        updatedDate: new Date().toISOString(),
+        artifactIds: [],
+        exploreItems: [],
+        exploreArtifactIds: [],
+        buildItems: [],
+        buildArtifactIds: [],
+        checkItems: [],
+        adaptItems: [],
+        explorationDecisions: [],
+        nextExplorationQuestions: [],
+        timeSpent: 0,
+        costs: 0,
+        invoicesArtifactIds: [],
+      };
+      
+      updatedLoops = [...updatedLoops, newLoop];
+    }
+    
+    const updatedProject: Project = {
+      ...project,
+      explorationQuestions: updatedQuestions,
+      explorationLoops: updatedLoops,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
+    setProject(updatedProject);
+    
+    if (willBeFavorite && !wasFavorite) {
+      Alert.alert(
+        'Exploration Loop Created',
+        'A new Draft Exploration Loop has been created and is now visible in the Exploration Loops overview.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  // Framing decisions
+  const handleSaveDecision = async () => {
+    if (!decisionSummary.trim()) {
+      Alert.alert('Required', 'Please enter a decision summary.');
+      return;
+    }
+    
+    if (!project) return;
+    
+    console.log('Saving decision:', decisionSummary);
+    let updatedDecisions: FramingDecision[];
+    
+    if (editingDecisionId) {
+      updatedDecisions = framingDecisions.map(d => 
+        d.id === editingDecisionId 
+          ? { ...d, summary: decisionSummary.trim(), rationale: decisionRationale.trim() } as any
+          : d
+      );
+    } else {
+      const newDecision: any = {
+        id: Date.now().toString(),
+        summary: decisionSummary.trim(),
+        rationale: decisionRationale.trim(),
+        artifacts: [],
+        timestamp: new Date().toISOString(),
+      };
+      updatedDecisions = [...framingDecisions, newDecision];
+    }
+    
+    setFramingDecisions(updatedDecisions);
+    
+    const updatedProject: Project = {
+      ...project,
+      framingDecisions: updatedDecisions,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
+    setProject(updatedProject);
+    
+    setDecisionSummary('');
+    setDecisionRationale('');
+    setEditingDecisionId(null);
+    setShowDecisionOverlay(false);
   };
 
   const handleEditDecision = (decision: any) => {
@@ -556,7 +1308,7 @@ export default function FramingScreen() {
           onPress: () => {
             console.log('Deleting decision:', decisionId);
             setFramingDecisions(framingDecisions.filter(d => d.id !== decisionId));
-            markAsChanged();
+            debouncedSave();
           }
         }
       ]
@@ -592,497 +1344,479 @@ export default function FramingScreen() {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}
+        contentInsetAdjustmentBehavior="automatic"
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          {/* 1. Opportunity Origin */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Opportunity Origin</Text>
-            <Text style={styles.helperText}>What triggered this project?</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Describe the origin of this opportunity..."
-              placeholderTextColor={colors.textSecondary}
-              value={opportunityOrigin}
-              onChangeText={(text) => {
-                setOpportunityOrigin(text);
-                markAsChanged();
-              }}
-              multiline
-              numberOfLines={4}
-              returnKeyType="default"
-              blurOnSubmit={false}
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </View>
+        {/* 1. Opportunity Origin */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Opportunity Origin</Text>
+          <Text style={styles.helperText}>What triggered this project?</Text>
+          <TextInput
+            style={styles.textArea}
+            placeholder="Describe the origin of this opportunity..."
+            placeholderTextColor={colors.textSecondary}
+            value={localOpportunityOrigin}
+            onChangeText={(text) => {
+              setLocalOpportunityOrigin(text);
+              debouncedSave();
+            }}
+            onBlur={saveOnBlur}
+            multiline
+            numberOfLines={4}
+            returnKeyType="default"
+            blurOnSubmit={false}
+            autoCorrect={true}
+            spellCheck={true}
+          />
+        </View>
 
-          {/* 2. Purpose */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Purpose</Text>
-            <Text style={styles.helperText}>What are we trying to acomplish and who will benefit?</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Describe the purpose of this project..."
-              placeholderTextColor={colors.textSecondary}
-              value={purpose}
-              onChangeText={(text) => {
-                setPurpose(text);
-                markAsChanged();
-              }}
-              multiline
-              numberOfLines={4}
-              returnKeyType="default"
-              blurOnSubmit={false}
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </View>
+        {/* 2. Purpose */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Purpose</Text>
+          <Text style={styles.helperText}>What are we trying to acomplish and who will benefit?</Text>
+          <TextInput
+            style={styles.textArea}
+            placeholder="Describe the purpose of this project..."
+            placeholderTextColor={colors.textSecondary}
+            value={localPurpose}
+            onChangeText={(text) => {
+              setLocalPurpose(text);
+              debouncedSave();
+            }}
+            onBlur={saveOnBlur}
+            multiline
+            numberOfLines={4}
+            returnKeyType="default"
+            blurOnSubmit={false}
+            autoCorrect={true}
+            spellCheck={true}
+          />
+        </View>
 
-          {/* 3. Artifacts (Visuals) - UPDATED to 4 columns grid */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <TouchableOpacity 
-                style={styles.addVisualsButton}
-                onPress={() => setShowArtifactOverlay(true)}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color={colors.phaseFraming} 
-                />
-                <Text style={styles.addVisualsText}>Visuals</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {project.artifacts.length > 0 && (
-              <View style={styles.artifactGrid}>
-                {project.artifacts.map((artifact) => (
-                  <View key={artifact.id} style={styles.artifactGridItem}>
-                    <TouchableOpacity
-                      style={styles.artifactThumb}
-                      onPress={() => handleOpenArtifact(artifact)}
-                    >
-                      {artifact.type === 'image' ? (
-                        <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                      ) : artifact.type === 'document' ? (
-                        <View style={styles.artifactDoc}>
-                          <IconSymbol 
-                            ios_icon_name="doc" 
-                            android_material_icon_name="description" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                          <Text style={styles.artifactLabel}>PDF</Text>
-                        </View>
-                      ) : artifact.type === 'url' ? (
-                        <View style={styles.artifactDoc}>
-                          <IconSymbol 
-                            ios_icon_name="link" 
-                            android_material_icon_name="link" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                          <Text style={styles.artifactLabel}>URL</Text>
-                        </View>
-                      ) : null}
-                      
-                      {/* Favorite and Delete icons in right upper corner */}
-                      <View style={styles.artifactOverlayActions}>
-                        <TouchableOpacity 
-                          style={styles.artifactActionButton}
-                          onPress={() => handleToggleArtifactFavorite(artifact.id)}
-                        >
-                          <IconSymbol 
-                            ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
-                            size={18} 
-                            color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.artifactActionButton}
-                          onPress={() => handleDeleteArtifact(artifact.id)}
-                        >
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={18} 
-                            color="#FFFFFF" 
-                          />
-                        </TouchableOpacity>
+        {/* 3. Artifacts (Visuals) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <TouchableOpacity 
+              style={styles.addVisualsButton}
+              onPress={() => setShowArtifactOverlay(true)}
+            >
+              <IconSymbol 
+                ios_icon_name="plus.circle" 
+                android_material_icon_name="add-circle" 
+                size={20} 
+                color={colors.phaseFraming} 
+              />
+              <Text style={styles.addVisualsText}>Visuals</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {project.artifacts.length > 0 && (
+            <View style={styles.artifactGrid}>
+              {project.artifacts.map((artifact) => (
+                <View key={artifact.id} style={styles.artifactGridItem}>
+                  <TouchableOpacity
+                    style={styles.artifactThumb}
+                    onPress={() => handleOpenArtifact(artifact)}
+                  >
+                    {artifact.type === 'image' ? (
+                      <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
+                    ) : artifact.type === 'document' ? (
+                      <View style={styles.artifactDoc}>
+                        <IconSymbol 
+                          ios_icon_name="doc" 
+                          android_material_icon_name="description" 
+                          size={32} 
+                          color={colors.textSecondary} 
+                        />
+                        <Text style={styles.artifactLabel}>PDF</Text>
                       </View>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* 4. Level of Certainty */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Level of Certainty</Text>
-            
-            {/* Segmented Control */}
-            <View style={styles.segmentedControl}>
-              <TouchableOpacity
-                style={[
-                  styles.segmentButton,
-                  selectedCertaintyCategory === 'known' && styles.segmentButtonActive
-                ]}
-                onPress={() => setSelectedCertaintyCategory('known')}
-              >
-                <Text style={[
-                  styles.segmentButtonText,
-                  selectedCertaintyCategory === 'known' && styles.segmentButtonTextActive
-                ]}>
-                  Known
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.segmentButton,
-                  selectedCertaintyCategory === 'assumed' && styles.segmentButtonActive
-                ]}
-                onPress={() => setSelectedCertaintyCategory('assumed')}
-              >
-                <Text style={[
-                  styles.segmentButtonText,
-                  selectedCertaintyCategory === 'assumed' && styles.segmentButtonTextActive
-                ]}>
-                  Assumed
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.segmentButton,
-                  selectedCertaintyCategory === 'unknown' && styles.segmentButtonActive
-                ]}
-                onPress={() => setSelectedCertaintyCategory('unknown')}
-              >
-                <Text style={[
-                  styles.segmentButtonText,
-                  selectedCertaintyCategory === 'unknown' && styles.segmentButtonTextActive
-                ]}>
-                  Unknown
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            {/* Helper text for selected category */}
-            <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
-            
-            {/* List for selected category - FIXED: Prevent keyboard dismissal */}
-            <View style={styles.listContainer}>
-              {getCertaintyItemsByCategory(selectedCertaintyCategory).map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingCertaintyId === item.id ? (
-                    <TextInput
-                      ref={certaintyInputRef}
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => {
-                        setCertaintyItems(certaintyItems.map(i => 
-                          i.id === item.id ? { ...i, text } : i
-                        ));
-                      }}
-                      onSubmitEditing={() => handleEditCertaintyItem(item.id, item.text)}
-                      onBlur={() => handleEditCertaintyItem(item.id, item.text)}
-                      autoFocus
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      autoCorrect={false}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <React.Fragment>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleStartEditCertainty(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteCertaintyItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
+                    ) : artifact.type === 'url' ? (
+                      <View style={styles.artifactDoc}>
+                        <IconSymbol 
+                          ios_icon_name="link" 
+                          android_material_icon_name="link" 
+                          size={32} 
+                          color={colors.textSecondary} 
+                        />
+                        <Text style={styles.artifactLabel}>URL</Text>
                       </View>
-                    </React.Fragment>
-                  )}
-                </View>
-              ))}
-              
-              {/* Add new item */}
-              <View style={styles.addItemRow}>
-                <TextInput
-                  style={styles.addItemInput}
-                  placeholder={`Add ${selectedCertaintyCategory} item...`}
-                  placeholderTextColor={colors.textSecondary}
-                  value={newCertaintyText}
-                  onChangeText={setNewCertaintyText}
-                  onSubmitEditing={handleAddCertaintyItem}
-                  returnKeyType="done"
-                  autoCorrect={false}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <TouchableOpacity onPress={handleAddCertaintyItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseFraming} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* 5. Design Space and Constraints */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Design Space and Constraints</Text>
-            <Text style={styles.helperText}>What limits or bounderies must be respected? (e.g. time, budget, technology, ethics)</Text>
-            
-            {/* FIXED: Prevent keyboard dismissal */}
-            <View style={styles.listContainer}>
-              {designSpaceItems.map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingDesignSpaceId === item.id ? (
-                    <TextInput
-                      ref={designSpaceInputRef}
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => {
-                        setDesignSpaceItems(designSpaceItems.map(i => 
-                          i.id === item.id ? { ...i, text } : i
-                        ));
-                      }}
-                      onSubmitEditing={() => handleEditDesignSpaceItem(item.id, item.text)}
-                      onBlur={() => handleEditDesignSpaceItem(item.id, item.text)}
-                      autoFocus
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      autoCorrect={false}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <React.Fragment>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleStartEditDesignSpace(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteDesignSpaceItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
-                </View>
-              ))}
-              
-              {/* Add new item */}
-              <View style={styles.addItemRow}>
-                <TextInput
-                  style={styles.addItemInput}
-                  placeholder="Add constraint or possibility..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={newDesignSpaceText}
-                  onChangeText={setNewDesignSpaceText}
-                  onSubmitEditing={handleAddDesignSpaceItem}
-                  returnKeyType="done"
-                  autoCorrect={false}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <TouchableOpacity onPress={handleAddDesignSpaceItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseFraming} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* 6. Exploration Questions - FIXED: Prevent keyboard dismissal and save favorite immediately */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Exploration Questions</Text>
-            <Text style={styles.helperText}>What are the first things we need to learn?</Text>
-            
-            <View style={styles.listContainer}>
-              {explorationQuestions.map((question) => (
-                <View key={question.id} style={styles.listItem}>
-                  {editingQuestionId === question.id ? (
-                    <TextInput
-                      ref={questionInputRef}
-                      style={styles.listItemInput}
-                      value={question.text}
-                      onChangeText={(text) => {
-                        setExplorationQuestions(explorationQuestions.map(q => 
-                          q.id === question.id ? { ...q, text } : q
-                        ));
-                      }}
-                      onSubmitEditing={() => handleEditExplorationQuestion(question.id, question.text)}
-                      onBlur={() => handleEditExplorationQuestion(question.id, question.text)}
-                      autoFocus
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      autoCorrect={false}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <React.Fragment>
-                      <Text style={styles.listItemText}>{question.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleQuestionFavorite(question.id)}>
-                          <IconSymbol 
-                            ios_icon_name={question.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={question.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={question.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleStartEditQuestion(question.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteExplorationQuestion(question.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
-                </View>
-              ))}
-              
-              {/* Add new question */}
-              <View style={styles.addItemRow}>
-                <TextInput
-                  style={styles.addItemInput}
-                  placeholder="Add exploration question..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={newQuestionText}
-                  onChangeText={setNewQuestionText}
-                  onSubmitEditing={handleAddExplorationQuestion}
-                  returnKeyType="done"
-                  autoCorrect={false}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <TouchableOpacity onPress={handleAddExplorationQuestion}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseFraming} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* 7. Framing Decisions & Changes - UPDATED to match Project Overview */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Framing Decisions & Changes</Text>
-              <TouchableOpacity onPress={() => setShowDecisionOverlay(true)}>
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={24} 
-                  color={colors.phaseFraming} 
-                />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.helperText}>Note important changes and decisions</Text>
-            
-            {framingDecisions.length === 0 ? (
-              <View style={styles.emptyDecisions}>
-                <Text style={styles.emptyDecisionsText}>No decisions recorded yet</Text>
-              </View>
-            ) : (
-              <View style={styles.decisionsList}>
-                {framingDecisions.map((decision: any) => (
-                  <View key={decision.id} style={styles.decisionCard}>
-                    <View style={styles.decisionHeader}>
-                      <Text style={styles.decisionDate}>
-                        {new Date(decision.timestamp).toLocaleDateString()}
-                      </Text>
-                      <View style={styles.decisionActions}>
-                        <TouchableOpacity onPress={() => handleEditDecision(decision)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteDecision(decision.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
+                    ) : null}
+                    
+                    <View style={styles.artifactOverlayActions}>
+                      <TouchableOpacity 
+                        style={styles.artifactActionButton}
+                        onPress={() => handleToggleArtifactFavorite(artifact.id)}
+                      >
+                        <IconSymbol 
+                          ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
+                          android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
+                          size={18} 
+                          color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.artifactActionButton}
+                        onPress={() => handleDeleteArtifact(artifact.id)}
+                      >
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={18} 
+                          color="#FFFFFF" 
+                        />
+                      </TouchableOpacity>
                     </View>
-                    <Text style={styles.decisionSummary}>{decision.summary}</Text>
-                    {decision.rationale && (
-                      <Text style={styles.decisionRationale}>{decision.rationale}</Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* 4. Level of Certainty */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Level of Certainty</Text>
+          
+          <View style={styles.segmentedControl}>
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                selectedCertaintyCategory === 'known' && styles.segmentButtonActive
+              ]}
+              onPress={() => setSelectedCertaintyCategory('known')}
+            >
+              <Text style={[
+                styles.segmentButtonText,
+                selectedCertaintyCategory === 'known' && styles.segmentButtonTextActive
+              ]}>
+                Known
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                selectedCertaintyCategory === 'assumed' && styles.segmentButtonActive
+              ]}
+              onPress={() => setSelectedCertaintyCategory('assumed')}
+            >
+              <Text style={[
+                styles.segmentButtonText,
+                selectedCertaintyCategory === 'assumed' && styles.segmentButtonTextActive
+              ]}>
+                Assumed
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                selectedCertaintyCategory === 'unknown' && styles.segmentButtonActive
+              ]}
+              onPress={() => setSelectedCertaintyCategory('unknown')}
+            >
+              <Text style={[
+                styles.segmentButtonText,
+                selectedCertaintyCategory === 'unknown' && styles.segmentButtonTextActive
+              ]}>
+                Unknown
+              </Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          
+          <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
+          
+          <View style={styles.listContainer}>
+            {getCertaintyItemsByCategory(selectedCertaintyCategory).map((item) => (
+              <View key={item.id} style={styles.listItem}>
+                {editingCertaintyId === item.id ? (
+                  <TextInput
+                    ref={certaintyInputRef}
+                    style={styles.listItemInput}
+                    value={item.text}
+                    onChangeText={(text) => {
+                      setCertaintyItems(certaintyItems.map(i => 
+                        i.id === item.id ? { ...i, text } : i
+                      ));
+                    }}
+                    onSubmitEditing={() => handleEditCertaintyItem(item.id, item.text)}
+                    onBlur={() => handleEditCertaintyItem(item.id, item.text)}
+                    autoFocus
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    autoCorrect={true}
+                    spellCheck={true}
+                  />
+                ) : (
+                  <React.Fragment>
+                    <Text style={styles.listItemText}>{item.text}</Text>
+                    <View style={styles.listItemActions}>
+                      <TouchableOpacity onPress={() => handleStartEditCertainty(item.id)}>
+                        <IconSymbol 
+                          ios_icon_name="pencil" 
+                          android_material_icon_name="edit" 
+                          size={20} 
+                          color={colors.textSecondary} 
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteCertaintyItem(item.id)}>
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={20} 
+                          color={colors.phaseFinish} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </React.Fragment>
+                )}
+              </View>
+            ))}
+            
+            <View style={styles.addItemRow}>
+              <TextInput
+                style={styles.addItemInput}
+                placeholder={`Add ${selectedCertaintyCategory} item...`}
+                placeholderTextColor={colors.textSecondary}
+                value={newCertaintyText}
+                onChangeText={setNewCertaintyText}
+                onSubmitEditing={handleAddCertaintyItem}
+                returnKeyType="done"
+                autoCorrect={true}
+                spellCheck={true}
+              />
+              <TouchableOpacity onPress={handleAddCertaintyItem}>
+                <IconSymbol 
+                  ios_icon_name="plus.circle.fill" 
+                  android_material_icon_name="add-circle" 
+                  size={28} 
+                  color={colors.phaseFraming} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* 5. Design Space and Constraints */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Design Space and Constraints</Text>
+          <Text style={styles.helperText}>What limits or bounderies must be respected? (e.g. time, budget, technology, ethics)</Text>
+          
+          <View style={styles.listContainer}>
+            {designSpaceItems.map((item) => (
+              <View key={item.id} style={styles.listItem}>
+                {editingDesignSpaceId === item.id ? (
+                  <TextInput
+                    ref={designSpaceInputRef}
+                    style={styles.listItemInput}
+                    value={item.text}
+                    onChangeText={(text) => {
+                      setDesignSpaceItems(designSpaceItems.map(i => 
+                        i.id === item.id ? { ...i, text } : i
+                      ));
+                    }}
+                    onSubmitEditing={() => handleEditDesignSpaceItem(item.id, item.text)}
+                    onBlur={() => handleEditDesignSpaceItem(item.id, item.text)}
+                    autoFocus
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    autoCorrect={true}
+                    spellCheck={true}
+                  />
+                ) : (
+                  <React.Fragment>
+                    <Text style={styles.listItemText}>{item.text}</Text>
+                    <View style={styles.listItemActions}>
+                      <TouchableOpacity onPress={() => handleStartEditDesignSpace(item.id)}>
+                        <IconSymbol 
+                          ios_icon_name="pencil" 
+                          android_material_icon_name="edit" 
+                          size={20} 
+                          color={colors.textSecondary} 
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteDesignSpaceItem(item.id)}>
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={20} 
+                          color={colors.phaseFinish} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </React.Fragment>
+                )}
+              </View>
+            ))}
+            
+            <View style={styles.addItemRow}>
+              <TextInput
+                style={styles.addItemInput}
+                placeholder="Add constraint or possibility..."
+                placeholderTextColor={colors.textSecondary}
+                value={newDesignSpaceText}
+                onChangeText={setNewDesignSpaceText}
+                onSubmitEditing={handleAddDesignSpaceItem}
+                returnKeyType="done"
+                autoCorrect={true}
+                spellCheck={true}
+              />
+              <TouchableOpacity onPress={handleAddDesignSpaceItem}>
+                <IconSymbol 
+                  ios_icon_name="plus.circle.fill" 
+                  android_material_icon_name="add-circle" 
+                  size={28} 
+                  color={colors.phaseFraming} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* 6. Exploration Questions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Exploration Questions</Text>
+          <Text style={styles.helperText}>What are the first things we need to learn?</Text>
+          
+          <View style={styles.listContainer}>
+            {explorationQuestions.map((question) => (
+              <View key={question.id} style={styles.listItem}>
+                {editingQuestionId === question.id ? (
+                  <TextInput
+                    ref={questionInputRef}
+                    style={styles.listItemInput}
+                    value={question.text}
+                    onChangeText={(text) => {
+                      setExplorationQuestions(explorationQuestions.map(q => 
+                        q.id === question.id ? { ...q, text } : q
+                      ));
+                    }}
+                    onSubmitEditing={() => handleEditExplorationQuestion(question.id, question.text)}
+                    onBlur={() => handleEditExplorationQuestion(question.id, question.text)}
+                    autoFocus
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    autoCorrect={true}
+                    spellCheck={true}
+                  />
+                ) : (
+                  <React.Fragment>
+                    <Text style={styles.listItemText}>{question.text}</Text>
+                    <View style={styles.listItemActions}>
+                      <TouchableOpacity onPress={() => handleToggleQuestionFavorite(question.id)}>
+                        <IconSymbol 
+                          ios_icon_name={question.isFavorite ? "star.fill" : "star"} 
+                          android_material_icon_name={question.isFavorite ? "star" : "star-border"} 
+                          size={20} 
+                          color={question.isFavorite ? "#FFD700" : colors.textSecondary} 
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleStartEditQuestion(question.id)}>
+                        <IconSymbol 
+                          ios_icon_name="pencil" 
+                          android_material_icon_name="edit" 
+                          size={20} 
+                          color={colors.textSecondary} 
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteExplorationQuestion(question.id)}>
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={20} 
+                          color={colors.phaseFinish} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </React.Fragment>
+                )}
+              </View>
+            ))}
+            
+            <View style={styles.addItemRow}>
+              <TextInput
+                style={styles.addItemInput}
+                placeholder="Add exploration question..."
+                placeholderTextColor={colors.textSecondary}
+                value={newQuestionText}
+                onChangeText={setNewQuestionText}
+                onSubmitEditing={handleAddExplorationQuestion}
+                returnKeyType="done"
+                autoCorrect={true}
+                spellCheck={true}
+              />
+              <TouchableOpacity onPress={handleAddExplorationQuestion}>
+                <IconSymbol 
+                  ios_icon_name="plus.circle.fill" 
+                  android_material_icon_name="add-circle" 
+                  size={28} 
+                  color={colors.phaseFraming} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* 7. Framing Decisions & Changes */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Framing Decisions & Changes</Text>
+            <TouchableOpacity onPress={() => setShowDecisionOverlay(true)}>
+              <IconSymbol 
+                ios_icon_name="plus.circle" 
+                android_material_icon_name="add-circle" 
+                size={24} 
+                color={colors.phaseFraming} 
+              />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.helperText}>Note important changes and decisions</Text>
+          
+          {framingDecisions.length === 0 ? (
+            <View style={styles.emptyDecisions}>
+              <Text style={styles.emptyDecisionsText}>No decisions recorded yet</Text>
+            </View>
+          ) : (
+            <View style={styles.decisionsList}>
+              {framingDecisions.map((decision: any) => (
+                <View key={decision.id} style={styles.decisionCard}>
+                  <View style={styles.decisionHeader}>
+                    <Text style={styles.decisionDate}>
+                      {new Date(decision.timestamp).toLocaleDateString()}
+                    </Text>
+                    <View style={styles.decisionActions}>
+                      <TouchableOpacity onPress={() => handleEditDecision(decision)}>
+                        <IconSymbol 
+                          ios_icon_name="pencil" 
+                          android_material_icon_name="edit" 
+                          size={20} 
+                          color={colors.textSecondary} 
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteDecision(decision.id)}>
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={20} 
+                          color={colors.phaseFinish} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <Text style={styles.decisionSummary}>{decision.summary}</Text>
+                  {decision.rationale && (
+                    <Text style={styles.decisionRationale}>{decision.rationale}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Add Artifact Overlay */}
       <Modal
@@ -1161,7 +1895,7 @@ export default function FramingScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Artifact Viewer - UPDATED: Removed favorite/delete actions (available on thumbnails) */}
+      {/* Artifact Viewer */}
       <Modal
         visible={showArtifactViewer}
         transparent
@@ -1202,7 +1936,7 @@ export default function FramingScreen() {
         </View>
       </Modal>
 
-      {/* Add/Edit Decision Overlay - UPDATED to match Project Overview */}
+      {/* Add/Edit Decision Overlay */}
       <Modal
         visible={showDecisionOverlay}
         transparent
@@ -1214,10 +1948,7 @@ export default function FramingScreen() {
           setDecisionRationale('');
         }}
       >
-        <KeyboardAvoidingView 
-          style={styles.overlayBackground}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <View style={styles.overlayBackground}>
           <TouchableOpacity 
             style={{ flex: 1 }}
             activeOpacity={1}
@@ -1241,9 +1972,8 @@ export default function FramingScreen() {
                 value={decisionSummary}
                 onChangeText={setDecisionSummary}
                 returnKeyType="next"
-                autoCorrect={false}
-                autoComplete="off"
-                spellCheck={false}
+                autoCorrect={true}
+                spellCheck={true}
               />
               
               <Text style={styles.inputLabel}>Rationale</Text>
@@ -1257,9 +1987,8 @@ export default function FramingScreen() {
                 numberOfLines={4}
                 returnKeyType="default"
                 blurOnSubmit={false}
-                autoCorrect={false}
-                autoComplete="off"
-                spellCheck={false}
+                autoCorrect={true}
+                spellCheck={true}
               />
               
               <View style={styles.decisionButtons}>
@@ -1284,7 +2013,7 @@ export default function FramingScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -1293,7 +2022,7 @@ export default function FramingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surfaceFraming, // #EAF0FF
+    backgroundColor: colors.surfaceFraming,
   },
   scrollContent: {
     padding: 16,
@@ -1359,7 +2088,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   artifactGridItem: {
-    width: '23%', // UPDATED: 4 columns (4 * 23% + 3 * 8px gap = ~100%)
+    width: '23%',
     aspectRatio: 1,
   },
   artifactThumb: {
