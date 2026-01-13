@@ -90,11 +90,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Project Overview',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerBackTitle: '', // Remove back button text, show only chevron
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
@@ -102,11 +101,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Framing',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerBackTitle: '', // Remove back button text, show only chevron
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
@@ -114,11 +112,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loops',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerBackTitle: '', // Remove back button text, show only chevron
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
@@ -126,11 +123,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loop',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerBackTitle: '', // Remove back button text, show only chevron
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
@@ -138,11 +134,10 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Timeline',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerBackTitle: '', // Remove back button text, show only chevron
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
       </Stack>
