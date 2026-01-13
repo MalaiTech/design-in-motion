@@ -105,9 +105,6 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Framing',
-            headerStyle: {
-              backgroundColor: colors.surfaceFraming, // #EAF0FF - Full screen background
-            },
           }}
         />
         <Stack.Screen
