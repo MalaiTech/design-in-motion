@@ -117,7 +117,6 @@ export default function CreateProjectScreen() {
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       console.log('Selected photos:', result.assets.length);
-      // Add all selected photos
       result.assets.forEach(asset => {
         console.log('Adding photo:', asset.uri);
         addArtifact('image', asset.uri);
@@ -237,6 +236,8 @@ export default function CreateProjectScreen() {
           style={styles.scrollView} 
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
           {/* Project Title */}
           <View style={styles.section}>
@@ -251,6 +252,11 @@ export default function CreateProjectScreen() {
               numberOfLines={3}
               maxLength={150}
               textAlignVertical="top"
+              returnKeyType="default"
+              blurOnSubmit={false}
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
             />
           </View>
 
@@ -283,6 +289,11 @@ export default function CreateProjectScreen() {
                   autoFocus
                   keyboardType="url"
                   autoCapitalize="none"
+                  returnKeyType="done"
+                  onSubmitEditing={handleUrlSubmit}
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <View style={styles.urlActions}>
                   <TouchableOpacity 

@@ -44,7 +44,7 @@ export default function ExplorationLoopScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
   
-  // Loop fields
+  // Loop fields - LOCAL STATE (not saved on every keystroke)
   const [status, setStatus] = useState<'active' | 'paused' | 'completed'>('active');
   const [question, setQuestion] = useState('');
   const [exploreItems, setExploreItems] = useState<ExploreItem[]>([]);
@@ -84,8 +84,9 @@ export default function ExplorationLoopScreen() {
   // Decision overlay
   const [decisionSummary, setDecisionSummary] = useState('');
   
-  const hasUnsavedChanges = useRef(false);
+  // Refs for debounced save
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUnsavedChanges = useRef(false);
 
   const loadProject = useCallback(async () => {
     const projects = await getProjects();
@@ -123,23 +124,11 @@ export default function ExplorationLoopScreen() {
     }
   }, [projectId, loopId, router]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProject();
-      return () => {
-        if (hasUnsavedChanges.current) {
-          saveChanges();
-        }
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-      };
-    }, [loadProject])
-  );
-
+  // DEBOUNCED SAVE - Only saves after 700ms of no changes
   const saveChanges = useCallback(async () => {
     if (!project) return;
     
+    console.log('Exploration Loop: Saving changes to AsyncStorage');
     const updatedLoop: ExplorationLoop = {
       id: loopId || Date.now().toString(),
       question,
@@ -173,20 +162,40 @@ export default function ExplorationLoopScreen() {
     };
     
     await updateProject(updatedProject);
+    setProject(updatedProject);
     hasUnsavedChanges.current = false;
   }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, adaptItems, explorationDecisions, nextExplorationQuestions, timeSpent, costs, invoicesArtifactIds]);
 
+  // Mark as changed and schedule debounced save
   const markAsChanged = useCallback(() => {
     hasUnsavedChanges.current = true;
     
-    // Debounced auto-save
+    // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
+    
+    // Schedule save after 700ms of no changes
     saveTimeoutRef.current = setTimeout(() => {
       saveChanges();
-    }, 500);
+    }, 700);
   }, [saveChanges]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProject();
+      return () => {
+        // Clear timeout on unmount
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        // Save any pending changes
+        if (hasUnsavedChanges.current) {
+          saveChanges();
+        }
+      };
+    }, [loadProject, saveChanges])
+  );
 
   // Artifact management
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
@@ -216,7 +225,6 @@ export default function ExplorationLoopScreen() {
               await updateProject(updatedProject);
               setProject(updatedProject);
               
-              // Add to appropriate section
               if (artifactSection === 'explore') {
                 setExploreArtifactIds([...exploreArtifactIds, newArtifact.id]);
               } else if (artifactSection === 'build') {
@@ -281,7 +289,6 @@ export default function ExplorationLoopScreen() {
         await updateProject(updatedProject);
         setProject(updatedProject);
         
-        // Add to appropriate section
         if (artifactSection === 'explore') {
           setExploreArtifactIds([...exploreArtifactIds, newArtifact.id]);
         } else if (artifactSection === 'build') {
@@ -321,7 +328,6 @@ export default function ExplorationLoopScreen() {
             await updateProject(updatedProject);
             setProject(updatedProject);
             
-            // Remove from section lists
             setExploreArtifactIds(exploreArtifactIds.filter(id => id !== artifactId));
             setBuildArtifactIds(buildArtifactIds.filter(id => id !== artifactId));
             setInvoicesArtifactIds(invoicesArtifactIds.filter(id => id !== artifactId));
@@ -570,6 +576,8 @@ export default function ExplorationLoopScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
           {/* 1. Status */}
           <View style={styles.section}>
@@ -598,12 +606,20 @@ export default function ExplorationLoopScreen() {
               placeholder="What are you exploring or learning?"
               placeholderTextColor={colors.textSecondary}
               value={question}
-              onChangeText={(text) => {
-                setQuestion(text);
-                markAsChanged();
+              onChangeText={setQuestion}
+              onBlur={() => {
+                // Save on blur
+                if (hasUnsavedChanges.current) {
+                  saveChanges();
+                }
               }}
               multiline
               numberOfLines={3}
+              returnKeyType="default"
+              blurOnSubmit={false}
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
             />
           </View>
 
@@ -618,9 +634,18 @@ export default function ExplorationLoopScreen() {
                     <TextInput
                       style={styles.listItemInput}
                       value={item.text}
-                      onChangeText={(text) => handleEditExploreItem(item.id, text)}
-                      onBlur={() => setEditingExploreId(null)}
+                      onChangeText={(text) => {
+                        setExploreItems(exploreItems.map(i => 
+                          i.id === item.id ? { ...i, text } : i
+                        ));
+                      }}
+                      onBlur={() => handleEditExploreItem(item.id, item.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment key={index}>
@@ -664,6 +689,10 @@ export default function ExplorationLoopScreen() {
                   value={newExploreText}
                   onChangeText={setNewExploreText}
                   onSubmitEditing={handleAddExploreItem}
+                  returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddExploreItem}>
                   <IconSymbol 
@@ -745,9 +774,18 @@ export default function ExplorationLoopScreen() {
                     <TextInput
                       style={styles.listItemInput}
                       value={item.text}
-                      onChangeText={(text) => handleEditBuildItem(item.id, text)}
-                      onBlur={() => setEditingBuildId(null)}
+                      onChangeText={(text) => {
+                        setBuildItems(buildItems.map(i => 
+                          i.id === item.id ? { ...i, text } : i
+                        ));
+                      }}
+                      onBlur={() => handleEditBuildItem(item.id, item.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment key={index}>
@@ -791,6 +829,10 @@ export default function ExplorationLoopScreen() {
                   value={newBuildText}
                   onChangeText={setNewBuildText}
                   onSubmitEditing={handleAddBuildItem}
+                  returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddBuildItem}>
                   <IconSymbol 
@@ -872,9 +914,18 @@ export default function ExplorationLoopScreen() {
                     <TextInput
                       style={styles.listItemInput}
                       value={item.text}
-                      onChangeText={(text) => handleEditCheckItem(item.id, text)}
-                      onBlur={() => setEditingCheckId(null)}
+                      onChangeText={(text) => {
+                        setCheckItems(checkItems.map(i => 
+                          i.id === item.id ? { ...i, text } : i
+                        ));
+                      }}
+                      onBlur={() => handleEditCheckItem(item.id, item.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment key={index}>
@@ -918,6 +969,10 @@ export default function ExplorationLoopScreen() {
                   value={newCheckText}
                   onChangeText={setNewCheckText}
                   onSubmitEditing={handleAddCheckItem}
+                  returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddCheckItem}>
                   <IconSymbol 
@@ -942,9 +997,18 @@ export default function ExplorationLoopScreen() {
                     <TextInput
                       style={styles.listItemInput}
                       value={item.text}
-                      onChangeText={(text) => handleEditAdaptItem(item.id, text)}
-                      onBlur={() => setEditingAdaptId(null)}
+                      onChangeText={(text) => {
+                        setAdaptItems(adaptItems.map(i => 
+                          i.id === item.id ? { ...i, text } : i
+                        ));
+                      }}
+                      onBlur={() => handleEditAdaptItem(item.id, item.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment key={index}>
@@ -988,6 +1052,10 @@ export default function ExplorationLoopScreen() {
                   value={newAdaptText}
                   onChangeText={setNewAdaptText}
                   onSubmitEditing={handleAddAdaptItem}
+                  returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddAdaptItem}>
                   <IconSymbol 
@@ -1046,9 +1114,18 @@ export default function ExplorationLoopScreen() {
                     <TextInput
                       style={styles.listItemInput}
                       value={question.text}
-                      onChangeText={(text) => handleEditNextQuestion(question.id, text)}
-                      onBlur={() => setEditingQuestionId(null)}
+                      onChangeText={(text) => {
+                        setNextExplorationQuestions(nextExplorationQuestions.map(q => 
+                          q.id === question.id ? { ...q, text } : q
+                        ));
+                      }}
+                      onBlur={() => handleEditNextQuestion(question.id, question.text)}
                       autoFocus
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment key={index}>
@@ -1092,6 +1169,10 @@ export default function ExplorationLoopScreen() {
                   value={newQuestionText}
                   onChangeText={setNewQuestionText}
                   onSubmitEditing={handleAddNextQuestion}
+                  returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddNextQuestion}>
                   <IconSymbol 
@@ -1116,11 +1197,15 @@ export default function ExplorationLoopScreen() {
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
                 value={timeSpent}
-                onChangeText={(text) => {
-                  setTimeSpent(text);
-                  markAsChanged();
+                onChangeText={setTimeSpent}
+                onBlur={() => {
+                  // Save on blur
+                  if (hasUnsavedChanges.current) {
+                    saveChanges();
+                  }
                 }}
                 keyboardType="numeric"
+                returnKeyType="done"
               />
             </View>
             
@@ -1131,11 +1216,15 @@ export default function ExplorationLoopScreen() {
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
                 value={costs}
-                onChangeText={(text) => {
-                  setCosts(text);
-                  markAsChanged();
+                onChangeText={setCosts}
+                onBlur={() => {
+                  // Save on blur
+                  if (hasUnsavedChanges.current) {
+                    saveChanges();
+                  }
                 }}
                 keyboardType="numeric"
+                returnKeyType="done"
               />
             </View>
           </View>
@@ -1431,6 +1520,11 @@ export default function ExplorationLoopScreen() {
                 onChangeText={setDecisionSummary}
                 multiline
                 numberOfLines={4}
+                returnKeyType="default"
+                blurOnSubmit={false}
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
               />
               
               <View style={styles.decisionButtons}>
@@ -1466,7 +1560,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   emptyContainer: {
     flex: 1,

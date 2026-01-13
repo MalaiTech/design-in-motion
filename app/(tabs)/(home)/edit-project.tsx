@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -35,8 +35,23 @@ export default function EditProjectScreen() {
   const [startDate, setStartDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Refs for debounced save
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUnsavedChanges = useRef(false);
+
   useEffect(() => {
     loadProject();
+    
+    return () => {
+      // Clear timeout on unmount
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      // Save any pending changes
+      if (hasUnsavedChanges.current && project) {
+        handleSaveImmediate();
+      }
+    };
   }, [id]);
 
   const loadProject = async () => {
@@ -51,7 +66,22 @@ export default function EditProjectScreen() {
     }
   };
 
-  const handleSave = async () => {
+  // Debounced save
+  const markAsChanged = useCallback(() => {
+    hasUnsavedChanges.current = true;
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Schedule save after 700ms of no changes
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSaveImmediate();
+    }, 700);
+  }, [project, title, startDate]);
+
+  const handleSaveImmediate = async () => {
     if (!project) return;
 
     console.log('Saving project changes:', title);
@@ -63,7 +93,18 @@ export default function EditProjectScreen() {
     };
 
     await updateProject(updatedProject);
+    setProject(updatedProject);
+    hasUnsavedChanges.current = false;
     console.log('Project updated successfully');
+  };
+
+  const handleSave = async () => {
+    // Clear any pending debounced save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    await handleSaveImmediate();
     router.back();
   };
 
@@ -133,6 +174,8 @@ export default function EditProjectScreen() {
           style={styles.scrollView} 
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
           {/* Project Title */}
           <View style={styles.section}>
@@ -140,13 +183,27 @@ export default function EditProjectScreen() {
             <TextInput
               style={styles.input}
               value={title}
-              onChangeText={setTitle}
+              onChangeText={(text) => {
+                setTitle(text);
+                markAsChanged();
+              }}
+              onBlur={() => {
+                // Save on blur
+                if (hasUnsavedChanges.current) {
+                  handleSaveImmediate();
+                }
+              }}
               placeholder="Enter project name"
               placeholderTextColor={BAUHAUS_COLORS.textSecondary}
               multiline
               numberOfLines={3}
               maxLength={150}
               textAlignVertical="top"
+              returnKeyType="default"
+              blurOnSubmit={false}
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
             />
           </View>
 
@@ -172,6 +229,7 @@ export default function EditProjectScreen() {
                   if (selectedDate) {
                     console.log('Date changed to:', selectedDate.toLocaleDateString());
                     setStartDate(selectedDate);
+                    markAsChanged();
                   }
                 }}
               />

@@ -44,7 +44,7 @@ export default function FramingScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   
-  // Framing fields
+  // Framing fields - LOCAL STATE (not saved on every keystroke)
   const [opportunityOrigin, setOpportunityOrigin] = useState('');
   const [purpose, setPurpose] = useState('');
   const [certaintyItems, setCertaintyItems] = useState<CertaintyItem[]>([]);
@@ -74,11 +74,8 @@ export default function FramingScreen() {
   const [decisionSummary, setDecisionSummary] = useState('');
   const [decisionRationale, setDecisionRationale] = useState('');
   
-  // Refs for edit inputs
-  const certaintyInputRef = useRef<TextInput>(null);
-  const designSpaceInputRef = useRef<TextInput>(null);
-  const questionInputRef = useRef<TextInput>(null);
-  
+  // Refs for debounced save
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUnsavedChanges = useRef(false);
 
   const loadProject = useCallback(async () => {
@@ -100,10 +97,11 @@ export default function FramingScreen() {
     }
   }, [projectId, router]);
 
+  // DEBOUNCED SAVE - Only saves after 700ms of no changes
   const saveChanges = useCallback(async () => {
     if (!project) return;
     
-    console.log('Framing: Saving changes');
+    console.log('Framing: Saving changes to AsyncStorage');
     const updatedProject: Project = {
       ...project,
       opportunityOrigin,
@@ -120,10 +118,30 @@ export default function FramingScreen() {
     hasUnsavedChanges.current = false;
   }, [project, opportunityOrigin, purpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
 
+  // Mark as changed and schedule debounced save
+  const markAsChanged = useCallback(() => {
+    hasUnsavedChanges.current = true;
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Schedule save after 700ms of no changes
+    saveTimeoutRef.current = setTimeout(() => {
+      saveChanges();
+    }, 700);
+  }, [saveChanges]);
+
   useFocusEffect(
     useCallback(() => {
       loadProject();
       return () => {
+        // Clear timeout on unmount
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        // Save any pending changes
         if (hasUnsavedChanges.current) {
           saveChanges();
         }
@@ -131,11 +149,7 @@ export default function FramingScreen() {
     }, [loadProject, saveChanges])
   );
 
-  const markAsChanged = () => {
-    hasUnsavedChanges.current = true;
-  };
-
-  // Artifact management - UPDATED to support multiple photo selection
+  // Artifact management
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project) return;
     
@@ -188,11 +202,10 @@ export default function FramingScreen() {
           Alert.alert('Permission Required', 'Photo library permission is needed.');
           return;
         }
-        // UPDATED: Enable multiple selection
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
-          allowsMultipleSelection: true, // Enable multiple selection
+          allowsMultipleSelection: true,
         });
       } else {
         result = await DocumentPicker.getDocumentAsync({
@@ -202,7 +215,6 @@ export default function FramingScreen() {
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // UPDATED: Process all selected assets
         const newArtifacts: Artifact[] = result.assets.map((asset, index) => {
           const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
           
@@ -280,7 +292,6 @@ export default function FramingScreen() {
   const handleOpenArtifact = async (artifact: Artifact) => {
     try {
       if (artifact.type === 'url') {
-        // For web URLs, use Linking.openURL to open in browser
         const canOpen = await Linking.canOpenURL(artifact.uri);
         if (canOpen) {
           await Linking.openURL(artifact.uri);
@@ -288,7 +299,6 @@ export default function FramingScreen() {
           Alert.alert('Error', 'Cannot open this URL');
         }
       } else if (artifact.type === 'document') {
-        // For local documents, use Sharing to open with system apps
         const isAvailable = await Sharing.isAvailableAsync();
         if (isAvailable) {
           await Sharing.shareAsync(artifact.uri, {
@@ -299,7 +309,6 @@ export default function FramingScreen() {
           Alert.alert('Not Available', 'File sharing is not available on this device');
         }
       } else {
-        // For images, show in viewer
         setSelectedArtifact(artifact);
         setShowArtifactViewer(true);
       }
@@ -309,7 +318,7 @@ export default function FramingScreen() {
     }
   };
 
-  // Certainty items - FIXED: Prevent keyboard from dismissing
+  // Certainty items
   const handleAddCertaintyItem = () => {
     if (!newCertaintyText.trim()) return;
     
@@ -345,7 +354,7 @@ export default function FramingScreen() {
     setEditingCertaintyId(id);
   };
 
-  // Design space items - FIXED: Prevent keyboard from dismissing
+  // Design space items
   const handleAddDesignSpaceItem = () => {
     if (!newDesignSpaceText.trim()) return;
     
@@ -380,7 +389,7 @@ export default function FramingScreen() {
     setEditingDesignSpaceId(id);
   };
 
-  // Exploration questions - FIXED: Save immediately when favoriting
+  // Exploration questions
   const handleAddExplorationQuestion = () => {
     if (!newQuestionText.trim()) return;
     
@@ -416,7 +425,7 @@ export default function FramingScreen() {
     setEditingQuestionId(id);
   };
 
-  // UPDATED: When toggling favorite, create a new Exploration Loop in Draft status
+  // Toggle favorite - Save immediately
   const handleToggleQuestionFavorite = async (id: string) => {
     if (!project) return;
     
@@ -427,15 +436,12 @@ export default function FramingScreen() {
     const wasFavorite = question.isFavorite;
     const willBeFavorite = !wasFavorite;
     
-    // Update the question's favorite status
     const updatedQuestions = explorationQuestions.map(q => 
       q.id === id ? { ...q, isFavorite: willBeFavorite } : q
     );
     
-    // Update state
     setExplorationQuestions(updatedQuestions);
     
-    // If the question is being favorited (not unfavorited), create a new Exploration Loop
     let updatedLoops = project.explorationLoops || [];
     if (willBeFavorite && !wasFavorite) {
       console.log('Creating new Draft Exploration Loop for question:', question.text);
@@ -462,7 +468,6 @@ export default function FramingScreen() {
       updatedLoops = [...updatedLoops, newLoop];
     }
     
-    // Save immediately to storage
     const updatedProject: Project = {
       ...project,
       explorationQuestions: updatedQuestions,
@@ -474,7 +479,6 @@ export default function FramingScreen() {
     setProject(updatedProject);
     hasUnsavedChanges.current = false;
     
-    // Show confirmation if a new loop was created
     if (willBeFavorite && !wasFavorite) {
       Alert.alert(
         'Exploration Loop Created',
@@ -484,7 +488,7 @@ export default function FramingScreen() {
     }
   };
 
-  // Framing decisions - UPDATED to match Project Overview approach
+  // Framing decisions
   const handleSaveDecision = async () => {
     if (!decisionSummary.trim()) {
       Alert.alert('Required', 'Please enter a decision summary.');
@@ -497,14 +501,12 @@ export default function FramingScreen() {
     let updatedDecisions: FramingDecision[];
     
     if (editingDecisionId) {
-      // Edit existing decision
       updatedDecisions = framingDecisions.map(d => 
         d.id === editingDecisionId 
           ? { ...d, summary: decisionSummary.trim(), rationale: decisionRationale.trim() } as any
           : d
       );
     } else {
-      // Add new decision
       const newDecision: any = {
         id: Date.now().toString(),
         summary: decisionSummary.trim(),
@@ -515,10 +517,8 @@ export default function FramingScreen() {
       updatedDecisions = [...framingDecisions, newDecision];
     }
     
-    // Update state immediately
     setFramingDecisions(updatedDecisions);
     
-    // Save to storage immediately
     const updatedProject: Project = {
       ...project,
       framingDecisions: updatedDecisions,
@@ -528,7 +528,6 @@ export default function FramingScreen() {
     await updateProject(updatedProject);
     setProject(updatedProject);
     
-    // Clear form
     setDecisionSummary('');
     setDecisionRationale('');
     setEditingDecisionId(null);
@@ -601,6 +600,7 @@ export default function FramingScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
           {/* 1. Opportunity Origin */}
           <View style={styles.section}>
@@ -611,9 +611,12 @@ export default function FramingScreen() {
               placeholder="Describe the origin of this opportunity..."
               placeholderTextColor={colors.textSecondary}
               value={opportunityOrigin}
-              onChangeText={(text) => {
-                setOpportunityOrigin(text);
-                markAsChanged();
+              onChangeText={setOpportunityOrigin}
+              onBlur={() => {
+                // Save on blur
+                if (hasUnsavedChanges.current) {
+                  saveChanges();
+                }
               }}
               multiline
               numberOfLines={4}
@@ -634,9 +637,12 @@ export default function FramingScreen() {
               placeholder="Describe the purpose of this project..."
               placeholderTextColor={colors.textSecondary}
               value={purpose}
-              onChangeText={(text) => {
-                setPurpose(text);
-                markAsChanged();
+              onChangeText={setPurpose}
+              onBlur={() => {
+                // Save on blur
+                if (hasUnsavedChanges.current) {
+                  saveChanges();
+                }
               }}
               multiline
               numberOfLines={4}
@@ -648,7 +654,7 @@ export default function FramingScreen() {
             />
           </View>
 
-          {/* 3. Artifacts (Visuals) - UPDATED to 4 columns grid */}
+          {/* 3. Artifacts (Visuals) */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <TouchableOpacity 
@@ -697,7 +703,6 @@ export default function FramingScreen() {
                         </View>
                       ) : null}
                       
-                      {/* Favorite and Delete icons in right upper corner */}
                       <View style={styles.artifactOverlayActions}>
                         <TouchableOpacity 
                           style={styles.artifactActionButton}
@@ -781,16 +786,17 @@ export default function FramingScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* Helper text for selected category */}
-            <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
+            {/* Helper text - ALWAYS VISIBLE (fixed height) */}
+            <View style={styles.helperTextContainer}>
+              <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
+            </View>
             
-            {/* List for selected category - FIXED: Prevent keyboard dismissal */}
+            {/* List for selected category */}
             <View style={styles.listContainer}>
               {getCertaintyItemsByCategory(selectedCertaintyCategory).map((item) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingCertaintyId === item.id ? (
                     <TextInput
-                      ref={certaintyInputRef}
                       style={styles.listItemInput}
                       value={item.text}
                       onChangeText={(text) => {
@@ -798,8 +804,9 @@ export default function FramingScreen() {
                           i.id === item.id ? { ...i, text } : i
                         ));
                       }}
-                      onSubmitEditing={() => handleEditCertaintyItem(item.id, item.text)}
-                      onBlur={() => handleEditCertaintyItem(item.id, item.text)}
+                      onBlur={() => {
+                        handleEditCertaintyItem(item.id, item.text);
+                      }}
                       autoFocus
                       returnKeyType="done"
                       blurOnSubmit={true}
@@ -862,15 +869,15 @@ export default function FramingScreen() {
           {/* 5. Design Space and Constraints */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Design Space and Constraints</Text>
-            <Text style={styles.helperText}>What limits or bounderies must be respected? (e.g. time, budget, technology, ethics)</Text>
+            <View style={styles.helperTextContainer}>
+              <Text style={styles.helperText}>What limits or bounderies must be respected? (e.g. time, budget, technology, ethics)</Text>
+            </View>
             
-            {/* FIXED: Prevent keyboard dismissal */}
             <View style={styles.listContainer}>
               {designSpaceItems.map((item) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingDesignSpaceId === item.id ? (
                     <TextInput
-                      ref={designSpaceInputRef}
                       style={styles.listItemInput}
                       value={item.text}
                       onChangeText={(text) => {
@@ -878,8 +885,9 @@ export default function FramingScreen() {
                           i.id === item.id ? { ...i, text } : i
                         ));
                       }}
-                      onSubmitEditing={() => handleEditDesignSpaceItem(item.id, item.text)}
-                      onBlur={() => handleEditDesignSpaceItem(item.id, item.text)}
+                      onBlur={() => {
+                        handleEditDesignSpaceItem(item.id, item.text);
+                      }}
                       autoFocus
                       returnKeyType="done"
                       blurOnSubmit={true}
@@ -939,17 +947,18 @@ export default function FramingScreen() {
             </View>
           </View>
 
-          {/* 6. Exploration Questions - FIXED: Prevent keyboard dismissal and save favorite immediately */}
+          {/* 6. Exploration Questions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Questions</Text>
-            <Text style={styles.helperText}>What are the first things we need to learn?</Text>
+            <View style={styles.helperTextContainer}>
+              <Text style={styles.helperText}>What are the first things we need to learn?</Text>
+            </View>
             
             <View style={styles.listContainer}>
               {explorationQuestions.map((question) => (
                 <View key={question.id} style={styles.listItem}>
                   {editingQuestionId === question.id ? (
                     <TextInput
-                      ref={questionInputRef}
                       style={styles.listItemInput}
                       value={question.text}
                       onChangeText={(text) => {
@@ -957,8 +966,9 @@ export default function FramingScreen() {
                           q.id === question.id ? { ...q, text } : q
                         ));
                       }}
-                      onSubmitEditing={() => handleEditExplorationQuestion(question.id, question.text)}
-                      onBlur={() => handleEditExplorationQuestion(question.id, question.text)}
+                      onBlur={() => {
+                        handleEditExplorationQuestion(question.id, question.text);
+                      }}
                       autoFocus
                       returnKeyType="done"
                       blurOnSubmit={true}
@@ -1026,7 +1036,7 @@ export default function FramingScreen() {
             </View>
           </View>
 
-          {/* 7. Framing Decisions & Changes - UPDATED to match Project Overview */}
+          {/* 7. Framing Decisions & Changes */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Framing Decisions & Changes</Text>
@@ -1039,7 +1049,9 @@ export default function FramingScreen() {
                 />
               </TouchableOpacity>
             </View>
-            <Text style={styles.helperText}>Note important changes and decisions</Text>
+            <View style={styles.helperTextContainer}>
+              <Text style={styles.helperText}>Note important changes and decisions</Text>
+            </View>
             
             {framingDecisions.length === 0 ? (
               <View style={styles.emptyDecisions}>
@@ -1161,7 +1173,7 @@ export default function FramingScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Artifact Viewer - UPDATED: Removed favorite/delete actions (available on thumbnails) */}
+      {/* Artifact Viewer */}
       <Modal
         visible={showArtifactViewer}
         transparent
@@ -1202,7 +1214,7 @@ export default function FramingScreen() {
         </View>
       </Modal>
 
-      {/* Add/Edit Decision Overlay - UPDATED to match Project Overview */}
+      {/* Add/Edit Decision Overlay */}
       <Modal
         visible={showDecisionOverlay}
         transparent
@@ -1293,11 +1305,11 @@ export default function FramingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surfaceFraming, // #EAF0FF
+    backgroundColor: colors.surfaceFraming,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   emptyContainer: {
     flex: 1,
@@ -1315,18 +1327,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: colors.phaseFraming,
+    marginBottom: 4,
+  },
+  helperTextContainer: {
+    minHeight: 36,
     marginBottom: 8,
   },
   helperText: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 12,
+    lineHeight: 18,
   },
   textArea: {
     backgroundColor: '#FFFFFF',
@@ -1359,7 +1375,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   artifactGridItem: {
-    width: '23%', // UPDATED: 4 columns (4 * 23% + 3 * 8px gap = ~100%)
+    width: '23%',
     aspectRatio: 1,
   },
   artifactThumb: {
