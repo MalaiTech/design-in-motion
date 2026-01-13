@@ -44,13 +44,17 @@ export default function FramingScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   
-  // Framing fields
+  // Framing fields - MAIN STATE (committed values)
   const [opportunityOrigin, setOpportunityOrigin] = useState('');
   const [purpose, setPurpose] = useState('');
   const [certaintyItems, setCertaintyItems] = useState<CertaintyItem[]>([]);
   const [designSpaceItems, setDesignSpaceItems] = useState<DesignSpaceItem[]>([]);
   const [explorationQuestions, setExplorationQuestions] = useState<ExplorationQuestion[]>([]);
   const [framingDecisions, setFramingDecisions] = useState<FramingDecision[]>([]);
+  
+  // LOCAL STATE for text inputs (while typing)
+  const [localOpportunityOrigin, setLocalOpportunityOrigin] = useState('');
+  const [localPurpose, setLocalPurpose] = useState('');
   
   // UI state
   const [selectedCertaintyCategory, setSelectedCertaintyCategory] = useState<CertaintyCategory>('known');
@@ -79,6 +83,10 @@ export default function FramingScreen() {
   const designSpaceInputRef = useRef<TextInput>(null);
   const questionInputRef = useRef<TextInput>(null);
   
+  // Debounce timer refs
+  const opportunityDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const purposeDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  
   const hasUnsavedChanges = useRef(false);
 
   const loadProject = useCallback(async () => {
@@ -87,8 +95,15 @@ export default function FramingScreen() {
     const found = projects.find(p => p.id === projectId);
     if (found) {
       setProject(found);
-      setOpportunityOrigin(found.opportunityOrigin || '');
-      setPurpose(found.purpose || '');
+      const oppOrigin = found.opportunityOrigin || '';
+      const purp = found.purpose || '';
+      
+      // Set both main state and local state
+      setOpportunityOrigin(oppOrigin);
+      setLocalOpportunityOrigin(oppOrigin);
+      setPurpose(purp);
+      setLocalPurpose(purp);
+      
       setCertaintyItems(found.certaintyItems || []);
       setDesignSpaceItems(found.designSpaceItems || []);
       setExplorationQuestions(found.explorationQuestions || []);
@@ -103,7 +118,7 @@ export default function FramingScreen() {
   const saveChanges = useCallback(async () => {
     if (!project) return;
     
-    console.log('Framing: Saving changes');
+    console.log('Framing: Saving changes to AsyncStorage');
     const updatedProject: Project = {
       ...project,
       opportunityOrigin,
@@ -124,12 +139,77 @@ export default function FramingScreen() {
     useCallback(() => {
       loadProject();
       return () => {
+        // Clear any pending debounce timers
+        if (opportunityDebounceTimer.current) {
+          clearTimeout(opportunityDebounceTimer.current);
+        }
+        if (purposeDebounceTimer.current) {
+          clearTimeout(purposeDebounceTimer.current);
+        }
+        
         if (hasUnsavedChanges.current) {
           saveChanges();
         }
       };
     }, [loadProject, saveChanges])
   );
+
+  // DEBOUNCED SAVE for Opportunity Origin
+  const handleOpportunityOriginChange = (text: string) => {
+    console.log('Opportunity Origin: Text changed (local state only)');
+    // Update local state immediately for responsive typing
+    setLocalOpportunityOrigin(text);
+    
+    // Clear existing timer
+    if (opportunityDebounceTimer.current) {
+      clearTimeout(opportunityDebounceTimer.current);
+    }
+    
+    // Set new timer to commit after 700ms of inactivity
+    opportunityDebounceTimer.current = setTimeout(() => {
+      console.log('Opportunity Origin: Committing to main state (debounced)');
+      setOpportunityOrigin(text);
+      hasUnsavedChanges.current = true;
+    }, 700);
+  };
+
+  // DEBOUNCED SAVE for Purpose
+  const handlePurposeChange = (text: string) => {
+    console.log('Purpose: Text changed (local state only)');
+    // Update local state immediately for responsive typing
+    setLocalPurpose(text);
+    
+    // Clear existing timer
+    if (purposeDebounceTimer.current) {
+      clearTimeout(purposeDebounceTimer.current);
+    }
+    
+    // Set new timer to commit after 700ms of inactivity
+    purposeDebounceTimer.current = setTimeout(() => {
+      console.log('Purpose: Committing to main state (debounced)');
+      setPurpose(text);
+      hasUnsavedChanges.current = true;
+    }, 700);
+  };
+
+  // BLUR handlers - commit immediately when user leaves the field
+  const handleOpportunityOriginBlur = () => {
+    console.log('Opportunity Origin: Blur - committing immediately');
+    if (opportunityDebounceTimer.current) {
+      clearTimeout(opportunityDebounceTimer.current);
+    }
+    setOpportunityOrigin(localOpportunityOrigin);
+    hasUnsavedChanges.current = true;
+  };
+
+  const handlePurposeBlur = () => {
+    console.log('Purpose: Blur - committing immediately');
+    if (purposeDebounceTimer.current) {
+      clearTimeout(purposeDebounceTimer.current);
+    }
+    setPurpose(localPurpose);
+    hasUnsavedChanges.current = true;
+  };
 
   const markAsChanged = () => {
     hasUnsavedChanges.current = true;
@@ -602,7 +682,7 @@ export default function FramingScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          {/* 1. Opportunity Origin */}
+          {/* 1. Opportunity Origin - FIXED: Use local state + debounced save */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Opportunity Origin</Text>
             <Text style={styles.helperText}>What triggered this project?</Text>
@@ -610,11 +690,9 @@ export default function FramingScreen() {
               style={styles.textArea}
               placeholder="Describe the origin of this opportunity..."
               placeholderTextColor={colors.textSecondary}
-              value={opportunityOrigin}
-              onChangeText={(text) => {
-                setOpportunityOrigin(text);
-                markAsChanged();
-              }}
+              value={localOpportunityOrigin}
+              onChangeText={handleOpportunityOriginChange}
+              onBlur={handleOpportunityOriginBlur}
               multiline
               numberOfLines={4}
               returnKeyType="default"
@@ -625,7 +703,7 @@ export default function FramingScreen() {
             />
           </View>
 
-          {/* 2. Purpose */}
+          {/* 2. Purpose - FIXED: Use local state + debounced save */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Purpose</Text>
             <Text style={styles.helperText}>What are we trying to acomplish and who will benefit?</Text>
@@ -633,11 +711,9 @@ export default function FramingScreen() {
               style={styles.textArea}
               placeholder="Describe the purpose of this project..."
               placeholderTextColor={colors.textSecondary}
-              value={purpose}
-              onChangeText={(text) => {
-                setPurpose(text);
-                markAsChanged();
-              }}
+              value={localPurpose}
+              onChangeText={handlePurposeChange}
+              onBlur={handlePurposeBlur}
               multiline
               numberOfLines={4}
               returnKeyType="default"
