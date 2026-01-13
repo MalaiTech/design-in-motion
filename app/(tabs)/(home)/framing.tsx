@@ -42,7 +42,7 @@ export default function FramingScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   
-  // Local state for text inputs (not synced to project until save)
+  // Local state for text inputs (not synced to storage until blur/exit)
   const [localOpportunityOrigin, setLocalOpportunityOrigin] = useState('');
   const [localPurpose, setLocalPurpose] = useState('');
   
@@ -78,10 +78,6 @@ export default function FramingScreen() {
   const certaintyInputRef = useRef<TextInput>(null);
   const designSpaceInputRef = useRef<TextInput>(null);
   const questionInputRef = useRef<TextInput>(null);
-  
-  // Debounced save timer
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const hasUnsavedChanges = useRef(false);
 
   const loadProject = useCallback(async () => {
     console.log('Framing: Loading project', projectId);
@@ -102,91 +98,35 @@ export default function FramingScreen() {
     }
   }, [projectId, router]);
 
-  // Background save function - does NOT update project state
-  const saveToStorage = useCallback(async (
-    opportunityOrigin: string,
-    purpose: string,
-    certainty: CertaintyItem[],
-    designSpace: DesignSpaceItem[],
-    questions: ExplorationQuestion[],
-    decisions: FramingDecision[]
-  ) => {
+  // Save to storage - only called on blur or screen exit
+  const saveToStorage = useCallback(async () => {
     if (!project) return;
     
-    console.log('Framing: Background save to AsyncStorage');
+    console.log('Framing: Saving to AsyncStorage');
     const updatedProject: Project = {
       ...project,
-      opportunityOrigin,
-      purpose,
-      certaintyItems: certainty,
-      designSpaceItems: designSpace,
-      explorationQuestions: questions,
-      framingDecisions: decisions,
+      opportunityOrigin: localOpportunityOrigin,
+      purpose: localPurpose,
+      certaintyItems,
+      designSpaceItems,
+      explorationQuestions,
+      framingDecisions,
       updatedDate: new Date().toISOString(),
     };
     
     await updateProject(updatedProject);
-    hasUnsavedChanges.current = false;
-  }, [project]);
-
-  // Debounced save - triggered on text changes
-  const debouncedSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    
-    hasUnsavedChanges.current = true;
-    
-    saveTimerRef.current = setTimeout(() => {
-      saveToStorage(
-        localOpportunityOrigin,
-        localPurpose,
-        certaintyItems,
-        designSpaceItems,
-        explorationQuestions,
-        framingDecisions
-      );
-    }, 700); // 700ms debounce
-  }, [localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
-
-  // Immediate save on blur
-  const saveOnBlur = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    
-    if (hasUnsavedChanges.current) {
-      saveToStorage(
-        localOpportunityOrigin,
-        localPurpose,
-        certaintyItems,
-        designSpaceItems,
-        explorationQuestions,
-        framingDecisions
-      );
-    }
-  }, [localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage]);
+    setProject(updatedProject);
+  }, [project, localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
 
   useFocusEffect(
     useCallback(() => {
       loadProject();
       return () => {
-        // Save on screen blur
-        if (saveTimerRef.current) {
-          clearTimeout(saveTimerRef.current);
-        }
-        if (hasUnsavedChanges.current) {
-          saveToStorage(
-            localOpportunityOrigin,
-            localPurpose,
-            certaintyItems,
-            designSpaceItems,
-            explorationQuestions,
-            framingDecisions
-          );
-        }
+        // Save when leaving the screen
+        console.log('Framing: Screen unfocused, saving data');
+        saveToStorage();
       };
-    }, [loadProject, localOpportunityOrigin, localPurpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions, saveToStorage])
+    }, [loadProject, saveToStorage])
   );
 
   // Artifact management
@@ -371,13 +311,15 @@ export default function FramingScreen() {
     
     setCertaintyItems([...certaintyItems, newItem]);
     setNewCertaintyText('');
-    debouncedSave();
+    // Save immediately after adding item
+    saveToStorage();
   };
 
   const handleDeleteCertaintyItem = (id: string) => {
     console.log('Deleting certainty item:', id);
     setCertaintyItems(certaintyItems.filter(item => item.id !== id));
-    debouncedSave();
+    // Save immediately after deleting
+    saveToStorage();
   };
 
   const handleEditCertaintyItem = (id: string, newText: string) => {
@@ -386,7 +328,8 @@ export default function FramingScreen() {
       item.id === id ? { ...item, text: newText } : item
     ));
     setEditingCertaintyId(null);
-    saveOnBlur();
+    // Save on blur
+    saveToStorage();
   };
 
   const handleStartEditCertainty = (id: string) => {
@@ -406,13 +349,15 @@ export default function FramingScreen() {
     
     setDesignSpaceItems([...designSpaceItems, newItem]);
     setNewDesignSpaceText('');
-    debouncedSave();
+    // Save immediately after adding item
+    saveToStorage();
   };
 
   const handleDeleteDesignSpaceItem = (id: string) => {
     console.log('Deleting design space item:', id);
     setDesignSpaceItems(designSpaceItems.filter(item => item.id !== id));
-    debouncedSave();
+    // Save immediately after deleting
+    saveToStorage();
   };
 
   const handleEditDesignSpaceItem = (id: string, newText: string) => {
@@ -421,7 +366,8 @@ export default function FramingScreen() {
       item.id === id ? { ...item, text: newText } : item
     ));
     setEditingDesignSpaceId(null);
-    saveOnBlur();
+    // Save on blur
+    saveToStorage();
   };
 
   const handleStartEditDesignSpace = (id: string) => {
@@ -442,13 +388,15 @@ export default function FramingScreen() {
     
     setExplorationQuestions([...explorationQuestions, newQuestion]);
     setNewQuestionText('');
-    debouncedSave();
+    // Save immediately after adding item
+    saveToStorage();
   };
 
   const handleDeleteExplorationQuestion = (id: string) => {
     console.log('Deleting exploration question:', id);
     setExplorationQuestions(explorationQuestions.filter(q => q.id !== id));
-    debouncedSave();
+    // Save immediately after deleting
+    saveToStorage();
   };
 
   const handleEditExplorationQuestion = (id: string, newText: string) => {
@@ -457,7 +405,8 @@ export default function FramingScreen() {
       q.id === id ? { ...q, text: newText } : q
     ));
     setEditingQuestionId(null);
-    saveOnBlur();
+    // Save on blur
+    saveToStorage();
   };
 
   const handleStartEditQuestion = (id: string) => {
@@ -592,7 +541,8 @@ export default function FramingScreen() {
           onPress: () => {
             console.log('Deleting decision:', decisionId);
             setFramingDecisions(framingDecisions.filter(d => d.id !== decisionId));
-            debouncedSave();
+            // Save immediately after deleting
+            saveToStorage();
           }
         }
       ]
@@ -644,11 +594,8 @@ export default function FramingScreen() {
             placeholder="Describe the origin of this opportunity..."
             placeholderTextColor={colors.textSecondary}
             value={localOpportunityOrigin}
-            onChangeText={(text) => {
-              setLocalOpportunityOrigin(text);
-              debouncedSave();
-            }}
-            onBlur={saveOnBlur}
+            onChangeText={setLocalOpportunityOrigin}
+            onBlur={saveToStorage}
             multiline
             numberOfLines={4}
             returnKeyType="default"
@@ -667,11 +614,8 @@ export default function FramingScreen() {
             placeholder="Describe the purpose of this project..."
             placeholderTextColor={colors.textSecondary}
             value={localPurpose}
-            onChangeText={(text) => {
-              setLocalPurpose(text);
-              debouncedSave();
-            }}
-            onBlur={saveOnBlur}
+            onChangeText={setLocalPurpose}
+            onBlur={saveToStorage}
             multiline
             numberOfLines={4}
             returnKeyType="default"
