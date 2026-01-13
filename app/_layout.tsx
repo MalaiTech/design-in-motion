@@ -86,7 +86,13 @@ export default function RootLayout() {
       >
         <WidgetProvider>
           <GestureHandlerRootView>
-            <Stack>
+            <Stack
+              screenOptions={{
+                headerBackButtonDisplayMode: "minimal",
+                headerBackTitleVisible: false,
+                headerBackTitle: "",
+              }}
+            >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             </Stack>
             <SystemBars style={"auto"} />

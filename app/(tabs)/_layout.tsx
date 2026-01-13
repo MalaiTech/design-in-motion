@@ -20,6 +20,9 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
+          headerBackButtonDisplayMode: "minimal",
+          headerBackTitleVisible: false,
+          headerBackTitle: "",
         }}
       >
         <Stack.Screen key="home" name="(home)" />
