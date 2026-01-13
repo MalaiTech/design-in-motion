@@ -29,6 +29,7 @@ import {
   DesignSpaceItem,
   ExplorationQuestion,
   FramingDecision,
+  ExplorationLoop,
 } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -415,28 +416,72 @@ export default function FramingScreen() {
     setEditingQuestionId(id);
   };
 
-  // FIXED: Save immediately when toggling favorite
+  // UPDATED: When toggling favorite, create a new Exploration Loop in Draft status
   const handleToggleQuestionFavorite = async (id: string) => {
     if (!project) return;
     
     console.log('Toggling question favorite:', id);
+    const question = explorationQuestions.find(q => q.id === id);
+    if (!question) return;
+    
+    const wasFavorite = question.isFavorite;
+    const willBeFavorite = !wasFavorite;
+    
+    // Update the question's favorite status
     const updatedQuestions = explorationQuestions.map(q => 
-      q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
+      q.id === id ? { ...q, isFavorite: willBeFavorite } : q
     );
     
     // Update state
     setExplorationQuestions(updatedQuestions);
     
+    // If the question is being favorited (not unfavorited), create a new Exploration Loop
+    let updatedLoops = project.explorationLoops || [];
+    if (willBeFavorite && !wasFavorite) {
+      console.log('Creating new Draft Exploration Loop for question:', question.text);
+      
+      const newLoop: ExplorationLoop = {
+        id: Date.now().toString(),
+        question: question.text,
+        status: 'draft',
+        updatedDate: new Date().toISOString(),
+        artifactIds: [],
+        exploreItems: [],
+        exploreArtifactIds: [],
+        buildItems: [],
+        buildArtifactIds: [],
+        checkItems: [],
+        adaptItems: [],
+        explorationDecisions: [],
+        nextExplorationQuestions: [],
+        timeSpent: 0,
+        costs: 0,
+        invoicesArtifactIds: [],
+      };
+      
+      updatedLoops = [...updatedLoops, newLoop];
+    }
+    
     // Save immediately to storage
     const updatedProject: Project = {
       ...project,
       explorationQuestions: updatedQuestions,
+      explorationLoops: updatedLoops,
       updatedDate: new Date().toISOString(),
     };
     
     await updateProject(updatedProject);
     setProject(updatedProject);
     hasUnsavedChanges.current = false;
+    
+    // Show confirmation if a new loop was created
+    if (willBeFavorite && !wasFavorite) {
+      Alert.alert(
+        'Exploration Loop Created',
+        'A new Draft Exploration Loop has been created and is now visible in the Exploration Loops overview.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   // Framing decisions - UPDATED to match Project Overview approach
@@ -574,6 +619,9 @@ export default function FramingScreen() {
               numberOfLines={4}
               returnKeyType="default"
               blurOnSubmit={false}
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
             />
           </View>
 
@@ -594,6 +642,9 @@ export default function FramingScreen() {
               numberOfLines={4}
               returnKeyType="default"
               blurOnSubmit={false}
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
             />
           </View>
 
@@ -752,6 +803,9 @@ export default function FramingScreen() {
                       autoFocus
                       returnKeyType="done"
                       blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment>
@@ -789,6 +843,9 @@ export default function FramingScreen() {
                   onChangeText={setNewCertaintyText}
                   onSubmitEditing={handleAddCertaintyItem}
                   returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddCertaintyItem}>
                   <IconSymbol 
@@ -826,6 +883,9 @@ export default function FramingScreen() {
                       autoFocus
                       returnKeyType="done"
                       blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment>
@@ -863,6 +923,9 @@ export default function FramingScreen() {
                   onChangeText={setNewDesignSpaceText}
                   onSubmitEditing={handleAddDesignSpaceItem}
                   returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddDesignSpaceItem}>
                   <IconSymbol 
@@ -899,6 +962,9 @@ export default function FramingScreen() {
                       autoFocus
                       returnKeyType="done"
                       blurOnSubmit={true}
+                      autoCorrect={false}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   ) : (
                     <React.Fragment>
@@ -944,6 +1010,9 @@ export default function FramingScreen() {
                   onChangeText={setNewQuestionText}
                   onSubmitEditing={handleAddExplorationQuestion}
                   returnKeyType="done"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <TouchableOpacity onPress={handleAddExplorationQuestion}>
                   <IconSymbol 
@@ -1172,6 +1241,9 @@ export default function FramingScreen() {
                 value={decisionSummary}
                 onChangeText={setDecisionSummary}
                 returnKeyType="next"
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
               />
               
               <Text style={styles.inputLabel}>Rationale</Text>
@@ -1185,6 +1257,9 @@ export default function FramingScreen() {
                 numberOfLines={4}
                 returnKeyType="default"
                 blurOnSubmit={false}
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
               />
               
               <View style={styles.decisionButtons}>
@@ -1218,7 +1293,7 @@ export default function FramingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surfaceFraming,
+    backgroundColor: colors.surfaceFraming, // #EAF0FF
   },
   scrollContent: {
     padding: 16,
