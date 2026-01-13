@@ -46,7 +46,7 @@ export default function HomeLayout() {
     },
   ];
 
-  // Common header style for all screens
+  // Common header style for specified screens
   const headerStyle = {
     backgroundColor: colors.background, // #FAFAF7
   };
@@ -59,22 +59,12 @@ export default function HomeLayout() {
 
   return (
     <>
-      <Stack
-        screenOptions={{
-          // CRITICAL: Global iOS back button configuration - applies to ALL screens
-          headerBackButtonDisplayMode: "minimal",
-          headerBackTitleVisible: false,
-          headerBackTitle: "",
-          headerTintColor: '#111111',
-          headerStyle,
-          headerTitleStyle,
-        }}
-      >
+      <Stack>
         <Stack.Screen
           name="index"
           options={{
             headerShown: false,
-            title: '',
+            title: ''
           }}
         />
         <Stack.Screen
@@ -83,6 +73,7 @@ export default function HomeLayout() {
             headerShown: true,
             title: 'Start a Project',
             presentation: 'modal',
+            headerStyle,
           }}
         />
         <Stack.Screen
@@ -91,6 +82,7 @@ export default function HomeLayout() {
             headerShown: true,
             title: 'Edit Project',
             presentation: 'modal',
+            headerStyle,
           }}
         />
         <Stack.Screen
@@ -98,6 +90,11 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Project Overview',
+            headerBackTitle: '',
+            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -105,6 +102,11 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Framing',
+            headerBackTitle: '',
+            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -112,6 +114,11 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loops',
+            headerBackTitle: '',
+            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -119,6 +126,11 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loop',
+            headerBackTitle: '',
+            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -126,6 +138,11 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Timeline',
+            headerBackTitle: '',
+            headerBackTitleVisible: false, // Explicitly hide back title text
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111',
           }}
         />
       </Stack>
