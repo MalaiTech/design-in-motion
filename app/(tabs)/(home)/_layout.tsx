@@ -59,7 +59,14 @@ export default function HomeLayout() {
 
   return (
     <>
-      <Stack>
+      <Stack
+        screenOptions={{
+          // CRITICAL: Set global defaults for ALL screens in this stack
+          headerBackTitleVisible: false,
+          headerBackTitle: '',
+          headerTintColor: '#111111',
+        }}
+      >
         <Stack.Screen
           name="index"
           options={{
@@ -90,11 +97,8 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Project Overview',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -102,11 +106,8 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Framing',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -114,11 +115,8 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loops',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -126,11 +124,8 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loop',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
           }}
         />
         <Stack.Screen
@@ -138,11 +133,8 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Timeline',
-            headerBackTitle: '',
-            headerBackTitleVisible: false, // Explicitly hide back title text
             headerStyle,
             headerTitleStyle,
-            headerTintColor: '#111111',
           }}
         />
       </Stack>
