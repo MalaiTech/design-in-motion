@@ -396,6 +396,8 @@ export default function FramingScreen() {
       return;
     }
     
+    if (!project) return;
+    
     let updatedDecisions: FramingDecision[];
     
     if (editingDecisionId) {
@@ -417,12 +419,25 @@ export default function FramingScreen() {
       updatedDecisions = [...framingDecisions, newDecision];
     }
     
+    // Update state immediately
     setFramingDecisions(updatedDecisions);
+    
+    // Save to storage immediately
+    const updatedProject: Project = {
+      ...project,
+      framingDecisions: updatedDecisions,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
+    setProject(updatedProject);
+    
+    // Clear form
     setDecisionSummary('');
     setDecisionRationale('');
     setEditingDecisionId(null);
     setShowDecisionOverlay(false);
-    markAsChanged();
+    hasUnsavedChanges.current = false;
   };
 
   const handleEditDecision = (decision: any) => {
@@ -991,7 +1006,7 @@ export default function FramingScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Artifact Viewer */}
+      {/* Artifact Viewer - UPDATED: Removed favorite/delete actions (available on thumbnails) */}
       <Modal
         visible={showArtifactViewer}
         transparent
@@ -1008,32 +1023,6 @@ export default function FramingScreen() {
                 color="#FFFFFF" 
               />
             </TouchableOpacity>
-            
-            <View style={styles.artifactViewerActions}>
-              <TouchableOpacity 
-                onPress={() => selectedArtifact && handleToggleArtifactFavorite(selectedArtifact.id)}
-                style={styles.artifactViewerAction}
-              >
-                <IconSymbol 
-                  ios_icon_name={selectedArtifact?.isFavorite ? "star.fill" : "star"} 
-                  android_material_icon_name={selectedArtifact?.isFavorite ? "star" : "star-border"} 
-                  size={28} 
-                  color={selectedArtifact?.isFavorite ? "#FFD700" : "#FFFFFF"} 
-                />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                onPress={() => selectedArtifact && handleDeleteArtifact(selectedArtifact.id)}
-                style={styles.artifactViewerAction}
-              >
-                <IconSymbol 
-                  ios_icon_name="trash" 
-                  android_material_icon_name="delete" 
-                  size={28} 
-                  color="#FFFFFF" 
-                />
-              </TouchableOpacity>
-            </View>
           </View>
           
           <View style={styles.artifactViewerContent}>
@@ -1397,17 +1386,10 @@ const styles = StyleSheet.create({
   },
   artifactViewerHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 16,
     paddingTop: Platform.OS === 'ios' ? 60 : 16,
-  },
-  artifactViewerActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  artifactViewerAction: {
-    padding: 8,
   },
   artifactViewerContent: {
     flex: 1,
