@@ -46,7 +46,7 @@ export default function HomeLayout() {
     },
   ];
 
-  // Common header style for specified screens
+  // Common header style for all screens
   const headerStyle = {
     backgroundColor: colors.background, // #FAFAF7
   };
@@ -55,6 +55,15 @@ export default function HomeLayout() {
     color: '#111111', // Black text for title
     fontSize: 17,
     fontWeight: '600' as const,
+  };
+
+  // CRITICAL: Common options for all screens to hide back button text on iOS
+  const commonScreenOptions = {
+    headerBackTitleVisible: false,
+    headerBackTitle: '',
+    headerTintColor: '#111111',
+    headerStyle,
+    headerTitleStyle,
   };
 
   return (
@@ -71,7 +80,9 @@ export default function HomeLayout() {
           name="index"
           options={{
             headerShown: false,
-            title: ''
+            title: '',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
           }}
         />
         <Stack.Screen
@@ -80,6 +91,9 @@ export default function HomeLayout() {
             headerShown: true,
             title: 'Start a Project',
             presentation: 'modal',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
           }}
         />
@@ -89,6 +103,9 @@ export default function HomeLayout() {
             headerShown: true,
             title: 'Edit Project',
             presentation: 'modal',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
           }}
         />
@@ -97,6 +114,9 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Project Overview',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
             headerTitleStyle,
           }}
@@ -106,6 +126,9 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Framing',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
             headerTitleStyle,
           }}
@@ -115,6 +138,9 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loops',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
             headerTitleStyle,
           }}
@@ -124,6 +150,9 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Exploration Loop',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
             headerTitleStyle,
           }}
@@ -133,6 +162,9 @@ export default function HomeLayout() {
           options={{
             headerShown: true,
             title: 'Timeline',
+            headerBackTitleVisible: false,
+            headerBackTitle: '',
+            headerTintColor: '#111111',
             headerStyle,
             headerTitleStyle,
           }}
