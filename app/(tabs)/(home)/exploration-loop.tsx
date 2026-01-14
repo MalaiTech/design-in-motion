@@ -79,7 +79,7 @@ export default function ExplorationLoopScreen() {
   
   // Time and costs tracking
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
-  const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
+  const [costEntries, setCostEntry] = useState<CostEntry[]>([]);
   
   // Section collapse states - auto-expand when content exists
   const [buildExpanded, setBuildExpanded] = useState(false);
@@ -151,7 +151,7 @@ export default function ExplorationLoopScreen() {
           const timeData = (foundLoop as any).timeEntries || [];
           const costData = (foundLoop as any).costEntries || [];
           setTimeEntries(timeData);
-          setCostEntries(costData);
+          setCostEntry(costData);
           
           // Auto-expand sections with content
           const hasBuildContent = (foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0;
@@ -666,19 +666,32 @@ export default function ExplorationLoopScreen() {
     markAsChanged();
   };
 
+  // FIXED: Apply same approach as Framing screen - update both questions and loops in single operation
   const handleToggleNextQuestionFavorite = async (id: string) => {
-    console.log('User toggling next question favorite:', id);
-    const question = nextExplorationQuestions.find(q => q.id === id);
+    if (!project) return;
     
-    if (question && !question.isFavorite && project) {
-      // First, update the question's favorite status
-      const updatedQuestions = nextExplorationQuestions.map(q => 
-        q.id === id ? { ...q, isFavorite: true } : q
-      );
-      setNextExplorationQuestions(updatedQuestions);
+    const question = nextExplorationQuestions.find(q => q.id === id);
+    if (!question) return;
+    
+    console.log('User toggling next question favorite:', id, 'Current favorite status:', question.isFavorite);
+    
+    // If marking as favorite, create a new Draft Exploration Loop
+    if (!question.isFavorite) {
+      console.log('Creating new exploration loop from favorited question:', question.text);
+      
+      // First, save current loop changes to ensure we have the latest state
+      await saveChanges();
+      
+      // Reload project to get fresh state
+      const projects = await getProjects();
+      const freshProject = projects.find(p => p.id === projectId);
+      
+      if (!freshProject) {
+        console.error('Project not found after reload');
+        return;
+      }
       
       // Create new exploration loop in Draft status
-      console.log('Creating new exploration loop from favorited question');
       const newLoop: ExplorationLoop = {
         id: Date.now().toString(),
         question: question.text,
@@ -700,20 +713,44 @@ export default function ExplorationLoopScreen() {
         invoicesArtifactIds: [],
       };
       
-      const updatedLoops = [...(project.explorationLoops || []), newLoop];
+      // Update the question's favorite status in the current loop
+      const updatedQuestions = nextExplorationQuestions.map(q => 
+        q.id === id ? { ...q, isFavorite: true } : q
+      );
+      setNextExplorationQuestions(updatedQuestions);
+      
+      // Get the current loop from fresh project
+      const currentLoop = freshProject.explorationLoops?.find(l => l.id === loopId);
+      
+      // Build updated loops array
+      let updatedLoops = [...(freshProject.explorationLoops || [])];
+      
+      // Update current loop with new question favorite status
+      if (currentLoop) {
+        updatedLoops = updatedLoops.map(l => 
+          l.id === loopId 
+            ? { ...l, nextExplorationQuestions: updatedQuestions }
+            : l
+        );
+      }
+      
+      // Add new loop
+      updatedLoops = [...updatedLoops, newLoop];
+      
+      // Save to project
       const updatedProject = {
-        ...project,
+        ...freshProject,
         explorationLoops: updatedLoops,
         updatedDate: new Date().toISOString(),
       };
       
-      console.log('Saving new loop to project. Total loops:', updatedLoops.length);
+      console.log('Saving project with', updatedLoops.length, 'exploration loops');
       await updateProject(updatedProject);
       
-      // Update local project state
+      // Update local state
       setProject(updatedProject);
       
-      // Mark as changed to save the updated questions with favorite status
+      // Mark as changed to trigger save of current loop
       markAsChanged();
       
       Alert.alert(
@@ -721,8 +758,8 @@ export default function ExplorationLoopScreen() {
         'A new exploration loop has been created in Draft status.',
         [{ text: 'OK' }]
       );
-    } else if (question && question.isFavorite) {
-      // Unfavorite
+    } else {
+      // Just toggle favorite off
       const updatedQuestions = nextExplorationQuestions.map(q => 
         q.id === id ? { ...q, isFavorite: false } : q
       );
@@ -803,7 +840,7 @@ export default function ExplorationLoopScreen() {
       amount,
     };
     
-    setCostEntries([...costEntries, newEntry]);
+    setCostEntry([...costEntries, newEntry]);
     setCostEntryReason('');
     setCostEntryAmount('');
     setShowCostEntryOverlay(false);
@@ -812,7 +849,7 @@ export default function ExplorationLoopScreen() {
 
   const handleDeleteCostEntry = (id: string) => {
     console.log('User deleting cost entry:', id);
-    setCostEntries(costEntries.filter(e => e.id !== id));
+    setCostEntry(costEntries.filter(e => e.id !== id));
     markAsChanged();
   };
 
