@@ -64,7 +64,8 @@ export default function ExplorationLoopScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
   
-  // Section collapse states
+  // Section collapse states - UPDATED: Added exploreNotesExpanded for Explore section
+  const [exploreNotesExpanded, setExploreNotesExpanded] = useState(true);
   const [buildExpanded, setBuildExpanded] = useState(false);
   const [checkExpanded, setCheckExpanded] = useState(false);
   const [adaptExpanded, setAdaptExpanded] = useState(false);
@@ -125,10 +126,12 @@ export default function ExplorationLoopScreen() {
           questionRef.current = foundLoop.question;
           
           // Auto-expand sections with content
+          const hasExploreContent = (foundLoop.exploreItems?.length || 0) > 0;
           const hasBuildContent = (foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0;
           const hasCheckContent = (foundLoop.checkItems?.length || 0) > 0 || (foundLoop.checkArtifactIds?.length || 0) > 0;
           const hasAdaptContent = (foundLoop.adaptItems?.length || 0) > 0 || (foundLoop.adaptArtifactIds?.length || 0) > 0;
           
+          setExploreNotesExpanded(hasExploreContent);
           setBuildExpanded(hasBuildContent);
           setCheckExpanded(hasCheckContent);
           setAdaptExpanded(hasAdaptContent);
@@ -435,6 +438,7 @@ export default function ExplorationLoopScreen() {
     await updateAndSaveLoop({ exploreItems: [...loop.exploreItems, newItem] });
     newExploreTextRef.current = '';
     setExploreInputKey(prev => prev + 1);
+    setExploreNotesExpanded(true);
   };
 
   const handleDeleteExploreItem = async (id: string) => {
@@ -1004,11 +1008,95 @@ export default function ExplorationLoopScreen() {
             />
           </View>
 
-          {/* 3. Explore */}
+          {/* 3. Explore - UPDATED: Notes collapsible, Visuals always visible below */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Explore</Text>
             
-            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
+            {/* Notes section with collapse toggle */}
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setExploreNotesExpanded(!exploreNotesExpanded)}
+            >
+              <Text style={styles.subsectionTitle}>Notes</Text>
+              <IconSymbol 
+                ios_icon_name={exploreNotesExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={exploreNotesExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
+            
+            {exploreNotesExpanded && (
+              <View style={styles.listContainer}>
+                {loop.exploreItems.map((item, index) => (
+                  <View key={item.id} style={styles.listItem}>
+                    {editingExploreId === item.id ? (
+                      <TextInput
+                        style={styles.listItemInput}
+                        value={item.text}
+                        onChangeText={(text) => handleEditExploreItem(item.id, text)}
+                        onBlur={() => setEditingExploreId(null)}
+                        autoFocus
+                      />
+                    ) : (
+                      <React.Fragment key={index}>
+                        <Text style={styles.listItemText}>{item.text}</Text>
+                        <View style={styles.listItemActions}>
+                          <TouchableOpacity onPress={() => handleToggleExploreFavorite(item.id)}>
+                            <IconSymbol 
+                              ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                              android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                              size={20} 
+                              color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => setEditingExploreId(item.id)}>
+                            <IconSymbol 
+                              ios_icon_name="pencil" 
+                              android_material_icon_name="edit" 
+                              size={20} 
+                              color={colors.textSecondary} 
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteExploreItem(item.id)}>
+                            <IconSymbol 
+                              ios_icon_name="trash" 
+                              android_material_icon_name="delete" 
+                              size={20} 
+                              color={colors.phaseFinish} 
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </React.Fragment>
+                    )}
+                  </View>
+                ))}
+                
+                <View style={styles.addItemRow}>
+                  <TextInput
+                    key={exploreInputKey}
+                    style={styles.addItemInput}
+                    placeholder="Add exploration note..."
+                    placeholderTextColor={colors.textSecondary}
+                    defaultValue=""
+                    onChangeText={(text) => {
+                      newExploreTextRef.current = text;
+                    }}
+                    onSubmitEditing={handleAddExploreItem}
+                  />
+                  <TouchableOpacity onPress={handleAddExploreItem}>
+                    <IconSymbol 
+                      ios_icon_name="plus.circle.fill" 
+                      android_material_icon_name="add-circle" 
+                      size={28} 
+                      color={colors.phaseExploration} 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            
+            {/* Visuals section - ALWAYS visible, positioned BELOW notes */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -1028,83 +1116,18 @@ export default function ExplorationLoopScreen() {
               
               {renderArtifactGrid(loop.exploreArtifactIds)}
             </View>
-            
-            <View style={styles.listContainer}>
-              {loop.exploreItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingExploreId === item.id ? (
-                    <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditExploreItem(item.id, text)}
-                      onBlur={() => setEditingExploreId(null)}
-                      autoFocus
-                    />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleExploreFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingExploreId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteExploreItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
-                </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  key={exploreInputKey}
-                  style={styles.addItemInput}
-                  placeholder="Add exploration note..."
-                  placeholderTextColor={colors.textSecondary}
-                  defaultValue=""
-                  onChangeText={(text) => {
-                    newExploreTextRef.current = text;
-                  }}
-                  onSubmitEditing={handleAddExploreItem}
-                />
-                <TouchableOpacity onPress={handleAddExploreItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
           </View>
 
-          {/* 4. Build (Collapsible) - FIXED: Visuals OUTSIDE collapsed section */}
+          {/* 4. Build (Collapsible) - Notes collapsible, Visuals always visible */}
           <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Build</Text>
+            
+            {/* Notes section with collapse toggle */}
             <TouchableOpacity 
               style={styles.collapsibleHeader}
               onPress={() => setBuildExpanded(!buildExpanded)}
             >
-              <Text style={styles.sectionTitle}>Build</Text>
+              <Text style={styles.subsectionTitle}>Notes</Text>
               <IconSymbol 
                 ios_icon_name={buildExpanded ? "chevron.up" : "chevron.down"} 
                 android_material_icon_name={buildExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
@@ -1112,27 +1135,6 @@ export default function ExplorationLoopScreen() {
                 color={colors.phaseExploration} 
               />
             </TouchableOpacity>
-            
-            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
-            <View style={styles.visualsSection}>
-              <TouchableOpacity 
-                style={styles.addVisualsButton}
-                onPress={() => {
-                  setArtifactSection('build');
-                  setShowArtifactOverlay(true);
-                }}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color={colors.phaseExploration} 
-                />
-                <Text style={styles.addVisualsText}>Visuals</Text>
-              </TouchableOpacity>
-              
-              {renderArtifactGrid(loop.buildArtifactIds)}
-            </View>
             
             {buildExpanded && (
               <View style={styles.listContainer}>
@@ -1203,29 +1205,13 @@ export default function ExplorationLoopScreen() {
                 </View>
               </View>
             )}
-          </View>
-
-          {/* 5. Check (Collapsible) - FIXED: Visuals OUTSIDE collapsed section */}
-          <View style={styles.section}>
-            <TouchableOpacity 
-              style={styles.collapsibleHeader}
-              onPress={() => setCheckExpanded(!checkExpanded)}
-            >
-              <Text style={styles.sectionTitle}>Check</Text>
-              <IconSymbol 
-                ios_icon_name={checkExpanded ? "chevron.up" : "chevron.down"} 
-                android_material_icon_name={checkExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
-                size={24} 
-                color={colors.phaseExploration} 
-              />
-            </TouchableOpacity>
             
-            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
+            {/* Visuals section - ALWAYS visible, positioned BELOW notes */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
-                  setArtifactSection('check');
+                  setArtifactSection('build');
                   setShowArtifactOverlay(true);
                 }}
               >
@@ -1238,8 +1224,27 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderArtifactGrid(loop.checkArtifactIds)}
+              {renderArtifactGrid(loop.buildArtifactIds)}
             </View>
+          </View>
+
+          {/* 5. Check (Collapsible) - Notes collapsible, Visuals always visible */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Check</Text>
+            
+            {/* Notes section with collapse toggle */}
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setCheckExpanded(!checkExpanded)}
+            >
+              <Text style={styles.subsectionTitle}>Notes</Text>
+              <IconSymbol 
+                ios_icon_name={checkExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={checkExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
             
             {checkExpanded && (
               <View style={styles.listContainer}>
@@ -1310,29 +1315,13 @@ export default function ExplorationLoopScreen() {
                 </View>
               </View>
             )}
-          </View>
-
-          {/* 6. Adapt (Collapsible) - FIXED: Visuals OUTSIDE collapsed section */}
-          <View style={styles.section}>
-            <TouchableOpacity 
-              style={styles.collapsibleHeader}
-              onPress={() => setAdaptExpanded(!adaptExpanded)}
-            >
-              <Text style={styles.sectionTitle}>Adapt</Text>
-              <IconSymbol 
-                ios_icon_name={adaptExpanded ? "chevron.up" : "chevron.down"} 
-                android_material_icon_name={adaptExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
-                size={24} 
-                color={colors.phaseExploration} 
-              />
-            </TouchableOpacity>
             
-            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
+            {/* Visuals section - ALWAYS visible, positioned BELOW notes */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
-                  setArtifactSection('adapt');
+                  setArtifactSection('check');
                   setShowArtifactOverlay(true);
                 }}
               >
@@ -1345,8 +1334,27 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderArtifactGrid(loop.adaptArtifactIds)}
+              {renderArtifactGrid(loop.checkArtifactIds)}
             </View>
+          </View>
+
+          {/* 6. Adapt (Collapsible) - Notes collapsible, Visuals always visible */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Adapt</Text>
+            
+            {/* Notes section with collapse toggle */}
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setAdaptExpanded(!adaptExpanded)}
+            >
+              <Text style={styles.subsectionTitle}>Notes</Text>
+              <IconSymbol 
+                ios_icon_name={adaptExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={adaptExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
             
             {adaptExpanded && (
               <View style={styles.listContainer}>
@@ -1417,6 +1425,27 @@ export default function ExplorationLoopScreen() {
                 </View>
               </View>
             )}
+            
+            {/* Visuals section - ALWAYS visible, positioned BELOW notes */}
+            <View style={styles.visualsSection}>
+              <TouchableOpacity 
+                style={styles.addVisualsButton}
+                onPress={() => {
+                  setArtifactSection('adapt');
+                  setShowArtifactOverlay(true);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addVisualsText}>Visuals</Text>
+              </TouchableOpacity>
+              
+              {renderArtifactGrid(loop.adaptArtifactIds)}
+            </View>
           </View>
 
           {/* 7. Exploration Decisions */}
@@ -2038,6 +2067,11 @@ const styles = StyleSheet.create({
     color: colors.phaseExploration,
     marginBottom: 12,
   },
+  subsectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
   helperText: {
     fontSize: 14,
     color: colors.textSecondary,
@@ -2049,6 +2083,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    paddingVertical: 4,
   },
   statusButton: {
     flexDirection: 'row',
@@ -2079,7 +2114,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.divider,
-    marginTop: 12,
+    marginBottom: 12,
   },
   listItem: {
     flexDirection: 'row',
@@ -2117,7 +2152,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   visualsSection: {
-    marginBottom: 12,
+    marginTop: 12,
   },
   addVisualsButton: {
     flexDirection: 'row',
