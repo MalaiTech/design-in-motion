@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
@@ -48,13 +49,19 @@ export default function FramingScreen() {
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   
+  // Decision form state
+  const [decisionSummary, setDecisionSummary] = useState('');
+  const [editingDecisionId, setEditingDecisionId] = useState<string | null>(null);
+  
   // Refs for temporary input values (prevents re-renders during typing)
   const opportunityOriginRef = useRef('');
   const purposeRef = useRef('');
   const newCertaintyTextRef = useRef('');
   const newDesignSpaceTextRef = useRef('');
   const newQuestionTextRef = useRef('');
-  const decisionSummaryRef = useRef('');
+  
+  // Ref for ScrollView to enable programmatic scrolling
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const loadProject = useCallback(async () => {
     console.log('Framing: Loading project', projectId);
@@ -325,23 +332,65 @@ export default function FramingScreen() {
 
   // Framing decisions
   const handleSaveDecision = async () => {
-    if (!project || !decisionSummaryRef.current.trim()) {
+    if (!project || !decisionSummary.trim()) {
       Alert.alert('Required', 'Please enter a decision summary.');
       return;
     }
     
     console.log('Framing: Saving decision');
-    const newDecision: FramingDecision = {
-      id: Date.now().toString(),
-      summary: decisionSummaryRef.current.trim(),
-      artifacts: [],
-      timestamp: new Date().toISOString(),
-    };
     
-    const updatedDecisions = [...(project.framingDecisions || []), newDecision];
+    let updatedDecisions: FramingDecision[];
+    
+    if (editingDecisionId) {
+      // Edit existing decision
+      updatedDecisions = (project.framingDecisions || []).map(d => 
+        d.id === editingDecisionId 
+          ? { ...d, summary: decisionSummary.trim() }
+          : d
+      );
+    } else {
+      // Add new decision
+      const newDecision: FramingDecision = {
+        id: Date.now().toString(),
+        summary: decisionSummary.trim(),
+        artifacts: [],
+        timestamp: new Date().toISOString(),
+      };
+      updatedDecisions = [...(project.framingDecisions || []), newDecision];
+    }
+    
     await updateAndSaveProject({ framingDecisions: updatedDecisions });
-    decisionSummaryRef.current = '';
+    setDecisionSummary('');
+    setEditingDecisionId(null);
     setShowDecisionOverlay(false);
+  };
+
+  const handleEditDecision = (decision: FramingDecision) => {
+    console.log('Framing: Editing decision', decision.id);
+    setDecisionSummary(decision.summary);
+    setEditingDecisionId(decision.id);
+    setShowDecisionOverlay(true);
+  };
+
+  const handleDeleteDecision = async (decisionId: string) => {
+    if (!project) return;
+    
+    console.log('Framing: Deleting decision', decisionId);
+    Alert.alert(
+      'Delete Decision',
+      'Are you sure you want to delete this decision?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const updatedDecisions = (project.framingDecisions || []).filter(d => d.id !== decisionId);
+            await updateAndSaveProject({ framingDecisions: updatedDecisions });
+          }
+        }
+      ]
+    );
   };
 
   if (!project) {
@@ -374,9 +423,12 @@ export default function FramingScreen() {
   return (
     <View style={styles.container}>
       <ScrollView 
+        ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}
+        contentInsetAdjustmentBehavior="automatic"
       >
         {/* 1. Opportunity Origin */}
         <View style={styles.section}>
@@ -557,6 +609,7 @@ export default function FramingScreen() {
                 }}
                 onSubmitEditing={handleAddCertaintyItem}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
               <TouchableOpacity onPress={handleAddCertaintyItem}>
                 <IconSymbol 
@@ -597,6 +650,7 @@ export default function FramingScreen() {
                 }}
                 onSubmitEditing={handleAddDesignSpaceItem}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
               <TouchableOpacity onPress={handleAddDesignSpaceItem}>
                 <IconSymbol 
@@ -639,6 +693,7 @@ export default function FramingScreen() {
                 }}
                 onSubmitEditing={handleAddExplorationQuestion}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
               <TouchableOpacity onPress={handleAddExplorationQuestion}>
                 <IconSymbol 
@@ -659,7 +714,10 @@ export default function FramingScreen() {
           
           <TouchableOpacity 
             style={styles.addDecisionButton}
-            onPress={() => setShowDecisionOverlay(true)}
+            onPress={() => {
+              console.log('Framing: Opening Add Decision overlay');
+              setShowDecisionOverlay(true);
+            }}
           >
             <IconSymbol 
               ios_icon_name="plus.circle" 
@@ -676,10 +734,30 @@ export default function FramingScreen() {
                 <View key={decision.id} style={styles.decisionItem}>
                   <View style={styles.decisionDot} />
                   <View style={styles.decisionContent}>
+                    <View style={styles.decisionHeader}>
+                      <Text style={styles.decisionTimestamp}>
+                        {new Date(decision.timestamp).toLocaleDateString()}
+                      </Text>
+                      <View style={styles.decisionActions}>
+                        <TouchableOpacity onPress={() => handleEditDecision(decision)}>
+                          <IconSymbol 
+                            ios_icon_name="pencil" 
+                            android_material_icon_name="edit" 
+                            size={20} 
+                            color={colors.textSecondary} 
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeleteDecision(decision.id)}>
+                          <IconSymbol 
+                            ios_icon_name="trash" 
+                            android_material_icon_name="delete" 
+                            size={20} 
+                            color={colors.phaseFinish} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                     <Text style={styles.decisionSummary}>{decision.summary}</Text>
-                    <Text style={styles.decisionTimestamp}>
-                      {new Date(decision.timestamp).toLocaleDateString()}
-                    </Text>
                   </View>
                 </View>
               ))}
@@ -832,54 +910,78 @@ export default function FramingScreen() {
         </View>
       </Modal>
 
-      {/* Add Decision Overlay */}
+      {/* Add/Edit Decision Overlay - UPDATED with KeyboardAvoidingView */}
       <Modal
         visible={showDecisionOverlay}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowDecisionOverlay(false)}
+        onRequestClose={() => {
+          console.log('Framing: Closing decision overlay');
+          setShowDecisionOverlay(false);
+          setEditingDecisionId(null);
+          setDecisionSummary('');
+        }}
       >
-        <TouchableOpacity 
+        <KeyboardAvoidingView 
           style={styles.overlayBackground}
-          activeOpacity={1}
-          onPress={() => setShowDecisionOverlay(false)}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.decisionOverlay}>
-            <Text style={styles.overlayTitle}>Add Decision</Text>
-            
-            <Text style={styles.inputLabel}>Decision / Change Summary</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="What was decided or changed?"
-              placeholderTextColor={colors.textSecondary}
-              defaultValue=""
-              onChangeText={(text) => {
-                decisionSummaryRef.current = text;
-              }}
-              multiline
-              numberOfLines={4}
-            />
-            
-            <View style={styles.decisionButtons}>
-              <TouchableOpacity 
-                style={styles.decisionCancelButton}
-                onPress={() => {
-                  decisionSummaryRef.current = '';
-                  setShowDecisionOverlay(false);
-                }}
-              >
-                <Text style={styles.decisionCancelText}>Cancel</Text>
-              </TouchableOpacity>
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => {
+              console.log('Framing: Closing decision overlay via background tap');
+              setShowDecisionOverlay(false);
+              setEditingDecisionId(null);
+              setDecisionSummary('');
+            }}
+          >
+            <View style={styles.decisionOverlay}>
+              <Text style={styles.overlayTitle}>
+                {editingDecisionId ? 'Edit Decision' : 'Add Decision'}
+              </Text>
               
-              <TouchableOpacity 
-                style={styles.decisionSaveButton}
-                onPress={handleSaveDecision}
-              >
-                <Text style={styles.decisionSaveText}>Save</Text>
-              </TouchableOpacity>
+              <Text style={styles.inputLabel}>Decision / Change Summary</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="What was decided or changed?"
+                placeholderTextColor={colors.textSecondary}
+                value={decisionSummary}
+                onChangeText={setDecisionSummary}
+                multiline
+                numberOfLines={4}
+                returnKeyType="done"
+                blurOnSubmit={true}
+              />
+              
+              <View style={styles.decisionButtons}>
+                <TouchableOpacity 
+                  style={styles.decisionCancelButton}
+                  onPress={() => {
+                    console.log('Framing: Cancel button pressed');
+                    setDecisionSummary('');
+                    setEditingDecisionId(null);
+                    setShowDecisionOverlay(false);
+                    Keyboard.dismiss();
+                  }}
+                >
+                  <Text style={styles.decisionCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.decisionSaveButton}
+                  onPress={() => {
+                    console.log('Framing: Save button pressed');
+                    handleSaveDecision();
+                    Keyboard.dismiss();
+                  }}
+                >
+                  <Text style={styles.decisionSaveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -967,7 +1069,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120, // Extra padding to ensure bottom fields are accessible above keyboard
   },
   emptyContainer: {
     flex: 1,
@@ -1150,14 +1252,23 @@ const styles = StyleSheet.create({
   decisionContent: {
     flex: 1,
   },
-  decisionSummary: {
-    fontSize: 16,
-    color: colors.text,
+  decisionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   decisionTimestamp: {
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  decisionActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  decisionSummary: {
+    fontSize: 16,
+    color: colors.text,
   },
   overlayBackground: {
     flex: 1,
