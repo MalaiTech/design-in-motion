@@ -55,10 +55,13 @@ export default function FramingScreen() {
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   
-  // Edit states
+  // Edit states - use local text state to prevent jitter
   const [editingCertaintyId, setEditingCertaintyId] = useState<string | null>(null);
+  const [editingCertaintyText, setEditingCertaintyText] = useState('');
   const [editingDesignSpaceId, setEditingDesignSpaceId] = useState<string | null>(null);
+  const [editingDesignSpaceText, setEditingDesignSpaceText] = useState('');
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editingQuestionText, setEditingQuestionText] = useState('');
   
   // New item inputs
   const [newCertaintyText, setNewCertaintyText] = useState('');
@@ -273,12 +276,21 @@ export default function FramingScreen() {
     setCertaintyItems(certaintyItems.filter(item => item.id !== id));
   };
 
-  const handleEditCertaintyItem = (id: string, newText: string) => {
-    console.log('Framing: Editing certainty item', id);
-    setCertaintyItems(certaintyItems.map(item => 
-      item.id === id ? { ...item, text: newText } : item
-    ));
+  const startEditingCertaintyItem = (id: string, text: string) => {
+    console.log('Framing: Starting to edit certainty item', id);
+    setEditingCertaintyId(id);
+    setEditingCertaintyText(text);
+  };
+
+  const finishEditingCertaintyItem = () => {
+    if (editingCertaintyId && editingCertaintyText.trim()) {
+      console.log('Framing: Finishing edit of certainty item', editingCertaintyId);
+      setCertaintyItems(certaintyItems.map(item => 
+        item.id === editingCertaintyId ? { ...item, text: editingCertaintyText.trim() } : item
+      ));
+    }
     setEditingCertaintyId(null);
+    setEditingCertaintyText('');
   };
 
   // Design space items
@@ -301,12 +313,21 @@ export default function FramingScreen() {
     setDesignSpaceItems(designSpaceItems.filter(item => item.id !== id));
   };
 
-  const handleEditDesignSpaceItem = (id: string, newText: string) => {
-    console.log('Framing: Editing design space item', id);
-    setDesignSpaceItems(designSpaceItems.map(item => 
-      item.id === id ? { ...item, text: newText } : item
-    ));
+  const startEditingDesignSpaceItem = (id: string, text: string) => {
+    console.log('Framing: Starting to edit design space item', id);
+    setEditingDesignSpaceId(id);
+    setEditingDesignSpaceText(text);
+  };
+
+  const finishEditingDesignSpaceItem = () => {
+    if (editingDesignSpaceId && editingDesignSpaceText.trim()) {
+      console.log('Framing: Finishing edit of design space item', editingDesignSpaceId);
+      setDesignSpaceItems(designSpaceItems.map(item => 
+        item.id === editingDesignSpaceId ? { ...item, text: editingDesignSpaceText.trim() } : item
+      ));
+    }
     setEditingDesignSpaceId(null);
+    setEditingDesignSpaceText('');
   };
 
   // Exploration questions
@@ -330,12 +351,21 @@ export default function FramingScreen() {
     setExplorationQuestions(explorationQuestions.filter(q => q.id !== id));
   };
 
-  const handleEditExplorationQuestion = (id: string, newText: string) => {
-    console.log('Framing: Editing exploration question', id);
-    setExplorationQuestions(explorationQuestions.map(q => 
-      q.id === id ? { ...q, text: newText } : q
-    ));
+  const startEditingExplorationQuestion = (id: string, text: string) => {
+    console.log('Framing: Starting to edit exploration question', id);
+    setEditingQuestionId(id);
+    setEditingQuestionText(text);
+  };
+
+  const finishEditingExplorationQuestion = () => {
+    if (editingQuestionId && editingQuestionText.trim()) {
+      console.log('Framing: Finishing edit of exploration question', editingQuestionId);
+      setExplorationQuestions(explorationQuestions.map(q => 
+        q.id === editingQuestionId ? { ...q, text: editingQuestionText.trim() } : q
+      ));
+    }
     setEditingQuestionId(null);
+    setEditingQuestionText('');
   };
 
   const handleToggleQuestionFavorite = (id: string) => {
@@ -411,7 +441,6 @@ export default function FramingScreen() {
             placeholderTextColor={colors.textSecondary}
             value={opportunityOrigin}
             onChangeText={setOpportunityOrigin}
-            onBlur={saveChanges}
             multiline
             numberOfLines={4}
           />
@@ -427,7 +456,6 @@ export default function FramingScreen() {
             placeholderTextColor={colors.textSecondary}
             value={purpose}
             onChangeText={setPurpose}
-            onBlur={saveChanges}
             multiline
             numberOfLines={4}
           />
@@ -551,19 +579,18 @@ export default function FramingScreen() {
                 {editingCertaintyId === item.id ? (
                   <TextInput
                     style={styles.listItemInput}
-                    value={item.text}
-                    onChangeText={(text) => handleEditCertaintyItem(item.id, text)}
-                    onBlur={() => {
-                      setEditingCertaintyId(null);
-                      saveChanges();
-                    }}
+                    value={editingCertaintyText}
+                    onChangeText={setEditingCertaintyText}
+                    onBlur={finishEditingCertaintyItem}
+                    onSubmitEditing={finishEditingCertaintyItem}
                     autoFocus
+                    returnKeyType="done"
                   />
                 ) : (
                   <>
                     <Text style={styles.listItemText}>{item.text}</Text>
                     <View style={styles.listItemActions}>
-                      <TouchableOpacity onPress={() => setEditingCertaintyId(item.id)}>
+                      <TouchableOpacity onPress={() => startEditingCertaintyItem(item.id, item.text)}>
                         <IconSymbol 
                           ios_icon_name="pencil" 
                           android_material_icon_name="edit" 
@@ -619,19 +646,18 @@ export default function FramingScreen() {
                 {editingDesignSpaceId === item.id ? (
                   <TextInput
                     style={styles.listItemInput}
-                    value={item.text}
-                    onChangeText={(text) => handleEditDesignSpaceItem(item.id, text)}
-                    onBlur={() => {
-                      setEditingDesignSpaceId(null);
-                      saveChanges();
-                    }}
+                    value={editingDesignSpaceText}
+                    onChangeText={setEditingDesignSpaceText}
+                    onBlur={finishEditingDesignSpaceItem}
+                    onSubmitEditing={finishEditingDesignSpaceItem}
                     autoFocus
+                    returnKeyType="done"
                   />
                 ) : (
                   <>
                     <Text style={styles.listItemText}>{item.text}</Text>
                     <View style={styles.listItemActions}>
-                      <TouchableOpacity onPress={() => setEditingDesignSpaceId(item.id)}>
+                      <TouchableOpacity onPress={() => startEditingDesignSpaceItem(item.id, item.text)}>
                         <IconSymbol 
                           ios_icon_name="pencil" 
                           android_material_icon_name="edit" 
@@ -687,13 +713,12 @@ export default function FramingScreen() {
                 {editingQuestionId === question.id ? (
                   <TextInput
                     style={styles.listItemInput}
-                    value={question.text}
-                    onChangeText={(text) => handleEditExplorationQuestion(question.id, text)}
-                    onBlur={() => {
-                      setEditingQuestionId(null);
-                      saveChanges();
-                    }}
+                    value={editingQuestionText}
+                    onChangeText={setEditingQuestionText}
+                    onBlur={finishEditingExplorationQuestion}
+                    onSubmitEditing={finishEditingExplorationQuestion}
                     autoFocus
+                    returnKeyType="done"
                   />
                 ) : (
                   <>
@@ -707,7 +732,7 @@ export default function FramingScreen() {
                           color={question.isFavorite ? "#FFD700" : colors.textSecondary} 
                         />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setEditingQuestionId(question.id)}>
+                      <TouchableOpacity onPress={() => startEditingExplorationQuestion(question.id, question.text)}>
                         <IconSymbol 
                           ios_icon_name="pencil" 
                           android_material_icon_name="edit" 
