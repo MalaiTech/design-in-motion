@@ -33,6 +33,7 @@ import {
 } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 
 type CertaintyCategory = 'known' | 'assumed' | 'unknown';
 
@@ -123,7 +124,7 @@ export default function FramingScreen() {
     await updateProject(updatedProject);
   }, [project]);
 
-  // Artifact management - UPDATED to support multiple photo selection
+  // Artifact management - UPDATED to support multiple photo selection and PDF-only documents
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project) return;
     
@@ -176,8 +177,9 @@ export default function FramingScreen() {
           allowsMultipleSelection: true,
         });
       } else {
+        // FIXED: Restrict to PDF documents only
         result = await DocumentPicker.getDocumentAsync({
-          type: '*/*',
+          type: 'application/pdf',
           copyToCacheDirectory: true,
         });
       }
@@ -234,13 +236,13 @@ export default function FramingScreen() {
     await updateAndSaveProject({ artifacts: updatedArtifacts });
   };
 
-  // FIXED: Improved error handling for opening artifacts
+  // FIXED: Use same approach as Project Overview screen for opening documents
   const handleOpenArtifact = async (artifact: Artifact) => {
     console.log('Framing: Attempting to open artifact', artifact.type, artifact.uri);
     
     try {
       if (artifact.type === 'url') {
-        // Validate URL format
+        // For web URLs, use Linking.openURL to open in browser
         let url = artifact.uri.trim();
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
           url = 'https://' + url;
@@ -253,13 +255,20 @@ export default function FramingScreen() {
           Alert.alert('Error', 'Cannot open this URL. Please check the URL format.');
         }
       } else if (artifact.type === 'document') {
-        // For documents, try to open with system handler
-        const canOpen = await Linking.canOpenURL(artifact.uri);
-        if (canOpen) {
-          await Linking.openURL(artifact.uri);
+        // FIXED: For local documents, use Sharing to open with system apps (same as Project Overview)
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(artifact.uri, {
+            dialogTitle: 'Open with...',
+            UTI: 'public.item',
+          });
         } else {
-          Alert.alert('Error', 'Cannot open this document. The file may not be accessible.');
+          Alert.alert('Not Available', 'File sharing is not available on this device');
         }
+      } else {
+        // For images, show in viewer
+        setSelectedArtifact(artifact);
+        setShowArtifactViewer(true);
       }
     } catch (error) {
       console.error('Framing: Error opening artifact:', error);
@@ -966,7 +975,7 @@ export default function FramingScreen() {
                 size={24} 
                 color={colors.text} 
               />
-              <Text style={styles.overlayOptionText}>Documents</Text>
+              <Text style={styles.overlayOptionText}>PDF Documents</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
