@@ -81,7 +81,7 @@ export default function ExplorationLoopScreen() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
   
-  // Section collapse states
+  // Section collapse states - auto-expand when content exists
   const [buildExpanded, setBuildExpanded] = useState(false);
   const [checkExpanded, setCheckExpanded] = useState(false);
   const [adaptExpanded, setAdaptExpanded] = useState(false);
@@ -154,9 +154,15 @@ export default function ExplorationLoopScreen() {
           setCostEntries(costData);
           
           // Auto-expand sections with content
-          setBuildExpanded((foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0);
-          setCheckExpanded((foundLoop.checkItems?.length || 0) > 0 || (foundLoop.checkArtifactIds?.length || 0) > 0);
-          setAdaptExpanded((foundLoop.adaptItems?.length || 0) > 0 || (foundLoop.adaptArtifactIds?.length || 0) > 0);
+          const hasBuildContent = (foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0;
+          const hasCheckContent = (foundLoop.checkItems?.length || 0) > 0 || (foundLoop.checkArtifactIds?.length || 0) > 0;
+          const hasAdaptContent = (foundLoop.adaptItems?.length || 0) > 0 || (foundLoop.adaptArtifactIds?.length || 0) > 0;
+          
+          setBuildExpanded(hasBuildContent);
+          setCheckExpanded(hasCheckContent);
+          setAdaptExpanded(hasAdaptContent);
+          
+          console.log('Loaded artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length);
         } else {
           Alert.alert('Loop Not Found', 'This exploration loop no longer exists.', [
             { text: 'OK', onPress: () => router.back() }
@@ -190,6 +196,7 @@ export default function ExplorationLoopScreen() {
     if (!project) return;
     
     console.log('Saving exploration loop changes with status:', status);
+    console.log('Artifact IDs - Explore:', exploreArtifactIds.length, 'Build:', buildArtifactIds.length, 'Check:', checkArtifactIds.length, 'Adapt:', adaptArtifactIds.length);
     
     // Calculate totals from entries
     const totalHours = timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -206,14 +213,14 @@ export default function ExplorationLoopScreen() {
       buildItems,
       buildArtifactIds,
       checkItems,
+      checkArtifactIds,
       adaptItems,
+      adaptArtifactIds,
       explorationDecisions,
       nextExplorationQuestions,
       timeSpent: totalHours,
       costs: totalCosts,
       invoicesArtifactIds: [],
-      ...(checkArtifactIds.length > 0 && { checkArtifactIds }),
-      ...(adaptArtifactIds.length > 0 && { adaptArtifactIds }),
       ...(timeEntries.length > 0 && { timeEntries }),
       ...(costEntries.length > 0 && { costEntries }),
     } as any;
@@ -285,10 +292,13 @@ export default function ExplorationLoopScreen() {
                 setExploreArtifactIds([...exploreArtifactIds, newArtifact.id]);
               } else if (artifactSection === 'build') {
                 setBuildArtifactIds([...buildArtifactIds, newArtifact.id]);
+                setBuildExpanded(true);
               } else if (artifactSection === 'check') {
                 setCheckArtifactIds([...checkArtifactIds, newArtifact.id]);
+                setCheckExpanded(true);
               } else {
                 setAdaptArtifactIds([...adaptArtifactIds, newArtifact.id]);
+                setAdaptExpanded(true);
               }
               
               markAsChanged();
@@ -330,7 +340,7 @@ export default function ExplorationLoopScreen() {
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        console.log('User adding', result.assets.length, 'artifacts');
+        console.log('User adding', result.assets.length, 'artifacts to', artifactSection);
         const newArtifacts: Artifact[] = result.assets.map((asset: any) => ({
           id: `${Date.now()}_${Math.random()}`,
           type: type === 'document' ? 'document' : 'image',
@@ -354,10 +364,13 @@ export default function ExplorationLoopScreen() {
           setExploreArtifactIds([...exploreArtifactIds, ...newIds]);
         } else if (artifactSection === 'build') {
           setBuildArtifactIds([...buildArtifactIds, ...newIds]);
+          setBuildExpanded(true);
         } else if (artifactSection === 'check') {
           setCheckArtifactIds([...checkArtifactIds, ...newIds]);
+          setCheckExpanded(true);
         } else {
           setAdaptArtifactIds([...adaptArtifactIds, ...newIds]);
+          setAdaptExpanded(true);
         }
         
         markAsChanged();
@@ -434,9 +447,13 @@ export default function ExplorationLoopScreen() {
     
     if (artifact.type === 'url') {
       try {
-        const canOpen = await Linking.canOpenURL(artifact.uri);
+        let url = artifact.uri;
+        if (!url.startsWith('https://') && !url.startsWith('http://')) {
+          url = 'https://' + url;
+        }
+        const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
-          await Linking.openURL(artifact.uri);
+          await Linking.openURL(url);
         } else {
           Alert.alert('Error', 'Cannot open this URL.');
         }
@@ -511,6 +528,7 @@ export default function ExplorationLoopScreen() {
     
     setBuildItems([...buildItems, newItem]);
     setNewBuildText('');
+    setBuildExpanded(true);
     markAsChanged();
   };
 
@@ -550,6 +568,7 @@ export default function ExplorationLoopScreen() {
     
     setCheckItems([...checkItems, newItem]);
     setNewCheckText('');
+    setCheckExpanded(true);
     markAsChanged();
   };
 
@@ -589,6 +608,7 @@ export default function ExplorationLoopScreen() {
     
     setAdaptItems([...adaptItems, newItem]);
     setNewAdaptText('');
+    setAdaptExpanded(true);
     markAsChanged();
   };
 
@@ -651,6 +671,12 @@ export default function ExplorationLoopScreen() {
     const question = nextExplorationQuestions.find(q => q.id === id);
     
     if (question && !question.isFavorite && project) {
+      // First, update the question's favorite status
+      const updatedQuestions = nextExplorationQuestions.map(q => 
+        q.id === id ? { ...q, isFavorite: true } : q
+      );
+      setNextExplorationQuestions(updatedQuestions);
+      
       // Create new exploration loop in Draft status
       console.log('Creating new exploration loop from favorited question');
       const newLoop: ExplorationLoop = {
@@ -664,7 +690,9 @@ export default function ExplorationLoopScreen() {
         buildItems: [],
         buildArtifactIds: [],
         checkItems: [],
+        checkArtifactIds: [],
         adaptItems: [],
+        adaptArtifactIds: [],
         explorationDecisions: [],
         nextExplorationQuestions: [],
         timeSpent: 0,
@@ -682,25 +710,25 @@ export default function ExplorationLoopScreen() {
       console.log('Saving new loop to project. Total loops:', updatedLoops.length);
       await updateProject(updatedProject);
       
-      // Reload the project to ensure state is fresh
-      const projects = await getProjects();
-      const refreshedProject = projects.find(p => p.id === projectId);
-      if (refreshedProject) {
-        setProject(refreshedProject);
-        console.log('Project refreshed. Exploration loops count:', refreshedProject.explorationLoops?.length || 0);
-      }
+      // Update local project state
+      setProject(updatedProject);
+      
+      // Mark as changed to save the updated questions with favorite status
+      markAsChanged();
       
       Alert.alert(
         'Loop Created',
         'A new exploration loop has been created in Draft status.',
         [{ text: 'OK' }]
       );
+    } else if (question && question.isFavorite) {
+      // Unfavorite
+      const updatedQuestions = nextExplorationQuestions.map(q => 
+        q.id === id ? { ...q, isFavorite: false } : q
+      );
+      setNextExplorationQuestions(updatedQuestions);
+      markAsChanged();
     }
-    
-    setNextExplorationQuestions(nextExplorationQuestions.map(q => 
-      q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
-    ));
-    markAsChanged();
   };
 
   // Exploration decisions
@@ -803,6 +831,10 @@ export default function ExplorationLoopScreen() {
 
   const renderThumbnailGrid = (artifactIds: string[]) => {
     const artifacts = getArtifactsByIds(artifactIds);
+    
+    if (artifacts.length === 0) {
+      return null;
+    }
     
     return (
       <View style={styles.thumbnailGrid}>
@@ -1034,7 +1066,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {exploreArtifactIds.length > 0 && renderThumbnailGrid(exploreArtifactIds)}
+              {renderThumbnailGrid(exploreArtifactIds)}
             </View>
           </View>
 
@@ -1138,7 +1170,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {buildArtifactIds.length > 0 && renderThumbnailGrid(buildArtifactIds)}
+                  {renderThumbnailGrid(buildArtifactIds)}
                 </View>
               </>
             )}
@@ -1244,7 +1276,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {checkArtifactIds.length > 0 && renderThumbnailGrid(checkArtifactIds)}
+                  {renderThumbnailGrid(checkArtifactIds)}
                 </View>
               </>
             )}
@@ -1350,7 +1382,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {adaptArtifactIds.length > 0 && renderThumbnailGrid(adaptArtifactIds)}
+                  {renderThumbnailGrid(adaptArtifactIds)}
                 </View>
               </>
             )}

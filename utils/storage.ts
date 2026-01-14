@@ -92,9 +92,11 @@ export interface ExplorationLoop {
   
   // Check section
   checkItems: CheckItem[];
+  checkArtifactIds: string[];
   
   // Adapt section
   adaptItems: AdaptItem[];
+  adaptArtifactIds: string[];
   
   // Exploration decisions
   explorationDecisions: ExplorationDecision[];
