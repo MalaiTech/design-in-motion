@@ -1236,7 +1236,7 @@ export default function FramingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EAF0FF', // UPDATED: Full screen background
+    backgroundColor: '#EAF0FF',
   },
   scrollContent: {
     padding: 16,
@@ -1295,7 +1295,6 @@ const styles = StyleSheet.create({
     color: colors.phaseFraming,
     fontWeight: '600',
   },
-  // UPDATED: 4-column grid layout
   artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1329,7 +1328,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
-  // UPDATED: Action buttons in top right corner
   artifactActions: {
     position: 'absolute',
     top: 8,

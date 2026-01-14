@@ -48,7 +48,7 @@ export default function EditProjectScreen() {
   useEffect(() => {
     console.log('EditProject: Loading project', id);
     loadProject();
-  }, [loadProject]);
+  }, [loadProject, id]);
 
   const handleSave = async () => {
     if (!project) return;
