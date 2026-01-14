@@ -120,7 +120,7 @@ export default function ExplorationLoopScreen() {
       if (loopId) {
         const foundLoop = found.explorationLoops?.find(l => l.id === loopId);
         if (foundLoop) {
-          console.log('Exploration Loop: Found loop', foundLoop.id);
+          console.log('Exploration Loop: Found loop', foundLoop.id, 'Status:', foundLoop.status);
           setLoop(foundLoop);
           questionRef.current = foundLoop.question;
           
@@ -203,10 +203,10 @@ export default function ExplorationLoopScreen() {
       updatedDate: new Date().toISOString(),
     };
     
-    // Update both state and AsyncStorage
+    // Update both state and AsyncStorage atomically
+    await updateProject(updatedProject);
     setProject(updatedProject);
     setLoop(updatedLoop);
-    await updateProject(updatedProject);
   }, [project, loop, isNewLoop]);
 
   // Save text field immediately
@@ -631,7 +631,7 @@ export default function ExplorationLoopScreen() {
     setEditingQuestionId(null);
   };
 
-  // FIXED: Use same pattern as Framing screen - single atomic operation
+  // FIXED: Match Framing screen pattern - single atomic operation
   const handleToggleNextQuestionFavorite = async (id: string) => {
     if (!project || !loop) return;
     
@@ -670,32 +670,37 @@ export default function ExplorationLoopScreen() {
         q.id === id ? { ...q, isFavorite: true } : q
       );
       
+      // Update current loop with new question favorite status
+      const updatedCurrentLoop: ExplorationLoop = {
+        ...loop,
+        nextExplorationQuestions: updatedQuestions,
+        updatedDate: new Date().toISOString(),
+      };
+      
       // Build updated loops array - update current loop AND add new loop
       let updatedLoops = project.explorationLoops || [];
       
-      // Update current loop with new question favorite status
+      // Update current loop
       updatedLoops = updatedLoops.map(l => 
-        l.id === loop.id 
-          ? { ...l, nextExplorationQuestions: updatedQuestions, updatedDate: new Date().toISOString() }
-          : l
+        l.id === loop.id ? updatedCurrentLoop : l
       );
       
       // Add new loop
       updatedLoops = [...updatedLoops, newLoop];
       
       // Single atomic update to project
-      const updatedProject = {
+      const updatedProject: Project = {
         ...project,
         explorationLoops: updatedLoops,
         updatedDate: new Date().toISOString(),
       };
       
       console.log('Exploration Loop: Saving project with', updatedLoops.length, 'loops');
-      await updateProject(updatedProject);
       
-      // Update local state
+      // FIXED: Save to AsyncStorage first, then update state
+      await updateProject(updatedProject);
       setProject(updatedProject);
-      setLoop({ ...loop, nextExplorationQuestions: updatedQuestions });
+      setLoop(updatedCurrentLoop);
       
       Alert.alert(
         'Loop Created',
