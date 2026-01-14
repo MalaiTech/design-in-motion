@@ -1008,6 +1008,27 @@ export default function ExplorationLoopScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Explore</Text>
             
+            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
+            <View style={styles.visualsSection}>
+              <TouchableOpacity 
+                style={styles.addVisualsButton}
+                onPress={() => {
+                  setArtifactSection('explore');
+                  setShowArtifactOverlay(true);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addVisualsText}>Visuals</Text>
+              </TouchableOpacity>
+              
+              {renderArtifactGrid(loop.exploreArtifactIds)}
+            </View>
+            
             <View style={styles.listContainer}>
               {loop.exploreItems.map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
@@ -1075,30 +1096,9 @@ export default function ExplorationLoopScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            
-            {/* FIXED: Match Framing screen visuals section */}
-            <View style={styles.visualsSection}>
-              <TouchableOpacity 
-                style={styles.addVisualsButton}
-                onPress={() => {
-                  setArtifactSection('explore');
-                  setShowArtifactOverlay(true);
-                }}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color={colors.phaseExploration} 
-                />
-                <Text style={styles.addVisualsText}>Visuals</Text>
-              </TouchableOpacity>
-              
-              {renderArtifactGrid(loop.exploreArtifactIds)}
-            </View>
           </View>
 
-          {/* 4. Build (Collapsible) - FIXED: Show artifacts outside collapsed section */}
+          {/* 4. Build (Collapsible) - FIXED: Visuals OUTSIDE collapsed section */}
           <View style={styles.section}>
             <TouchableOpacity 
               style={styles.collapsibleHeader}
@@ -1113,7 +1113,7 @@ export default function ExplorationLoopScreen() {
               />
             </TouchableOpacity>
             
-            {/* FIXED: Always show visuals button and artifacts, even when collapsed */}
+            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -1205,7 +1205,7 @@ export default function ExplorationLoopScreen() {
             )}
           </View>
 
-          {/* 5. Check (Collapsible) - FIXED: Show artifacts outside collapsed section */}
+          {/* 5. Check (Collapsible) - FIXED: Visuals OUTSIDE collapsed section */}
           <View style={styles.section}>
             <TouchableOpacity 
               style={styles.collapsibleHeader}
@@ -1220,7 +1220,7 @@ export default function ExplorationLoopScreen() {
               />
             </TouchableOpacity>
             
-            {/* FIXED: Always show visuals button and artifacts, even when collapsed */}
+            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -1312,7 +1312,7 @@ export default function ExplorationLoopScreen() {
             )}
           </View>
 
-          {/* 6. Adapt (Collapsible) - FIXED: Show artifacts outside collapsed section */}
+          {/* 6. Adapt (Collapsible) - FIXED: Visuals OUTSIDE collapsed section */}
           <View style={styles.section}>
             <TouchableOpacity 
               style={styles.collapsibleHeader}
@@ -1327,7 +1327,7 @@ export default function ExplorationLoopScreen() {
               />
             </TouchableOpacity>
             
-            {/* FIXED: Always show visuals button and artifacts, even when collapsed */}
+            {/* FIXED: Visuals section ALWAYS visible, positioned OUTSIDE collapsible content */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -2079,6 +2079,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.divider,
+    marginTop: 12,
   },
   listItem: {
     flexDirection: 'row',
@@ -2116,7 +2117,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   visualsSection: {
-    marginTop: 12,
+    marginBottom: 12,
   },
   addVisualsButton: {
     flexDirection: 'row',
@@ -2124,6 +2125,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.divider,
     gap: 8,
   },
   addVisualsText: {
@@ -2131,7 +2134,6 @@ const styles = StyleSheet.create({
     color: colors.phaseExploration,
     fontWeight: '600',
   },
-  // FIXED: Match Framing screen artifact grid
   artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
