@@ -36,6 +36,67 @@ import * as DocumentPicker from 'expo-document-picker';
 
 type CertaintyCategory = 'known' | 'assumed' | 'unknown';
 
+// Reusable editable list item component
+function EditableListItem({ 
+  text, 
+  onEdit, 
+  onDelete, 
+}: { 
+  text: string; 
+  onEdit: (newText: string) => void; 
+  onDelete: () => void; 
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(text);
+
+  const handleFinishEdit = () => {
+    if (editText.trim() && editText !== text) {
+      onEdit(editText.trim());
+    } else {
+      setEditText(text);
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <View style={styles.listItem}>
+      {isEditing ? (
+        <TextInput
+          style={styles.listItemInput}
+          value={editText}
+          onChangeText={setEditText}
+          onBlur={handleFinishEdit}
+          onSubmitEditing={handleFinishEdit}
+          autoFocus
+          returnKeyType="done"
+        />
+      ) : (
+        <>
+          <Text style={styles.listItemText}>{text}</Text>
+          <View style={styles.listItemActions}>
+            <TouchableOpacity onPress={() => setIsEditing(true)}>
+              <IconSymbol 
+                ios_icon_name="pencil" 
+                android_material_icon_name="edit" 
+                size={20} 
+                color={colors.textSecondary} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onDelete}>
+              <IconSymbol 
+                ios_icon_name="trash" 
+                android_material_icon_name="delete" 
+                size={20} 
+                color={colors.phaseFinish} 
+              />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
 export default function FramingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -1168,67 +1229,6 @@ export default function FramingScreen() {
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
-  );
-}
-
-// Reusable editable list item component
-function EditableListItem({ 
-  text, 
-  onEdit, 
-  onDelete, 
-}: { 
-  text: string; 
-  onEdit: (newText: string) => void; 
-  onDelete: () => void; 
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(text);
-
-  const handleFinishEdit = () => {
-    if (editText.trim() && editText !== text) {
-      onEdit(editText.trim());
-    } else {
-      setEditText(text);
-    }
-    setIsEditing(false);
-  };
-
-  return (
-    <View style={styles.listItem}>
-      {isEditing ? (
-        <TextInput
-          style={styles.listItemInput}
-          value={editText}
-          onChangeText={setEditText}
-          onBlur={handleFinishEdit}
-          onSubmitEditing={handleFinishEdit}
-          autoFocus
-          returnKeyType="done"
-        />
-      ) : (
-        <>
-          <Text style={styles.listItemText}>{text}</Text>
-          <View style={styles.listItemActions}>
-            <TouchableOpacity onPress={() => setIsEditing(true)}>
-              <IconSymbol 
-                ios_icon_name="pencil" 
-                android_material_icon_name="edit" 
-                size={20} 
-                color={colors.textSecondary} 
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onDelete}>
-              <IconSymbol 
-                ios_icon_name="trash" 
-                android_material_icon_name="delete" 
-                size={20} 
-                color={colors.phaseFinish} 
-              />
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
     </View>
   );
 }

@@ -87,6 +87,45 @@ export default function ExplorationLoopScreen() {
   const hasUnsavedChanges = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const saveChanges = useCallback(async () => {
+    if (!project) return;
+    
+    const updatedLoop: ExplorationLoop = {
+      id: loopId || Date.now().toString(),
+      question,
+      status,
+      updatedDate: new Date().toISOString(),
+      artifactIds: [...exploreArtifactIds, ...buildArtifactIds, ...invoicesArtifactIds],
+      exploreItems,
+      exploreArtifactIds,
+      buildItems,
+      buildArtifactIds,
+      checkItems,
+      adaptItems,
+      explorationDecisions,
+      nextExplorationQuestions,
+      timeSpent: parseFloat(timeSpent) || 0,
+      costs: parseFloat(costs) || 0,
+      invoicesArtifactIds,
+    };
+    
+    let updatedLoops = project.explorationLoops || [];
+    if (isNewLoop) {
+      updatedLoops = [...updatedLoops, updatedLoop];
+    } else {
+      updatedLoops = updatedLoops.map(l => l.id === loopId ? updatedLoop : l);
+    }
+    
+    const updatedProject: Project = {
+      ...project,
+      explorationLoops: updatedLoops,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    await updateProject(updatedProject);
+    hasUnsavedChanges.current = false;
+  }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, adaptItems, explorationDecisions, nextExplorationQuestions, timeSpent, costs, invoicesArtifactIds]);
+
   const loadProject = useCallback(async () => {
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
@@ -134,47 +173,8 @@ export default function ExplorationLoopScreen() {
           clearTimeout(saveTimeoutRef.current);
         }
       };
-    }, [loadProject])
+    }, [loadProject, saveChanges])
   );
-
-  const saveChanges = useCallback(async () => {
-    if (!project) return;
-    
-    const updatedLoop: ExplorationLoop = {
-      id: loopId || Date.now().toString(),
-      question,
-      status,
-      updatedDate: new Date().toISOString(),
-      artifactIds: [...exploreArtifactIds, ...buildArtifactIds, ...invoicesArtifactIds],
-      exploreItems,
-      exploreArtifactIds,
-      buildItems,
-      buildArtifactIds,
-      checkItems,
-      adaptItems,
-      explorationDecisions,
-      nextExplorationQuestions,
-      timeSpent: parseFloat(timeSpent) || 0,
-      costs: parseFloat(costs) || 0,
-      invoicesArtifactIds,
-    };
-    
-    let updatedLoops = project.explorationLoops || [];
-    if (isNewLoop) {
-      updatedLoops = [...updatedLoops, updatedLoop];
-    } else {
-      updatedLoops = updatedLoops.map(l => l.id === loopId ? updatedLoop : l);
-    }
-    
-    const updatedProject: Project = {
-      ...project,
-      explorationLoops: updatedLoops,
-      updatedDate: new Date().toISOString(),
-    };
-    
-    await updateProject(updatedProject);
-    hasUnsavedChanges.current = false;
-  }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, adaptItems, explorationDecisions, nextExplorationQuestions, timeSpent, costs, invoicesArtifactIds]);
 
   const markAsChanged = useCallback(() => {
     hasUnsavedChanges.current = true;
