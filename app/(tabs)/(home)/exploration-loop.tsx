@@ -37,9 +37,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const THUMBNAIL_GAP = 8;
+const THUMBNAIL_GAP = 12;
 const THUMBNAILS_PER_ROW = 4;
-const THUMBNAIL_SIZE = (SCREEN_WIDTH - 32 - (THUMBNAIL_GAP * (THUMBNAILS_PER_ROW + 1))) / THUMBNAILS_PER_ROW;
+const THUMBNAIL_SIZE = (SCREEN_WIDTH - 32 - (THUMBNAIL_GAP * (THUMBNAILS_PER_ROW - 1))) / THUMBNAILS_PER_ROW;
 
 interface TimeEntry {
   id: string;
@@ -216,7 +216,7 @@ export default function ExplorationLoopScreen() {
     await updateAndSaveLoop({ [field]: value });
   }, [loop, updateAndSaveLoop]);
 
-  // Artifact management
+  // Artifact management - FIXED: Match Framing screen approach
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project || !loop) return;
     
@@ -227,7 +227,7 @@ export default function ExplorationLoopScreen() {
           'Enter the URL of the artifact',
           async (url) => {
             if (url && url.trim()) {
-              console.log('Exploration Loop: Adding URL artifact');
+              console.log('Exploration Loop: Adding URL artifact to', artifactSection);
               const newArtifact: Artifact = {
                 id: Date.now().toString(),
                 type: 'url',
@@ -294,7 +294,7 @@ export default function ExplorationLoopScreen() {
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        console.log('Exploration Loop: Adding', result.assets.length, 'artifacts');
+        console.log('Exploration Loop: Adding', result.assets.length, 'artifacts to', artifactSection);
         const newArtifacts: Artifact[] = result.assets.map((asset: any, index: number) => ({
           id: `${Date.now()}_${index}`,
           type: type === 'document' ? 'document' : 'image',
@@ -848,7 +848,8 @@ export default function ExplorationLoopScreen() {
     return entries.reduce((sum: number, entry: CostEntry) => sum + entry.amount, 0);
   };
 
-  const renderThumbnailGrid = (artifactIds: string[]) => {
+  // FIXED: Match Framing screen artifact grid layout
+  const renderArtifactGrid = (artifactIds: string[]) => {
     const artifacts = getArtifactsByIds(artifactIds);
     
     if (artifacts.length === 0) {
@@ -856,11 +857,11 @@ export default function ExplorationLoopScreen() {
     }
     
     return (
-      <View style={styles.thumbnailGrid}>
+      <View style={styles.artifactGrid}>
         {artifacts.map((artifact) => (
           <TouchableOpacity
             key={artifact.id}
-            style={styles.thumbnail}
+            style={styles.artifactGridItem}
             onPress={() => {
               if (artifact.type === 'url' || artifact.type === 'document') {
                 handleOpenArtifact(artifact);
@@ -871,32 +872,32 @@ export default function ExplorationLoopScreen() {
             }}
           >
             {artifact.type === 'image' ? (
-              <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
+              <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
             ) : artifact.type === 'document' ? (
-              <View style={styles.thumbnailDoc}>
+              <View style={styles.artifactPlaceholder}>
                 <IconSymbol 
                   ios_icon_name="doc.fill" 
                   android_material_icon_name="description" 
                   size={32} 
-                  color={colors.textSecondary} 
+                  color={colors.phaseExploration} 
                 />
-                <Text style={styles.thumbnailLabel}>PDF</Text>
+                <Text style={styles.artifactPlaceholderText}>PDF</Text>
               </View>
             ) : (
-              <View style={styles.thumbnailDoc}>
+              <View style={styles.artifactPlaceholder}>
                 <IconSymbol 
                   ios_icon_name="link" 
                   android_material_icon_name="link" 
                   size={32} 
-                  color={colors.textSecondary} 
+                  color={colors.phaseExploration} 
                 />
-                <Text style={styles.thumbnailLabel}>URL</Text>
+                <Text style={styles.artifactPlaceholderText}>URL</Text>
               </View>
             )}
             
-            <View style={styles.thumbnailActions}>
+            <View style={styles.artifactActions}>
               <TouchableOpacity 
-                style={styles.thumbnailActionButton}
+                style={styles.artifactActionButton}
                 onPress={(e) => {
                   e.stopPropagation();
                   handleToggleArtifactFavorite(artifact.id);
@@ -905,21 +906,21 @@ export default function ExplorationLoopScreen() {
                 <IconSymbol 
                   ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
                   android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
-                  size={16} 
+                  size={18} 
                   color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
                 />
               </TouchableOpacity>
               <TouchableOpacity 
-                style={styles.thumbnailActionButton}
+                style={styles.artifactActionButton}
                 onPress={(e) => {
                   e.stopPropagation();
                   handleDeleteArtifact(artifact.id);
                 }}
               >
                 <IconSymbol 
-                  ios_icon_name="trash.fill" 
+                  ios_icon_name="trash" 
                   android_material_icon_name="delete" 
-                  size={16} 
+                  size={18} 
                   color="#FFFFFF" 
                 />
               </TouchableOpacity>
@@ -1075,6 +1076,7 @@ export default function ExplorationLoopScreen() {
               </View>
             </View>
             
+            {/* FIXED: Match Framing screen visuals section */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -1092,7 +1094,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderThumbnailGrid(loop.exploreArtifactIds)}
+              {renderArtifactGrid(loop.exploreArtifactIds)}
             </View>
           </View>
 
@@ -1181,6 +1183,7 @@ export default function ExplorationLoopScreen() {
                   </View>
                 </View>
                 
+                {/* FIXED: Match Framing screen visuals section */}
                 <View style={styles.visualsSection}>
                   <TouchableOpacity 
                     style={styles.addVisualsButton}
@@ -1198,7 +1201,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {renderThumbnailGrid(loop.buildArtifactIds)}
+                  {renderArtifactGrid(loop.buildArtifactIds)}
                 </View>
               </>
             )}
@@ -1289,6 +1292,7 @@ export default function ExplorationLoopScreen() {
                   </View>
                 </View>
                 
+                {/* FIXED: Match Framing screen visuals section */}
                 <View style={styles.visualsSection}>
                   <TouchableOpacity 
                     style={styles.addVisualsButton}
@@ -1306,7 +1310,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {renderThumbnailGrid(loop.checkArtifactIds)}
+                  {renderArtifactGrid(loop.checkArtifactIds)}
                 </View>
               </>
             )}
@@ -1397,6 +1401,7 @@ export default function ExplorationLoopScreen() {
                   </View>
                 </View>
                 
+                {/* FIXED: Match Framing screen visuals section */}
                 <View style={styles.visualsSection}>
                   <TouchableOpacity 
                     style={styles.addVisualsButton}
@@ -1414,7 +1419,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {renderThumbnailGrid(loop.adaptArtifactIds)}
+                  {renderArtifactGrid(loop.adaptArtifactIds)}
                 </View>
               </>
             )}
@@ -2132,50 +2137,47 @@ const styles = StyleSheet.create({
     color: colors.phaseExploration,
     fontWeight: '600',
   },
-  thumbnailGrid: {
+  // FIXED: Match Framing screen artifact grid
+  artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 12,
     gap: THUMBNAIL_GAP,
   },
-  thumbnail: {
+  artifactGridItem: {
     width: THUMBNAIL_SIZE,
     height: THUMBNAIL_SIZE,
     backgroundColor: colors.divider,
     position: 'relative',
   },
-  thumbnailImage: {
+  artifactImage: {
     width: '100%',
     height: '100%',
   },
-  thumbnailDoc: {
+  artifactPlaceholder: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  thumbnailLabel: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    marginTop: 4,
+  artifactPlaceholderText: {
+    fontSize: 12,
+    color: colors.phaseExploration,
     fontWeight: '600',
+    marginTop: 4,
   },
-  thumbnailActions: {
+  artifactActions: {
     position: 'absolute',
     top: 4,
     right: 4,
     flexDirection: 'row',
     gap: 4,
   },
-  thumbnailActionButton: {
+  artifactActionButton: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
     padding: 4,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   addDecisionButton: {
     flexDirection: 'row',
