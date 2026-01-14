@@ -55,6 +55,9 @@ export default function FramingScreen() {
   const newDesignSpaceTextRef = useRef('');
   const newQuestionTextRef = useRef('');
   const decisionSummaryRef = useRef('');
+  
+  // Ref for ScrollView to enable programmatic scrolling
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const loadProject = useCallback(async () => {
     console.log('Framing: Loading project', projectId);
@@ -374,9 +377,12 @@ export default function FramingScreen() {
   return (
     <View style={styles.container}>
       <ScrollView 
+        ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}
+        contentInsetAdjustmentBehavior="automatic"
       >
         {/* 1. Opportunity Origin */}
         <View style={styles.section}>
@@ -557,6 +563,7 @@ export default function FramingScreen() {
                 }}
                 onSubmitEditing={handleAddCertaintyItem}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
               <TouchableOpacity onPress={handleAddCertaintyItem}>
                 <IconSymbol 
@@ -597,6 +604,7 @@ export default function FramingScreen() {
                 }}
                 onSubmitEditing={handleAddDesignSpaceItem}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
               <TouchableOpacity onPress={handleAddDesignSpaceItem}>
                 <IconSymbol 
@@ -639,6 +647,7 @@ export default function FramingScreen() {
                 }}
                 onSubmitEditing={handleAddExplorationQuestion}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
               <TouchableOpacity onPress={handleAddExplorationQuestion}>
                 <IconSymbol 
@@ -967,7 +976,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120, // Extra padding to ensure bottom fields are accessible above keyboard
   },
   emptyContainer: {
     flex: 1,
