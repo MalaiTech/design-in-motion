@@ -36,7 +36,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
-const THUMBNAIL_SIZE = 80;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const THUMBNAIL_GAP = 8;
+const THUMBNAILS_PER_ROW = 4;
+const THUMBNAIL_SIZE = (SCREEN_WIDTH - 32 - (THUMBNAIL_GAP * (THUMBNAILS_PER_ROW + 1))) / THUMBNAILS_PER_ROW;
 
 interface TimeEntry {
   id: string;
@@ -218,8 +221,10 @@ export default function ExplorationLoopScreen() {
     let updatedLoops = project.explorationLoops || [];
     if (isNewLoop) {
       updatedLoops = [...updatedLoops, updatedLoop];
+      console.log('Adding new loop to project. Total loops:', updatedLoops.length);
     } else {
       updatedLoops = updatedLoops.map(l => l.id === loopId ? updatedLoop : l);
+      console.log('Updating existing loop in project');
     }
     
     const updatedProject: Project = {
@@ -229,7 +234,9 @@ export default function ExplorationLoopScreen() {
     };
     
     await updateProject(updatedProject);
+    setProject(updatedProject);
     hasUnsavedChanges.current = false;
+    console.log('Exploration loop saved successfully');
   }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, checkArtifactIds, adaptItems, adaptArtifactIds, explorationDecisions, nextExplorationQuestions, timeEntries, costEntries]);
 
   const markAsChanged = useCallback(() => {
@@ -672,8 +679,16 @@ export default function ExplorationLoopScreen() {
         updatedDate: new Date().toISOString(),
       };
       
+      console.log('Saving new loop to project. Total loops:', updatedLoops.length);
       await updateProject(updatedProject);
-      setProject(updatedProject);
+      
+      // Reload the project to ensure state is fresh
+      const projects = await getProjects();
+      const refreshedProject = projects.find(p => p.id === projectId);
+      if (refreshedProject) {
+        setProject(refreshedProject);
+        console.log('Project refreshed. Exploration loops count:', refreshedProject.explorationLoops?.length || 0);
+      }
       
       Alert.alert(
         'Loop Created',
@@ -786,10 +801,89 @@ export default function ExplorationLoopScreen() {
     return costEntries.reduce((sum, entry) => sum + entry.amount, 0);
   };
 
+  const renderThumbnailGrid = (artifactIds: string[]) => {
+    const artifacts = getArtifactsByIds(artifactIds);
+    
+    return (
+      <View style={styles.thumbnailGrid}>
+        {artifacts.map((artifact, index) => (
+          <TouchableOpacity
+            key={artifact.id}
+            style={styles.thumbnail}
+            onPress={() => {
+              if (artifact.type === 'url' || artifact.type === 'document') {
+                handleOpenArtifact(artifact);
+              } else {
+                setSelectedArtifact(artifact);
+                setShowArtifactViewer(true);
+              }
+            }}
+          >
+            {artifact.type === 'image' ? (
+              <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
+            ) : artifact.type === 'document' ? (
+              <View style={styles.thumbnailDoc}>
+                <IconSymbol 
+                  ios_icon_name="doc.fill" 
+                  android_material_icon_name="description" 
+                  size={32} 
+                  color={colors.textSecondary} 
+                />
+                <Text style={styles.thumbnailLabel}>PDF</Text>
+              </View>
+            ) : (
+              <View style={styles.thumbnailDoc}>
+                <IconSymbol 
+                  ios_icon_name="link" 
+                  android_material_icon_name="link" 
+                  size={32} 
+                  color={colors.textSecondary} 
+                />
+                <Text style={styles.thumbnailLabel}>URL</Text>
+              </View>
+            )}
+            
+            {/* Action icons in upper right corner */}
+            <View style={styles.thumbnailActions}>
+              <TouchableOpacity 
+                style={styles.thumbnailActionButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleToggleArtifactFavorite(artifact.id);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
+                  android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
+                  size={16} 
+                  color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.thumbnailActionButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteArtifact(artifact.id);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name="trash.fill" 
+                  android_material_icon_name="delete" 
+                  size={16} 
+                  color="#FFFFFF" 
+                />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: '', headerShown: true }} />
+        <Stack.Screen options={{ title: '', headerShown: true, headerStyle: { backgroundColor: '#FFF6D8' } }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -803,6 +897,8 @@ export default function ExplorationLoopScreen() {
         options={{ 
           title: '',
           headerShown: true,
+          headerStyle: { backgroundColor: '#FFF6D8' },
+          headerTintColor: colors.text,
         }} 
       />
       
@@ -938,43 +1034,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {exploreArtifactIds.length > 0 && (
-                <View style={styles.thumbnailGrid}>
-                  {getArtifactsByIds(exploreArtifactIds).map((artifact, index) => (
-                    <TouchableOpacity
-                      key={artifact.id}
-                      style={styles.thumbnail}
-                      onPress={() => {
-                        setSelectedArtifact(artifact);
-                        setShowArtifactViewer(true);
-                      }}
-                    >
-                      {artifact.type === 'image' ? (
-                        <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
-                      ) : (
-                        <View style={styles.thumbnailDoc}>
-                          <IconSymbol 
-                            ios_icon_name="doc" 
-                            android_material_icon_name="description" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                        </View>
-                      )}
-                      {artifact.isFavorite && (
-                        <View style={styles.favoriteBadge}>
-                          <IconSymbol 
-                            ios_icon_name="star.fill" 
-                            android_material_icon_name="star" 
-                            size={12} 
-                            color="#FFD700" 
-                          />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              {exploreArtifactIds.length > 0 && renderThumbnailGrid(exploreArtifactIds)}
             </View>
           </View>
 
@@ -1078,43 +1138,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {buildArtifactIds.length > 0 && (
-                    <View style={styles.thumbnailGrid}>
-                      {getArtifactsByIds(buildArtifactIds).map((artifact, index) => (
-                        <TouchableOpacity
-                          key={artifact.id}
-                          style={styles.thumbnail}
-                          onPress={() => {
-                            setSelectedArtifact(artifact);
-                            setShowArtifactViewer(true);
-                          }}
-                        >
-                          {artifact.type === 'image' ? (
-                            <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
-                          ) : (
-                            <View style={styles.thumbnailDoc}>
-                              <IconSymbol 
-                                ios_icon_name="doc" 
-                                android_material_icon_name="description" 
-                                size={32} 
-                                color={colors.textSecondary} 
-                              />
-                            </View>
-                          )}
-                          {artifact.isFavorite && (
-                            <View style={styles.favoriteBadge}>
-                              <IconSymbol 
-                                ios_icon_name="star.fill" 
-                                android_material_icon_name="star" 
-                                size={12} 
-                                color="#FFD700" 
-                              />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                  {buildArtifactIds.length > 0 && renderThumbnailGrid(buildArtifactIds)}
                 </View>
               </>
             )}
@@ -1220,43 +1244,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {checkArtifactIds.length > 0 && (
-                    <View style={styles.thumbnailGrid}>
-                      {getArtifactsByIds(checkArtifactIds).map((artifact, index) => (
-                        <TouchableOpacity
-                          key={artifact.id}
-                          style={styles.thumbnail}
-                          onPress={() => {
-                            setSelectedArtifact(artifact);
-                            setShowArtifactViewer(true);
-                          }}
-                        >
-                          {artifact.type === 'image' ? (
-                            <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
-                          ) : (
-                            <View style={styles.thumbnailDoc}>
-                              <IconSymbol 
-                                ios_icon_name="doc" 
-                                android_material_icon_name="description" 
-                                size={32} 
-                                color={colors.textSecondary} 
-                              />
-                            </View>
-                          )}
-                          {artifact.isFavorite && (
-                            <View style={styles.favoriteBadge}>
-                              <IconSymbol 
-                                ios_icon_name="star.fill" 
-                                android_material_icon_name="star" 
-                                size={12} 
-                                color="#FFD700" 
-                              />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                  {checkArtifactIds.length > 0 && renderThumbnailGrid(checkArtifactIds)}
                 </View>
               </>
             )}
@@ -1362,43 +1350,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {adaptArtifactIds.length > 0 && (
-                    <View style={styles.thumbnailGrid}>
-                      {getArtifactsByIds(adaptArtifactIds).map((artifact, index) => (
-                        <TouchableOpacity
-                          key={artifact.id}
-                          style={styles.thumbnail}
-                          onPress={() => {
-                            setSelectedArtifact(artifact);
-                            setShowArtifactViewer(true);
-                          }}
-                        >
-                          {artifact.type === 'image' ? (
-                            <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
-                          ) : (
-                            <View style={styles.thumbnailDoc}>
-                              <IconSymbol 
-                                ios_icon_name="doc" 
-                                android_material_icon_name="description" 
-                                size={32} 
-                                color={colors.textSecondary} 
-                              />
-                            </View>
-                          )}
-                          {artifact.isFavorite && (
-                            <View style={styles.favoriteBadge}>
-                              <IconSymbol 
-                                ios_icon_name="star.fill" 
-                                android_material_icon_name="star" 
-                                size={12} 
-                                color="#FFD700" 
-                              />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                  {adaptArtifactIds.length > 0 && renderThumbnailGrid(adaptArtifactIds)}
                 </View>
               </>
             )}
@@ -2120,7 +2072,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 12,
-    gap: 8,
+    gap: THUMBNAIL_GAP,
   },
   thumbnail: {
     width: THUMBNAIL_SIZE,
@@ -2139,13 +2091,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  favoriteBadge: {
+  thumbnailLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  thumbnailActions: {
     position: 'absolute',
     top: 4,
     right: 4,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  thumbnailActionButton: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 4,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addDecisionButton: {
     flexDirection: 'row',
