@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   Dimensions,
   Keyboard,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -38,38 +38,26 @@ export default function FramingScreen() {
   const params = useLocalSearchParams();
   const projectId = params.id as string;
 
+  // Single source of truth for project data
   const [project, setProject] = useState<Project | null>(null);
   
-  // Framing fields - local state
-  const [opportunityOrigin, setOpportunityOrigin] = useState('');
-  const [purpose, setPurpose] = useState('');
-  const [certaintyItems, setCertaintyItems] = useState<CertaintyItem[]>([]);
-  const [designSpaceItems, setDesignSpaceItems] = useState<DesignSpaceItem[]>([]);
-  const [explorationQuestions, setExplorationQuestions] = useState<ExplorationQuestion[]>([]);
-  const [framingDecisions, setFramingDecisions] = useState<FramingDecision[]>([]);
-  
-  // UI state
+  // UI state only
   const [selectedCertaintyCategory, setSelectedCertaintyCategory] = useState<CertaintyCategory>('known');
   const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   
-  // Edit states - use local text state to prevent jitter
-  const [editingCertaintyId, setEditingCertaintyId] = useState<string | null>(null);
-  const [editingCertaintyText, setEditingCertaintyText] = useState('');
-  const [editingDesignSpaceId, setEditingDesignSpaceId] = useState<string | null>(null);
-  const [editingDesignSpaceText, setEditingDesignSpaceText] = useState('');
-  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
-  const [editingQuestionText, setEditingQuestionText] = useState('');
+  // Refs for temporary input values (prevents re-renders during typing)
+  const opportunityOriginRef = useRef('');
+  const purposeRef = useRef('');
+  const newCertaintyTextRef = useRef('');
+  const newDesignSpaceTextRef = useRef('');
+  const newQuestionTextRef = useRef('');
+  const decisionSummaryRef = useRef('');
   
-  // New item inputs
-  const [newCertaintyText, setNewCertaintyText] = useState('');
-  const [newDesignSpaceText, setNewDesignSpaceText] = useState('');
-  const [newQuestionText, setNewQuestionText] = useState('');
-  
-  // Decision overlay
-  const [decisionSummary, setDecisionSummary] = useState('');
+  // Track if data has been modified
+  const hasChangesRef = useRef(false);
 
   const loadProject = useCallback(async () => {
     console.log('Framing: Loading project', projectId);
@@ -77,12 +65,9 @@ export default function FramingScreen() {
     const found = projects.find(p => p.id === projectId);
     if (found) {
       setProject(found);
-      setOpportunityOrigin(found.opportunityOrigin || '');
-      setPurpose(found.purpose || '');
-      setCertaintyItems(found.certaintyItems || []);
-      setDesignSpaceItems(found.designSpaceItems || []);
-      setExplorationQuestions(found.explorationQuestions || []);
-      setFramingDecisions(found.framingDecisions || []);
+      opportunityOriginRef.current = found.opportunityOrigin || '';
+      purposeRef.current = found.purpose || '';
+      hasChangesRef.current = false;
     } else {
       Alert.alert('Project Not Found', 'This project no longer exists.', [
         { text: 'OK', onPress: () => router.back() }
@@ -90,33 +75,40 @@ export default function FramingScreen() {
     }
   }, [projectId, router]);
 
-  const saveChanges = useCallback(async () => {
-    if (!project) return;
+  const saveProject = useCallback(async () => {
+    if (!project || !hasChangesRef.current) {
+      console.log('Framing: No changes to save');
+      return;
+    }
     
-    console.log('Framing: Saving changes to project');
+    console.log('Framing: Saving project changes');
     const updatedProject: Project = {
       ...project,
-      opportunityOrigin,
-      purpose,
-      certaintyItems,
-      designSpaceItems,
-      explorationQuestions,
-      framingDecisions,
+      opportunityOrigin: opportunityOriginRef.current,
+      purpose: purposeRef.current,
       updatedDate: new Date().toISOString(),
     };
     
     await updateProject(updatedProject);
-  }, [project, opportunityOrigin, purpose, certaintyItems, designSpaceItems, explorationQuestions, framingDecisions]);
+    hasChangesRef.current = false;
+  }, [project]);
 
   useFocusEffect(
     useCallback(() => {
       loadProject();
       return () => {
-        console.log('Framing: Screen unfocused, saving changes');
-        saveChanges();
+        console.log('Framing: Screen unfocused, saving if needed');
+        saveProject();
       };
-    }, [loadProject, saveChanges])
+    }, [loadProject, saveProject])
   );
+
+  // Helper to update project and mark as changed
+  const updateProjectData = useCallback((updates: Partial<Project>) => {
+    if (!project) return;
+    setProject({ ...project, ...updates });
+    hasChangesRef.current = true;
+  }, [project]);
 
   // Artifact management
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
@@ -138,14 +130,8 @@ export default function FramingScreen() {
               };
               
               const updatedArtifacts = [...project.artifacts, newArtifact];
-              const updatedProject = {
-                ...project,
-                artifacts: updatedArtifacts,
-                updatedDate: new Date().toISOString(),
-              };
-              
-              await updateProject(updatedProject);
-              setProject(updatedProject);
+              updateProjectData({ artifacts: updatedArtifacts });
+              await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
               setShowArtifactOverlay(false);
             }
           }
@@ -192,14 +178,8 @@ export default function FramingScreen() {
         };
         
         const updatedArtifacts = [...project.artifacts, newArtifact];
-        const updatedProject = {
-          ...project,
-          artifacts: updatedArtifacts,
-          updatedDate: new Date().toISOString(),
-        };
-        
-        await updateProject(updatedProject);
-        setProject(updatedProject);
+        updateProjectData({ artifacts: updatedArtifacts });
+        await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
         setShowArtifactOverlay(false);
       }
     } catch (error) {
@@ -222,14 +202,8 @@ export default function FramingScreen() {
           style: 'destructive',
           onPress: async () => {
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
-            const updatedProject = {
-              ...project,
-              artifacts: updatedArtifacts,
-              updatedDate: new Date().toISOString(),
-            };
-            
-            await updateProject(updatedProject);
-            setProject(updatedProject);
+            updateProjectData({ artifacts: updatedArtifacts });
+            await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
             setShowArtifactViewer(false);
           }
         }
@@ -245,139 +219,120 @@ export default function FramingScreen() {
       a.id === artifactId ? { ...a, caption: a.caption === 'favorite' ? undefined : 'favorite' } : a
     );
     
-    const updatedProject = {
-      ...project,
-      artifacts: updatedArtifacts,
-      updatedDate: new Date().toISOString(),
-    };
-    
-    await updateProject(updatedProject);
-    setProject(updatedProject);
+    updateProjectData({ artifacts: updatedArtifacts });
+    await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
   };
 
   // Certainty items
   const handleAddCertaintyItem = () => {
-    if (!newCertaintyText.trim()) return;
+    if (!project || !newCertaintyTextRef.current.trim()) return;
     
     console.log('Framing: Adding certainty item');
     const newItem: CertaintyItem = {
       id: Date.now().toString(),
-      text: newCertaintyText.trim(),
+      text: newCertaintyTextRef.current.trim(),
       category: selectedCertaintyCategory,
     };
     
-    setCertaintyItems([...certaintyItems, newItem]);
-    setNewCertaintyText('');
+    const updatedItems = [...(project.certaintyItems || []), newItem];
+    updateProjectData({ certaintyItems: updatedItems });
+    newCertaintyTextRef.current = '';
     Keyboard.dismiss();
   };
 
   const handleDeleteCertaintyItem = (id: string) => {
+    if (!project) return;
     console.log('Framing: Deleting certainty item', id);
-    setCertaintyItems(certaintyItems.filter(item => item.id !== id));
+    const updatedItems = (project.certaintyItems || []).filter(item => item.id !== id);
+    updateProjectData({ certaintyItems: updatedItems });
   };
 
-  const startEditingCertaintyItem = (id: string, text: string) => {
-    console.log('Framing: Starting to edit certainty item', id);
-    setEditingCertaintyId(id);
-    setEditingCertaintyText(text);
-  };
-
-  const finishEditingCertaintyItem = () => {
-    if (editingCertaintyId && editingCertaintyText.trim()) {
-      console.log('Framing: Finishing edit of certainty item', editingCertaintyId);
-      setCertaintyItems(certaintyItems.map(item => 
-        item.id === editingCertaintyId ? { ...item, text: editingCertaintyText.trim() } : item
-      ));
-    }
-    setEditingCertaintyId(null);
-    setEditingCertaintyText('');
+  const handleEditCertaintyItem = (id: string, newText: string) => {
+    if (!project || !newText.trim()) return;
+    console.log('Framing: Editing certainty item', id);
+    const updatedItems = (project.certaintyItems || []).map(item => 
+      item.id === id ? { ...item, text: newText.trim() } : item
+    );
+    updateProjectData({ certaintyItems: updatedItems });
   };
 
   // Design space items
   const handleAddDesignSpaceItem = () => {
-    if (!newDesignSpaceText.trim()) return;
+    if (!project || !newDesignSpaceTextRef.current.trim()) return;
     
     console.log('Framing: Adding design space item');
     const newItem: DesignSpaceItem = {
       id: Date.now().toString(),
-      text: newDesignSpaceText.trim(),
+      text: newDesignSpaceTextRef.current.trim(),
     };
     
-    setDesignSpaceItems([...designSpaceItems, newItem]);
-    setNewDesignSpaceText('');
+    const updatedItems = [...(project.designSpaceItems || []), newItem];
+    updateProjectData({ designSpaceItems: updatedItems });
+    newDesignSpaceTextRef.current = '';
     Keyboard.dismiss();
   };
 
   const handleDeleteDesignSpaceItem = (id: string) => {
+    if (!project) return;
     console.log('Framing: Deleting design space item', id);
-    setDesignSpaceItems(designSpaceItems.filter(item => item.id !== id));
+    const updatedItems = (project.designSpaceItems || []).filter(item => item.id !== id);
+    updateProjectData({ designSpaceItems: updatedItems });
   };
 
-  const startEditingDesignSpaceItem = (id: string, text: string) => {
-    console.log('Framing: Starting to edit design space item', id);
-    setEditingDesignSpaceId(id);
-    setEditingDesignSpaceText(text);
-  };
-
-  const finishEditingDesignSpaceItem = () => {
-    if (editingDesignSpaceId && editingDesignSpaceText.trim()) {
-      console.log('Framing: Finishing edit of design space item', editingDesignSpaceId);
-      setDesignSpaceItems(designSpaceItems.map(item => 
-        item.id === editingDesignSpaceId ? { ...item, text: editingDesignSpaceText.trim() } : item
-      ));
-    }
-    setEditingDesignSpaceId(null);
-    setEditingDesignSpaceText('');
+  const handleEditDesignSpaceItem = (id: string, newText: string) => {
+    if (!project || !newText.trim()) return;
+    console.log('Framing: Editing design space item', id);
+    const updatedItems = (project.designSpaceItems || []).map(item => 
+      item.id === id ? { ...item, text: newText.trim() } : item
+    );
+    updateProjectData({ designSpaceItems: updatedItems });
   };
 
   // Exploration questions
   const handleAddExplorationQuestion = () => {
-    if (!newQuestionText.trim()) return;
+    if (!project || !newQuestionTextRef.current.trim()) return;
     
     console.log('Framing: Adding exploration question');
     const newQuestion: ExplorationQuestion = {
       id: Date.now().toString(),
-      text: newQuestionText.trim(),
+      text: newQuestionTextRef.current.trim(),
       isFavorite: false,
     };
     
-    setExplorationQuestions([...explorationQuestions, newQuestion]);
-    setNewQuestionText('');
+    const updatedQuestions = [...(project.explorationQuestions || []), newQuestion];
+    updateProjectData({ explorationQuestions: updatedQuestions });
+    newQuestionTextRef.current = '';
     Keyboard.dismiss();
   };
 
   const handleDeleteExplorationQuestion = (id: string) => {
+    if (!project) return;
     console.log('Framing: Deleting exploration question', id);
-    setExplorationQuestions(explorationQuestions.filter(q => q.id !== id));
+    const updatedQuestions = (project.explorationQuestions || []).filter(q => q.id !== id);
+    updateProjectData({ explorationQuestions: updatedQuestions });
   };
 
-  const startEditingExplorationQuestion = (id: string, text: string) => {
-    console.log('Framing: Starting to edit exploration question', id);
-    setEditingQuestionId(id);
-    setEditingQuestionText(text);
-  };
-
-  const finishEditingExplorationQuestion = () => {
-    if (editingQuestionId && editingQuestionText.trim()) {
-      console.log('Framing: Finishing edit of exploration question', editingQuestionId);
-      setExplorationQuestions(explorationQuestions.map(q => 
-        q.id === editingQuestionId ? { ...q, text: editingQuestionText.trim() } : q
-      ));
-    }
-    setEditingQuestionId(null);
-    setEditingQuestionText('');
+  const handleEditExplorationQuestion = (id: string, newText: string) => {
+    if (!project || !newText.trim()) return;
+    console.log('Framing: Editing exploration question', id);
+    const updatedQuestions = (project.explorationQuestions || []).map(q => 
+      q.id === id ? { ...q, text: newText.trim() } : q
+    );
+    updateProjectData({ explorationQuestions: updatedQuestions });
   };
 
   const handleToggleQuestionFavorite = (id: string) => {
+    if (!project) return;
     console.log('Framing: Toggling question favorite', id);
-    setExplorationQuestions(explorationQuestions.map(q => 
+    const updatedQuestions = (project.explorationQuestions || []).map(q => 
       q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
-    ));
+    );
+    updateProjectData({ explorationQuestions: updatedQuestions });
   };
 
   // Framing decisions
   const handleSaveDecision = async () => {
-    if (!decisionSummary.trim()) {
+    if (!project || !decisionSummaryRef.current.trim()) {
       Alert.alert('Required', 'Please enter a decision summary.');
       return;
     }
@@ -385,13 +340,15 @@ export default function FramingScreen() {
     console.log('Framing: Saving decision');
     const newDecision: FramingDecision = {
       id: Date.now().toString(),
-      summary: decisionSummary.trim(),
+      summary: decisionSummaryRef.current.trim(),
       artifacts: [],
       timestamp: new Date().toISOString(),
     };
     
-    setFramingDecisions([...framingDecisions, newDecision]);
-    setDecisionSummary('');
+    const updatedDecisions = [...(project.framingDecisions || []), newDecision];
+    updateProjectData({ framingDecisions: updatedDecisions });
+    await updateProject({ ...project, framingDecisions: updatedDecisions, updatedDate: new Date().toISOString() });
+    decisionSummaryRef.current = '';
     setShowDecisionOverlay(false);
   };
 
@@ -406,7 +363,7 @@ export default function FramingScreen() {
   }
 
   const getCertaintyItemsByCategory = (category: CertaintyCategory) => {
-    return certaintyItems.filter(item => item.category === category);
+    return (project.certaintyItems || []).filter(item => item.category === category);
   };
 
   const getCertaintyHelperText = (category: CertaintyCategory) => {
@@ -427,8 +384,6 @@ export default function FramingScreen() {
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
-        contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode="on-drag"
       >
         {/* 1. Opportunity Origin */}
@@ -439,10 +394,18 @@ export default function FramingScreen() {
             style={styles.textArea}
             placeholder="Describe the origin of this opportunity..."
             placeholderTextColor={colors.textSecondary}
-            value={opportunityOrigin}
-            onChangeText={setOpportunityOrigin}
+            defaultValue={project.opportunityOrigin || ''}
+            onChangeText={(text) => {
+              opportunityOriginRef.current = text;
+              hasChangesRef.current = true;
+            }}
+            onBlur={() => {
+              updateProjectData({ opportunityOrigin: opportunityOriginRef.current });
+            }}
             multiline
             numberOfLines={4}
+            returnKeyType="done"
+            blurOnSubmit={true}
           />
         </View>
 
@@ -454,10 +417,18 @@ export default function FramingScreen() {
             style={styles.textArea}
             placeholder="Describe the purpose of this project..."
             placeholderTextColor={colors.textSecondary}
-            value={purpose}
-            onChangeText={setPurpose}
+            defaultValue={project.purpose || ''}
+            onChangeText={(text) => {
+              purposeRef.current = text;
+              hasChangesRef.current = true;
+            }}
+            onBlur={() => {
+              updateProjectData({ purpose: purposeRef.current });
+            }}
             multiline
             numberOfLines={4}
+            returnKeyType="done"
+            blurOnSubmit={true}
           />
         </View>
 
@@ -569,47 +540,17 @@ export default function FramingScreen() {
             </TouchableOpacity>
           </View>
           
-          {/* Helper text for selected category */}
           <Text style={styles.helperText}>{getCertaintyHelperText(selectedCertaintyCategory)}</Text>
           
           {/* List for selected category */}
           <View style={styles.listContainer}>
             {getCertaintyItemsByCategory(selectedCertaintyCategory).map((item) => (
-              <View key={item.id} style={styles.listItem}>
-                {editingCertaintyId === item.id ? (
-                  <TextInput
-                    style={styles.listItemInput}
-                    value={editingCertaintyText}
-                    onChangeText={setEditingCertaintyText}
-                    onBlur={finishEditingCertaintyItem}
-                    onSubmitEditing={finishEditingCertaintyItem}
-                    autoFocus
-                    returnKeyType="done"
-                  />
-                ) : (
-                  <>
-                    <Text style={styles.listItemText}>{item.text}</Text>
-                    <View style={styles.listItemActions}>
-                      <TouchableOpacity onPress={() => startEditingCertaintyItem(item.id, item.text)}>
-                        <IconSymbol 
-                          ios_icon_name="pencil" 
-                          android_material_icon_name="edit" 
-                          size={20} 
-                          color={colors.textSecondary} 
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDeleteCertaintyItem(item.id)}>
-                        <IconSymbol 
-                          ios_icon_name="trash" 
-                          android_material_icon_name="delete" 
-                          size={20} 
-                          color={colors.phaseFinish} 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
+              <EditableListItem
+                key={item.id}
+                text={item.text}
+                onEdit={(newText) => handleEditCertaintyItem(item.id, newText)}
+                onDelete={() => handleDeleteCertaintyItem(item.id)}
+              />
             ))}
             
             {/* Add new item */}
@@ -618,8 +559,10 @@ export default function FramingScreen() {
                 style={styles.addItemInput}
                 placeholder={`Add ${selectedCertaintyCategory} item...`}
                 placeholderTextColor={colors.textSecondary}
-                value={newCertaintyText}
-                onChangeText={setNewCertaintyText}
+                defaultValue=""
+                onChangeText={(text) => {
+                  newCertaintyTextRef.current = text;
+                }}
                 onSubmitEditing={handleAddCertaintyItem}
                 returnKeyType="done"
               />
@@ -641,42 +584,13 @@ export default function FramingScreen() {
           <Text style={styles.helperText}>What limits or boundaries must be respected? (e.g. time, budget, technology, ethics)</Text>
           
           <View style={styles.listContainer}>
-            {designSpaceItems.map((item) => (
-              <View key={item.id} style={styles.listItem}>
-                {editingDesignSpaceId === item.id ? (
-                  <TextInput
-                    style={styles.listItemInput}
-                    value={editingDesignSpaceText}
-                    onChangeText={setEditingDesignSpaceText}
-                    onBlur={finishEditingDesignSpaceItem}
-                    onSubmitEditing={finishEditingDesignSpaceItem}
-                    autoFocus
-                    returnKeyType="done"
-                  />
-                ) : (
-                  <>
-                    <Text style={styles.listItemText}>{item.text}</Text>
-                    <View style={styles.listItemActions}>
-                      <TouchableOpacity onPress={() => startEditingDesignSpaceItem(item.id, item.text)}>
-                        <IconSymbol 
-                          ios_icon_name="pencil" 
-                          android_material_icon_name="edit" 
-                          size={20} 
-                          color={colors.textSecondary} 
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDeleteDesignSpaceItem(item.id)}>
-                        <IconSymbol 
-                          ios_icon_name="trash" 
-                          android_material_icon_name="delete" 
-                          size={20} 
-                          color={colors.phaseFinish} 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
+            {(project.designSpaceItems || []).map((item) => (
+              <EditableListItem
+                key={item.id}
+                text={item.text}
+                onEdit={(newText) => handleEditDesignSpaceItem(item.id, newText)}
+                onDelete={() => handleDeleteDesignSpaceItem(item.id)}
+              />
             ))}
             
             {/* Add new item */}
@@ -685,8 +599,10 @@ export default function FramingScreen() {
                 style={styles.addItemInput}
                 placeholder="Add constraint or possibility..."
                 placeholderTextColor={colors.textSecondary}
-                value={newDesignSpaceText}
-                onChangeText={setNewDesignSpaceText}
+                defaultValue=""
+                onChangeText={(text) => {
+                  newDesignSpaceTextRef.current = text;
+                }}
                 onSubmitEditing={handleAddDesignSpaceItem}
                 returnKeyType="done"
               />
@@ -708,50 +624,15 @@ export default function FramingScreen() {
           <Text style={styles.helperText}>What are the first things we need to learn?</Text>
           
           <View style={styles.listContainer}>
-            {explorationQuestions.map((question) => (
-              <View key={question.id} style={styles.listItem}>
-                {editingQuestionId === question.id ? (
-                  <TextInput
-                    style={styles.listItemInput}
-                    value={editingQuestionText}
-                    onChangeText={setEditingQuestionText}
-                    onBlur={finishEditingExplorationQuestion}
-                    onSubmitEditing={finishEditingExplorationQuestion}
-                    autoFocus
-                    returnKeyType="done"
-                  />
-                ) : (
-                  <>
-                    <Text style={styles.listItemText}>{question.text}</Text>
-                    <View style={styles.listItemActions}>
-                      <TouchableOpacity onPress={() => handleToggleQuestionFavorite(question.id)}>
-                        <IconSymbol 
-                          ios_icon_name={question.isFavorite ? "star.fill" : "star"} 
-                          android_material_icon_name={question.isFavorite ? "star" : "star-border"} 
-                          size={20} 
-                          color={question.isFavorite ? "#FFD700" : colors.textSecondary} 
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => startEditingExplorationQuestion(question.id, question.text)}>
-                        <IconSymbol 
-                          ios_icon_name="pencil" 
-                          android_material_icon_name="edit" 
-                          size={20} 
-                          color={colors.textSecondary} 
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDeleteExplorationQuestion(question.id)}>
-                        <IconSymbol 
-                          ios_icon_name="trash" 
-                          android_material_icon_name="delete" 
-                          size={20} 
-                          color={colors.phaseFinish} 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
+            {(project.explorationQuestions || []).map((question) => (
+              <EditableListItem
+                key={question.id}
+                text={question.text}
+                isFavorite={question.isFavorite}
+                onEdit={(newText) => handleEditExplorationQuestion(question.id, newText)}
+                onDelete={() => handleDeleteExplorationQuestion(question.id)}
+                onToggleFavorite={() => handleToggleQuestionFavorite(question.id)}
+              />
             ))}
             
             {/* Add new question */}
@@ -760,8 +641,10 @@ export default function FramingScreen() {
                 style={styles.addItemInput}
                 placeholder="Add exploration question..."
                 placeholderTextColor={colors.textSecondary}
-                value={newQuestionText}
-                onChangeText={setNewQuestionText}
+                defaultValue=""
+                onChangeText={(text) => {
+                  newQuestionTextRef.current = text;
+                }}
                 onSubmitEditing={handleAddExplorationQuestion}
                 returnKeyType="done"
               />
@@ -795,9 +678,9 @@ export default function FramingScreen() {
             <Text style={styles.addDecisionText}>Add Decision</Text>
           </TouchableOpacity>
           
-          {framingDecisions.length > 0 && (
+          {(project.framingDecisions || []).length > 0 && (
             <View style={styles.decisionsTimeline}>
-              {framingDecisions.map((decision) => (
+              {(project.framingDecisions || []).map((decision) => (
                 <View key={decision.id} style={styles.decisionItem}>
                   <View style={styles.decisionDot} />
                   <View style={styles.decisionContent}>
@@ -977,8 +860,10 @@ export default function FramingScreen() {
               style={[styles.input, styles.textArea]}
               placeholder="What was decided or changed?"
               placeholderTextColor={colors.textSecondary}
-              value={decisionSummary}
-              onChangeText={setDecisionSummary}
+              defaultValue=""
+              onChangeText={(text) => {
+                decisionSummaryRef.current = text;
+              }}
               multiline
               numberOfLines={4}
             />
@@ -987,7 +872,7 @@ export default function FramingScreen() {
               <TouchableOpacity 
                 style={styles.decisionCancelButton}
                 onPress={() => {
-                  setDecisionSummary('');
+                  decisionSummaryRef.current = '';
                   setShowDecisionOverlay(false);
                 }}
               >
@@ -1004,6 +889,81 @@ export default function FramingScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+    </View>
+  );
+}
+
+// Reusable editable list item component
+function EditableListItem({ 
+  text, 
+  isFavorite, 
+  onEdit, 
+  onDelete, 
+  onToggleFavorite 
+}: { 
+  text: string; 
+  isFavorite?: boolean; 
+  onEdit: (newText: string) => void; 
+  onDelete: () => void; 
+  onToggleFavorite?: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(text);
+
+  const handleFinishEdit = () => {
+    if (editText.trim() && editText !== text) {
+      onEdit(editText.trim());
+    } else {
+      setEditText(text);
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <View style={styles.listItem}>
+      {isEditing ? (
+        <TextInput
+          style={styles.listItemInput}
+          value={editText}
+          onChangeText={setEditText}
+          onBlur={handleFinishEdit}
+          onSubmitEditing={handleFinishEdit}
+          autoFocus
+          returnKeyType="done"
+        />
+      ) : (
+        <>
+          <Text style={styles.listItemText}>{text}</Text>
+          <View style={styles.listItemActions}>
+            {onToggleFavorite && (
+              <TouchableOpacity onPress={onToggleFavorite}>
+                <IconSymbol 
+                  ios_icon_name={isFavorite ? "star.fill" : "star"} 
+                  android_material_icon_name={isFavorite ? "star" : "star-border"} 
+                  size={20} 
+                  color={isFavorite ? "#FFD700" : colors.textSecondary} 
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => setIsEditing(true)}>
+              <IconSymbol 
+                ios_icon_name="pencil" 
+                android_material_icon_name="edit" 
+                size={20} 
+                color={colors.textSecondary} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onDelete}>
+              <IconSymbol 
+                ios_icon_name="trash" 
+                android_material_icon_name="delete" 
+                size={20} 
+                color={colors.phaseFinish} 
+              />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </View>
   );
 }
