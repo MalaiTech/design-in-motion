@@ -27,8 +27,6 @@ import {
   Artifact,
   Decision,
 } from '@/utils/storage';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
 export default function ProjectOverviewScreen() {
@@ -42,7 +40,6 @@ export default function ProjectOverviewScreen() {
   
   // Overlays
   const [showPhaseMenu, setShowPhaseMenu] = useState(false);
-  const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
@@ -53,6 +50,7 @@ export default function ProjectOverviewScreen() {
   const [editingDecisionId, setEditingDecisionId] = useState<string | null>(null);
 
   const loadProject = useCallback(async () => {
+    console.log('Project Overview: Loading project', projectId);
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
     if (found) {
@@ -86,6 +84,7 @@ export default function ProjectOverviewScreen() {
   const handlePhaseChange = async (newPhase: ProjectPhase) => {
     if (!project) return;
     
+    console.log('Project Overview: Changing phase to', newPhase);
     const updatedProject = {
       ...project,
       phase: newPhase,
@@ -111,158 +110,23 @@ export default function ProjectOverviewScreen() {
 
   const { totalCosts, totalHours } = calculateTotals();
 
-  // Artifact management - UPDATED to support multiple photo selection
-  const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
-    if (!project) return;
-    
-    try {
-      if (type === 'url') {
-        Alert.prompt(
-          'Add URL',
-          'Enter the URL',
-          async (url) => {
-            if (url && url.trim()) {
-              const newArtifact: Artifact = {
-                id: Date.now().toString(),
-                type: 'url',
-                uri: url.trim(),
-                name: 'URL Link',
-                isFavorite: false,
-              };
-              
-              const updatedArtifacts = [...project.artifacts, newArtifact];
-              const updatedProject = {
-                ...project,
-                artifacts: updatedArtifacts,
-                updatedDate: new Date().toISOString(),
-              };
-              
-              await updateProject(updatedProject);
-              setProject(updatedProject);
-              setShowArtifactOverlay(false);
-            }
-          }
-        );
-        return;
-      }
-      
-      let result: any = null;
-      
-      if (type === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permission Required', 'Camera permission is needed to take photos.');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.8,
-        });
-      } else if (type === 'photo') {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permission Required', 'Photo library permission is needed.');
-          return;
-        }
-        // UPDATED: Enable multiple selection
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.8,
-          allowsMultipleSelection: true, // Enable multiple selection
-        });
-      } else {
-        result = await DocumentPicker.getDocumentAsync({
-          type: '*/*',
-          copyToCacheDirectory: true,
-        });
-      }
-      
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        // UPDATED: Process all selected assets
-        const newArtifacts: Artifact[] = result.assets.map((asset, index) => {
-          const isPDF = asset.name?.toLowerCase().endsWith('.pdf') || asset.mimeType === 'application/pdf';
-          
-          return {
-            id: `${Date.now()}-${index}`,
-            type: isPDF ? 'document' : 'image',
-            uri: asset.uri,
-            name: asset.name || 'Untitled',
-            isFavorite: false,
-          };
-        });
-        
-        const updatedArtifacts = [...project.artifacts, ...newArtifacts];
-        const updatedProject = {
-          ...project,
-          artifacts: updatedArtifacts,
-          updatedDate: new Date().toISOString(),
-        };
-        
-        await updateProject(updatedProject);
-        setProject(updatedProject);
-        setShowArtifactOverlay(false);
-      }
-    } catch (error) {
-      console.error('Error adding artifact:', error);
-      Alert.alert('Error', 'Failed to add artifact.');
-    }
-  };
-
-  const handleDeleteArtifact = async (artifactId: string) => {
-    if (!project) return;
-    
-    Alert.alert(
-      'Delete Artifact',
-      'Are you sure you want to delete this artifact?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
-            const updatedProject = {
-              ...project,
-              artifacts: updatedArtifacts,
-              updatedDate: new Date().toISOString(),
-            };
-            
-            await updateProject(updatedProject);
-            setProject(updatedProject);
-          }
-        }
-      ]
-    );
-  };
-
-  const handleToggleArtifactFavorite = async (artifactId: string) => {
-    if (!project) return;
-    
-    const updatedArtifacts = project.artifacts.map(a => 
-      a.id === artifactId 
-        ? { ...a, isFavorite: !a.isFavorite } 
-        : a
-    );
-    
-    const updatedProject = {
-      ...project,
-      artifacts: updatedArtifacts,
-      updatedDate: new Date().toISOString(),
-    };
-    
-    await updateProject(updatedProject);
-    setProject(updatedProject);
-  };
-
+  // UPDATED: Handle opening artifacts (URLs, PDFs, images)
   const handleOpenArtifact = async (artifact: Artifact) => {
+    console.log('Project Overview: Attempting to open artifact', artifact.type, artifact.uri);
+    
     try {
       if (artifact.type === 'url') {
-        // For web URLs, use Linking.openURL to open in browser
-        const canOpen = await Linking.canOpenURL(artifact.uri);
+        // FIXED: For web URLs, use Linking.openURL to open in browser (same as Framing)
+        let url = artifact.uri.trim();
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        
+        const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
-          await Linking.openURL(artifact.uri);
+          await Linking.openURL(url);
         } else {
-          Alert.alert('Error', 'Cannot open this URL');
+          Alert.alert('Error', 'Cannot open this URL. Please check the URL format.');
         }
       } else if (artifact.type === 'document') {
         // For local documents, use Sharing to open with system apps
@@ -281,8 +145,8 @@ export default function ProjectOverviewScreen() {
         setShowArtifactViewer(true);
       }
     } catch (error) {
-      console.error('Error opening artifact:', error);
-      Alert.alert('Error', 'Could not open this file');
+      console.error('Project Overview: Error opening artifact:', error);
+      Alert.alert('Error', 'Failed to open artifact. Please try again.');
     }
   };
 
@@ -293,6 +157,7 @@ export default function ProjectOverviewScreen() {
       return;
     }
     
+    console.log('Project Overview: Saving decision');
     let updatedDecisions: Decision[];
     
     if (editingDecisionId) {
@@ -331,6 +196,7 @@ export default function ProjectOverviewScreen() {
   };
 
   const handleEditDecision = (decision: Decision) => {
+    console.log('Project Overview: Editing decision', decision.id);
     setDecisionSummary(decision.summary);
     setDecisionRationale(decision.rationale || '');
     setEditingDecisionId(decision.id);
@@ -340,6 +206,7 @@ export default function ProjectOverviewScreen() {
   const handleDeleteDecision = async (decisionId: string) => {
     if (!project) return;
     
+    console.log('Project Overview: Deleting decision', decisionId);
     Alert.alert(
       'Delete Decision',
       'Are you sure you want to delete this decision?',
@@ -439,83 +306,47 @@ export default function ProjectOverviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Visuals (Artifacts) - Grid layout with + icon on the right - UPDATED to 4 columns */}
+          {/* UPDATED: Visuals (Artifacts) - Read-only, no add/delete/favorite options */}
           <View style={styles.section}>
-            <View style={styles.visualsHeader}>
-              <Text style={styles.sectionTitle}>Visuals</Text>
-              <TouchableOpacity 
-                style={styles.addButton}
-                onPress={() => setShowArtifactOverlay(true)}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={24} 
-                  color={colors.primary} 
-                />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionTitle}>Visuals</Text>
             
-            {displayArtifacts.length > 0 && (
+            {displayArtifacts.length > 0 ? (
               <View style={styles.artifactGrid}>
                 {displayArtifacts.map((artifact) => (
-                  <View key={artifact.id} style={styles.artifactGridItem}>
-                    <TouchableOpacity
-                      style={styles.artifactThumb}
-                      onPress={() => handleOpenArtifact(artifact)}
-                    >
-                      {artifact.type === 'image' ? (
-                        <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                      ) : artifact.type === 'document' ? (
-                        <View style={styles.artifactDoc}>
-                          <IconSymbol 
-                            ios_icon_name="doc" 
-                            android_material_icon_name="description" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                          <Text style={styles.artifactLabel}>PDF</Text>
-                        </View>
-                      ) : artifact.type === 'url' ? (
-                        <View style={styles.artifactDoc}>
-                          <IconSymbol 
-                            ios_icon_name="link" 
-                            android_material_icon_name="link" 
-                            size={32} 
-                            color={colors.textSecondary} 
-                          />
-                          <Text style={styles.artifactLabel}>URL</Text>
-                        </View>
-                      ) : null}
-                      
-                      {/* Favorite and Delete icons in right upper corner */}
-                      <View style={styles.artifactOverlayActions}>
-                        <TouchableOpacity 
-                          style={styles.artifactActionButton}
-                          onPress={() => handleToggleArtifactFavorite(artifact.id)}
-                        >
-                          <IconSymbol 
-                            ios_icon_name={artifact.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={artifact.isFavorite ? "star" : "star-border"} 
-                            size={18} 
-                            color={artifact.isFavorite ? "#FFD700" : "#FFFFFF"} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.artifactActionButton}
-                          onPress={() => handleDeleteArtifact(artifact.id)}
-                        >
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={18} 
-                            color="#FFFFFF" 
-                          />
-                        </TouchableOpacity>
+                  <TouchableOpacity
+                    key={artifact.id}
+                    style={styles.artifactGridItem}
+                    onPress={() => handleOpenArtifact(artifact)}
+                  >
+                    {artifact.type === 'image' ? (
+                      <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
+                    ) : artifact.type === 'document' ? (
+                      <View style={styles.artifactDoc}>
+                        <IconSymbol 
+                          ios_icon_name="doc" 
+                          android_material_icon_name="description" 
+                          size={32} 
+                          color={colors.textSecondary} 
+                        />
+                        <Text style={styles.artifactLabel}>PDF</Text>
                       </View>
-                    </TouchableOpacity>
-                  </View>
+                    ) : artifact.type === 'url' ? (
+                      <View style={styles.artifactDoc}>
+                        <IconSymbol 
+                          ios_icon_name="link" 
+                          android_material_icon_name="link" 
+                          size={32} 
+                          color={colors.textSecondary} 
+                        />
+                        <Text style={styles.artifactLabel}>URL</Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
                 ))}
+              </View>
+            ) : (
+              <View style={styles.emptyVisuals}>
+                <Text style={styles.emptyVisualsText}>No visuals added yet</Text>
               </View>
             )}
           </View>
@@ -526,7 +357,10 @@ export default function ProjectOverviewScreen() {
             <View style={styles.toolsList}>
               <TouchableOpacity 
                 style={styles.toolItem}
-                onPress={() => router.push(`/(tabs)/(home)/framing?id=${project.id}`)}
+                onPress={() => {
+                  console.log('Project Overview: Navigating to Framing');
+                  router.push(`/(tabs)/(home)/framing?id=${project.id}`);
+                }}
               >
                 <View style={styles.toolItemLeft}>
                   <IconSymbol 
@@ -547,7 +381,10 @@ export default function ProjectOverviewScreen() {
               
               <TouchableOpacity 
                 style={styles.toolItem}
-                onPress={() => router.push(`/(tabs)/(home)/exploration-loops?id=${project.id}`)}
+                onPress={() => {
+                  console.log('Project Overview: Navigating to Exploration Loops');
+                  router.push(`/(tabs)/(home)/exploration-loops?id=${project.id}`);
+                }}
               >
                 <View style={styles.toolItemLeft}>
                   <IconSymbol 
@@ -568,7 +405,10 @@ export default function ProjectOverviewScreen() {
               
               <TouchableOpacity 
                 style={styles.toolItem}
-                onPress={() => router.push(`/(tabs)/(home)/timeline?id=${project.id}`)}
+                onPress={() => {
+                  console.log('Project Overview: Navigating to Timeline');
+                  router.push(`/(tabs)/(home)/timeline?id=${project.id}`);
+                }}
               >
                 <View style={styles.toolItemLeft}>
                   <IconSymbol 
@@ -587,7 +427,12 @@ export default function ProjectOverviewScreen() {
                 />
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.toolItem}>
+              <TouchableOpacity 
+                style={styles.toolItem}
+                onPress={() => {
+                  console.log('Project Overview: Export tapped (not yet implemented)');
+                }}
+              >
                 <View style={styles.toolItemLeft}>
                   <IconSymbol 
                     ios_icon_name="arrow.down.doc" 
@@ -611,7 +456,10 @@ export default function ProjectOverviewScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Project Decisions</Text>
-              <TouchableOpacity onPress={() => setShowDecisionOverlay(true)}>
+              <TouchableOpacity onPress={() => {
+                console.log('Project Overview: Opening Add Decision overlay');
+                setShowDecisionOverlay(true);
+              }}>
                 <IconSymbol 
                   ios_icon_name="plus.circle" 
                   android_material_icon_name="add-circle" 
@@ -704,83 +552,6 @@ export default function ProjectOverviewScreen() {
             <TouchableOpacity 
               style={styles.overlayCancelButton}
               onPress={() => setShowPhaseMenu(false)}
-            >
-              <Text style={styles.overlayCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Add Artifact Overlay */}
-      <Modal
-        visible={showArtifactOverlay}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowArtifactOverlay(false)}
-      >
-        <TouchableOpacity 
-          style={styles.overlayBackground}
-          activeOpacity={1}
-          onPress={() => setShowArtifactOverlay(false)}
-        >
-          <View style={styles.overlayContent}>
-            <Text style={styles.overlayTitle}>Add Visual</Text>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => handleAddArtifact('camera')}
-            >
-              <IconSymbol 
-                ios_icon_name="camera" 
-                android_material_icon_name="camera" 
-                size={24} 
-                color={colors.text} 
-              />
-              <Text style={styles.overlayOptionText}>Camera</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => handleAddArtifact('photo')}
-            >
-              <IconSymbol 
-                ios_icon_name="photo" 
-                android_material_icon_name="photo" 
-                size={24} 
-                color={colors.text} 
-              />
-              <Text style={styles.overlayOptionText}>Photos (Multiple)</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => handleAddArtifact('document')}
-            >
-              <IconSymbol 
-                ios_icon_name="doc" 
-                android_material_icon_name="description" 
-                size={24} 
-                color={colors.text} 
-              />
-              <Text style={styles.overlayOptionText}>Documents</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => handleAddArtifact('url')}
-            >
-              <IconSymbol 
-                ios_icon_name="link" 
-                android_material_icon_name="link" 
-                size={24} 
-                color={colors.text} 
-              />
-              <Text style={styles.overlayOptionText}>Add URL</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayCancelButton}
-              onPress={() => setShowArtifactOverlay(false)}
             >
               <Text style={styles.overlayCancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -989,29 +760,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
   },
-  visualsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  addButton: {
-    padding: 4,
-  },
   artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 8,
   },
   artifactGridItem: {
-    width: '23%', // UPDATED: Changed from 31% to 23% to fit 4 columns (4 * 23% + 3 * 8px gap = ~100%)
+    width: '23%', // 4 columns
     aspectRatio: 1,
-  },
-  artifactThumb: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.divider,
-    position: 'relative',
   },
   artifactImage: {
     width: '100%',
@@ -1023,6 +780,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.divider,
   },
   artifactLabel: {
     fontSize: 10,
@@ -1030,17 +789,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
-  artifactOverlayActions: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    flexDirection: 'row',
-    gap: 4,
+  emptyVisuals: {
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.divider,
+    marginTop: 8,
   },
-  artifactActionButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    padding: 4,
+  emptyVisualsText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   toolsList: {
     backgroundColor: '#FFFFFF',
@@ -1126,16 +885,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 16,
-  },
-  overlayOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    gap: 16,
-  },
-  overlayOptionText: {
-    fontSize: 16,
-    color: colors.text,
   },
   overlayCancelButton: {
     marginTop: 16,
