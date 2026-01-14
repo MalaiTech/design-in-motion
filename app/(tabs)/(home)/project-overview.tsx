@@ -452,10 +452,13 @@ export default function ProjectOverviewScreen() {
             </View>
           </View>
 
-          {/* Project Decisions */}
+          {/* UPDATED: Project Decisions & Changes - with helper text */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Project Decisions</Text>
+              <View>
+                <Text style={styles.sectionTitle}>Project Decisions & Changes</Text>
+                <Text style={styles.helperText}>Note important overall project decisions and changes</Text>
+              </View>
               <TouchableOpacity onPress={() => {
                 console.log('Project Overview: Opening Add Decision overlay');
                 setShowDecisionOverlay(true);
@@ -698,18 +701,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: 4,
+  },
+  helperText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   fieldLabel: {
     fontSize: 14,
