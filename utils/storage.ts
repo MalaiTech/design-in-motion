@@ -41,6 +41,7 @@ export interface ExplorationQuestion {
 export interface FramingDecision {
   id: string;
   summary: string;
+  rationale?: string;
   artifacts: string[];
   timestamp: string;
 }
