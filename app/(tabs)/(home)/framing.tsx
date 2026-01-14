@@ -55,9 +55,6 @@ export default function FramingScreen() {
   const newDesignSpaceTextRef = useRef('');
   const newQuestionTextRef = useRef('');
   const decisionSummaryRef = useRef('');
-  
-  // Track if data has been modified
-  const hasChangesRef = useRef(false);
 
   const loadProject = useCallback(async () => {
     console.log('Framing: Loading project', projectId);
@@ -67,7 +64,6 @@ export default function FramingScreen() {
       setProject(found);
       opportunityOriginRef.current = found.opportunityOrigin || '';
       purposeRef.current = found.purpose || '';
-      hasChangesRef.current = false;
     } else {
       Alert.alert('Project Not Found', 'This project no longer exists.', [
         { text: 'OK', onPress: () => router.back() }
@@ -75,39 +71,40 @@ export default function FramingScreen() {
     }
   }, [projectId, router]);
 
-  const saveProject = useCallback(async () => {
-    if (!project || !hasChangesRef.current) {
-      console.log('Framing: No changes to save');
-      return;
-    }
+  // Save text fields immediately to AsyncStorage
+  const saveTextField = useCallback(async (field: 'opportunityOrigin' | 'purpose', value: string) => {
+    if (!project) return;
     
-    console.log('Framing: Saving project changes');
+    console.log(`Framing: Saving ${field} to AsyncStorage`);
     const updatedProject: Project = {
       ...project,
-      opportunityOrigin: opportunityOriginRef.current,
-      purpose: purposeRef.current,
+      [field]: value,
       updatedDate: new Date().toISOString(),
     };
     
+    // Update both state and AsyncStorage immediately
+    setProject(updatedProject);
     await updateProject(updatedProject);
-    hasChangesRef.current = false;
   }, [project]);
 
   useFocusEffect(
     useCallback(() => {
       loadProject();
-      return () => {
-        console.log('Framing: Screen unfocused, saving if needed');
-        saveProject();
-      };
-    }, [loadProject, saveProject])
+    }, [loadProject])
   );
 
-  // Helper to update project and mark as changed
-  const updateProjectData = useCallback((updates: Partial<Project>) => {
+  // Helper to update project state and save to AsyncStorage
+  const updateAndSaveProject = useCallback(async (updates: Partial<Project>) => {
     if (!project) return;
-    setProject({ ...project, ...updates });
-    hasChangesRef.current = true;
+    
+    const updatedProject = { 
+      ...project, 
+      ...updates,
+      updatedDate: new Date().toISOString(),
+    };
+    
+    setProject(updatedProject);
+    await updateProject(updatedProject);
   }, [project]);
 
   // Artifact management
@@ -130,8 +127,7 @@ export default function FramingScreen() {
               };
               
               const updatedArtifacts = [...project.artifacts, newArtifact];
-              updateProjectData({ artifacts: updatedArtifacts });
-              await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
+              await updateAndSaveProject({ artifacts: updatedArtifacts });
               setShowArtifactOverlay(false);
             }
           }
@@ -178,8 +174,7 @@ export default function FramingScreen() {
         };
         
         const updatedArtifacts = [...project.artifacts, newArtifact];
-        updateProjectData({ artifacts: updatedArtifacts });
-        await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
+        await updateAndSaveProject({ artifacts: updatedArtifacts });
         setShowArtifactOverlay(false);
       }
     } catch (error) {
@@ -202,8 +197,7 @@ export default function FramingScreen() {
           style: 'destructive',
           onPress: async () => {
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
-            updateProjectData({ artifacts: updatedArtifacts });
-            await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
+            await updateAndSaveProject({ artifacts: updatedArtifacts });
             setShowArtifactViewer(false);
           }
         }
@@ -219,12 +213,11 @@ export default function FramingScreen() {
       a.id === artifactId ? { ...a, caption: a.caption === 'favorite' ? undefined : 'favorite' } : a
     );
     
-    updateProjectData({ artifacts: updatedArtifacts });
-    await updateProject({ ...project, artifacts: updatedArtifacts, updatedDate: new Date().toISOString() });
+    await updateAndSaveProject({ artifacts: updatedArtifacts });
   };
 
   // Certainty items
-  const handleAddCertaintyItem = () => {
+  const handleAddCertaintyItem = async () => {
     if (!project || !newCertaintyTextRef.current.trim()) return;
     
     console.log('Framing: Adding certainty item');
@@ -235,29 +228,29 @@ export default function FramingScreen() {
     };
     
     const updatedItems = [...(project.certaintyItems || []), newItem];
-    updateProjectData({ certaintyItems: updatedItems });
+    await updateAndSaveProject({ certaintyItems: updatedItems });
     newCertaintyTextRef.current = '';
     Keyboard.dismiss();
   };
 
-  const handleDeleteCertaintyItem = (id: string) => {
+  const handleDeleteCertaintyItem = async (id: string) => {
     if (!project) return;
     console.log('Framing: Deleting certainty item', id);
     const updatedItems = (project.certaintyItems || []).filter(item => item.id !== id);
-    updateProjectData({ certaintyItems: updatedItems });
+    await updateAndSaveProject({ certaintyItems: updatedItems });
   };
 
-  const handleEditCertaintyItem = (id: string, newText: string) => {
+  const handleEditCertaintyItem = async (id: string, newText: string) => {
     if (!project || !newText.trim()) return;
     console.log('Framing: Editing certainty item', id);
     const updatedItems = (project.certaintyItems || []).map(item => 
       item.id === id ? { ...item, text: newText.trim() } : item
     );
-    updateProjectData({ certaintyItems: updatedItems });
+    await updateAndSaveProject({ certaintyItems: updatedItems });
   };
 
   // Design space items
-  const handleAddDesignSpaceItem = () => {
+  const handleAddDesignSpaceItem = async () => {
     if (!project || !newDesignSpaceTextRef.current.trim()) return;
     
     console.log('Framing: Adding design space item');
@@ -267,29 +260,29 @@ export default function FramingScreen() {
     };
     
     const updatedItems = [...(project.designSpaceItems || []), newItem];
-    updateProjectData({ designSpaceItems: updatedItems });
+    await updateAndSaveProject({ designSpaceItems: updatedItems });
     newDesignSpaceTextRef.current = '';
     Keyboard.dismiss();
   };
 
-  const handleDeleteDesignSpaceItem = (id: string) => {
+  const handleDeleteDesignSpaceItem = async (id: string) => {
     if (!project) return;
     console.log('Framing: Deleting design space item', id);
     const updatedItems = (project.designSpaceItems || []).filter(item => item.id !== id);
-    updateProjectData({ designSpaceItems: updatedItems });
+    await updateAndSaveProject({ designSpaceItems: updatedItems });
   };
 
-  const handleEditDesignSpaceItem = (id: string, newText: string) => {
+  const handleEditDesignSpaceItem = async (id: string, newText: string) => {
     if (!project || !newText.trim()) return;
     console.log('Framing: Editing design space item', id);
     const updatedItems = (project.designSpaceItems || []).map(item => 
       item.id === id ? { ...item, text: newText.trim() } : item
     );
-    updateProjectData({ designSpaceItems: updatedItems });
+    await updateAndSaveProject({ designSpaceItems: updatedItems });
   };
 
   // Exploration questions
-  const handleAddExplorationQuestion = () => {
+  const handleAddExplorationQuestion = async () => {
     if (!project || !newQuestionTextRef.current.trim()) return;
     
     console.log('Framing: Adding exploration question');
@@ -300,34 +293,34 @@ export default function FramingScreen() {
     };
     
     const updatedQuestions = [...(project.explorationQuestions || []), newQuestion];
-    updateProjectData({ explorationQuestions: updatedQuestions });
+    await updateAndSaveProject({ explorationQuestions: updatedQuestions });
     newQuestionTextRef.current = '';
     Keyboard.dismiss();
   };
 
-  const handleDeleteExplorationQuestion = (id: string) => {
+  const handleDeleteExplorationQuestion = async (id: string) => {
     if (!project) return;
     console.log('Framing: Deleting exploration question', id);
     const updatedQuestions = (project.explorationQuestions || []).filter(q => q.id !== id);
-    updateProjectData({ explorationQuestions: updatedQuestions });
+    await updateAndSaveProject({ explorationQuestions: updatedQuestions });
   };
 
-  const handleEditExplorationQuestion = (id: string, newText: string) => {
+  const handleEditExplorationQuestion = async (id: string, newText: string) => {
     if (!project || !newText.trim()) return;
     console.log('Framing: Editing exploration question', id);
     const updatedQuestions = (project.explorationQuestions || []).map(q => 
       q.id === id ? { ...q, text: newText.trim() } : q
     );
-    updateProjectData({ explorationQuestions: updatedQuestions });
+    await updateAndSaveProject({ explorationQuestions: updatedQuestions });
   };
 
-  const handleToggleQuestionFavorite = (id: string) => {
+  const handleToggleQuestionFavorite = async (id: string) => {
     if (!project) return;
     console.log('Framing: Toggling question favorite', id);
     const updatedQuestions = (project.explorationQuestions || []).map(q => 
       q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
     );
-    updateProjectData({ explorationQuestions: updatedQuestions });
+    await updateAndSaveProject({ explorationQuestions: updatedQuestions });
   };
 
   // Framing decisions
@@ -346,8 +339,7 @@ export default function FramingScreen() {
     };
     
     const updatedDecisions = [...(project.framingDecisions || []), newDecision];
-    updateProjectData({ framingDecisions: updatedDecisions });
-    await updateProject({ ...project, framingDecisions: updatedDecisions, updatedDate: new Date().toISOString() });
+    await updateAndSaveProject({ framingDecisions: updatedDecisions });
     decisionSummaryRef.current = '';
     setShowDecisionOverlay(false);
   };
@@ -397,10 +389,10 @@ export default function FramingScreen() {
             defaultValue={project.opportunityOrigin || ''}
             onChangeText={(text) => {
               opportunityOriginRef.current = text;
-              hasChangesRef.current = true;
             }}
             onBlur={() => {
-              updateProjectData({ opportunityOrigin: opportunityOriginRef.current });
+              console.log('Framing: Opportunity Origin blur, saving:', opportunityOriginRef.current);
+              saveTextField('opportunityOrigin', opportunityOriginRef.current);
             }}
             multiline
             numberOfLines={4}
@@ -420,10 +412,10 @@ export default function FramingScreen() {
             defaultValue={project.purpose || ''}
             onChangeText={(text) => {
               purposeRef.current = text;
-              hasChangesRef.current = true;
             }}
             onBlur={() => {
-              updateProjectData({ purpose: purposeRef.current });
+              console.log('Framing: Purpose blur, saving:', purposeRef.current);
+              saveTextField('purpose', purposeRef.current);
             }}
             multiline
             numberOfLines={4}
