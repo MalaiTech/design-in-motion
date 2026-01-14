@@ -78,7 +78,7 @@ export interface ExplorationDecision {
 export interface ExplorationLoop {
   id: string;
   question: string;
-  status: 'active' | 'paused' | 'completed';
+  status: 'draft' | 'active' | 'paused' | 'completed';
   updatedDate: string;
   artifactIds: string[];
   

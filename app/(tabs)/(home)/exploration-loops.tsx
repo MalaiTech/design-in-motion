@@ -31,6 +31,7 @@ export default function ExplorationLoopsScreen() {
   const [loops, setLoops] = useState<ExplorationLoop[]>([]);
 
   const loadProject = useCallback(async () => {
+    console.log('Exploration Loops: Loading project', projectId);
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
     if (found) {
@@ -50,10 +51,12 @@ export default function ExplorationLoopsScreen() {
   );
 
   const handleCreateLoop = () => {
+    console.log('Exploration Loops: Creating new loop');
     router.push(`/exploration-loop?projectId=${projectId}`);
   };
 
   const handleOpenLoop = (loopId: string) => {
+    console.log('Exploration Loops: Opening loop', loopId);
     router.push(`/exploration-loop?projectId=${projectId}&loopId=${loopId}`);
   };
 
@@ -69,6 +72,7 @@ export default function ExplorationLoopsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            console.log('Exploration Loops: Deleting loop', loopId);
             const updatedLoops = loops.filter(loop => loop.id !== loopId);
             
             const updatedProject = {
@@ -88,6 +92,8 @@ export default function ExplorationLoopsScreen() {
 
   const getStatusColor = (status: ExplorationLoop['status']): string => {
     switch (status) {
+      case 'draft':
+        return colors.textSecondary;
       case 'active':
         return colors.phaseExploration;
       case 'paused':

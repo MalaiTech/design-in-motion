@@ -45,7 +45,7 @@ export default function ExplorationLoopScreen() {
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
   
   // Loop fields
-  const [status, setStatus] = useState<'active' | 'paused' | 'completed'>('active');
+  const [status, setStatus] = useState<'draft' | 'active' | 'paused' | 'completed'>('draft');
   const [question, setQuestion] = useState('');
   const [exploreItems, setExploreItems] = useState<ExploreItem[]>([]);
   const [exploreArtifactIds, setExploreArtifactIds] = useState<string[]>([]);
@@ -88,6 +88,7 @@ export default function ExplorationLoopScreen() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadProject = useCallback(async () => {
+    console.log('Loading project for exploration loop:', projectId, loopId);
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
     if (found) {
@@ -96,6 +97,7 @@ export default function ExplorationLoopScreen() {
       if (loopId) {
         const foundLoop = found.explorationLoops?.find(l => l.id === loopId);
         if (foundLoop) {
+          console.log('Found exploration loop:', foundLoop);
           setLoop(foundLoop);
           setStatus(foundLoop.status);
           setQuestion(foundLoop.question);
@@ -115,6 +117,8 @@ export default function ExplorationLoopScreen() {
             { text: 'OK', onPress: () => router.back() }
           ]);
         }
+      } else {
+        console.log('Creating new exploration loop with draft status');
       }
     } else {
       Alert.alert('Project Not Found', 'This project no longer exists.', [
@@ -140,6 +144,7 @@ export default function ExplorationLoopScreen() {
   const saveChanges = useCallback(async () => {
     if (!project) return;
     
+    console.log('Saving exploration loop changes with status:', status);
     const updatedLoop: ExplorationLoop = {
       id: loopId || Date.now().toString(),
       question,
@@ -199,6 +204,7 @@ export default function ExplorationLoopScreen() {
           'Enter the URL of the artifact',
           async (url) => {
             if (url && url.trim()) {
+              console.log('Adding URL artifact:', url);
               const newArtifact: Artifact = {
                 id: Date.now().toString(),
                 type: 'url',
@@ -264,6 +270,7 @@ export default function ExplorationLoopScreen() {
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        console.log('Adding artifact:', asset.name);
         const newArtifact: Artifact = {
           id: Date.now().toString(),
           type: type === 'document' ? 'document' : 'image',
@@ -311,6 +318,7 @@ export default function ExplorationLoopScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            console.log('Deleting artifact:', artifactId);
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
             const updatedProject = {
               ...project,
@@ -337,6 +345,7 @@ export default function ExplorationLoopScreen() {
   const handleToggleArtifactFavorite = async (artifactId: string) => {
     if (!project) return;
     
+    console.log('Toggling artifact favorite:', artifactId);
     const updatedArtifacts = project.artifacts.map(a => 
       a.id === artifactId ? { ...a, caption: a.caption === 'favorite' ? undefined : 'favorite' } : a
     );
@@ -355,6 +364,7 @@ export default function ExplorationLoopScreen() {
   const handleAddExploreItem = () => {
     if (!newExploreText.trim()) return;
     
+    console.log('Adding explore item:', newExploreText);
     const newItem: ExploreItem = {
       id: Date.now().toString(),
       text: newExploreText.trim(),
@@ -367,11 +377,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteExploreItem = (id: string) => {
+    console.log('Deleting explore item:', id);
     setExploreItems(exploreItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditExploreItem = (id: string, newText: string) => {
+    console.log('Editing explore item:', id, newText);
     setExploreItems(exploreItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -380,6 +392,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleExploreFavorite = (id: string) => {
+    console.log('Toggling explore favorite:', id);
     setExploreItems(exploreItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -390,6 +403,7 @@ export default function ExplorationLoopScreen() {
   const handleAddBuildItem = () => {
     if (!newBuildText.trim()) return;
     
+    console.log('Adding build item:', newBuildText);
     const newItem: BuildItem = {
       id: Date.now().toString(),
       text: newBuildText.trim(),
@@ -402,11 +416,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteBuildItem = (id: string) => {
+    console.log('Deleting build item:', id);
     setBuildItems(buildItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditBuildItem = (id: string, newText: string) => {
+    console.log('Editing build item:', id, newText);
     setBuildItems(buildItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -415,6 +431,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleBuildFavorite = (id: string) => {
+    console.log('Toggling build favorite:', id);
     setBuildItems(buildItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -425,6 +442,7 @@ export default function ExplorationLoopScreen() {
   const handleAddCheckItem = () => {
     if (!newCheckText.trim()) return;
     
+    console.log('Adding check item:', newCheckText);
     const newItem: CheckItem = {
       id: Date.now().toString(),
       text: newCheckText.trim(),
@@ -437,11 +455,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteCheckItem = (id: string) => {
+    console.log('Deleting check item:', id);
     setCheckItems(checkItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditCheckItem = (id: string, newText: string) => {
+    console.log('Editing check item:', id, newText);
     setCheckItems(checkItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -450,6 +470,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleCheckFavorite = (id: string) => {
+    console.log('Toggling check favorite:', id);
     setCheckItems(checkItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -460,6 +481,7 @@ export default function ExplorationLoopScreen() {
   const handleAddAdaptItem = () => {
     if (!newAdaptText.trim()) return;
     
+    console.log('Adding adapt item:', newAdaptText);
     const newItem: AdaptItem = {
       id: Date.now().toString(),
       text: newAdaptText.trim(),
@@ -472,11 +494,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteAdaptItem = (id: string) => {
+    console.log('Deleting adapt item:', id);
     setAdaptItems(adaptItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditAdaptItem = (id: string, newText: string) => {
+    console.log('Editing adapt item:', id, newText);
     setAdaptItems(adaptItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -485,6 +509,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleAdaptFavorite = (id: string) => {
+    console.log('Toggling adapt favorite:', id);
     setAdaptItems(adaptItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -495,6 +520,7 @@ export default function ExplorationLoopScreen() {
   const handleAddNextQuestion = () => {
     if (!newQuestionText.trim()) return;
     
+    console.log('Adding next exploration question:', newQuestionText);
     const newQuestion: ExplorationQuestion = {
       id: Date.now().toString(),
       text: newQuestionText.trim(),
@@ -507,11 +533,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteNextQuestion = (id: string) => {
+    console.log('Deleting next exploration question:', id);
     setNextExplorationQuestions(nextExplorationQuestions.filter(q => q.id !== id));
     markAsChanged();
   };
 
   const handleEditNextQuestion = (id: string, newText: string) => {
+    console.log('Editing next exploration question:', id, newText);
     setNextExplorationQuestions(nextExplorationQuestions.map(q => 
       q.id === id ? { ...q, text: newText } : q
     ));
@@ -520,6 +548,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleNextQuestionFavorite = (id: string) => {
+    console.log('Toggling next question favorite:', id);
     setNextExplorationQuestions(nextExplorationQuestions.map(q => 
       q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
     ));
@@ -533,6 +562,7 @@ export default function ExplorationLoopScreen() {
       return;
     }
     
+    console.log('Saving exploration decision:', decisionSummary);
     const newDecision: ExplorationDecision = {
       id: Date.now().toString(),
       summary: decisionSummary.trim(),
@@ -1227,6 +1257,19 @@ export default function ExplorationLoopScreen() {
             <TouchableOpacity 
               style={styles.overlayOption}
               onPress={() => {
+                console.log('User selected Draft status');
+                setStatus('draft');
+                markAsChanged();
+                setShowStatusPicker(false);
+              }}
+            >
+              <Text style={styles.overlayOptionText}>Draft</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.overlayOption}
+              onPress={() => {
+                console.log('User selected Active status');
                 setStatus('active');
                 markAsChanged();
                 setShowStatusPicker(false);
@@ -1238,6 +1281,7 @@ export default function ExplorationLoopScreen() {
             <TouchableOpacity 
               style={styles.overlayOption}
               onPress={() => {
+                console.log('User selected Paused status');
                 setStatus('paused');
                 markAsChanged();
                 setShowStatusPicker(false);
@@ -1249,6 +1293,7 @@ export default function ExplorationLoopScreen() {
             <TouchableOpacity 
               style={styles.overlayOption}
               onPress={() => {
+                console.log('User selected Completed status');
                 setStatus('completed');
                 markAsChanged();
                 setShowStatusPicker(false);
