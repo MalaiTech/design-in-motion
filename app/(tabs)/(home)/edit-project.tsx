@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,12 @@ export default function EditProjectScreen() {
   const [startDate, setStartDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const loadProject = useCallback(async () => {
+  useEffect(() => {
+    console.log('EditProject: Loading project', id);
+    loadProject();
+  }, [id]);
+
+  const loadProject = async () => {
     const projects = await getProjects();
     const foundProject = projects.find(p => p.id === id);
     if (foundProject) {
@@ -43,12 +48,7 @@ export default function EditProjectScreen() {
       setTitle(foundProject.title);
       setStartDate(new Date(foundProject.startDate));
     }
-  }, [id]);
-
-  useEffect(() => {
-    console.log('EditProject: Loading project', id);
-    loadProject();
-  }, [loadProject, id]);
+  };
 
   const handleSave = async () => {
     if (!project) return;
