@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   Image,
+  Keyboard,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -35,6 +36,7 @@ export default function EditProjectScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
+    console.log('EditProject: Loading project', id);
     loadProject();
   }, [id]);
 
@@ -51,6 +53,9 @@ export default function EditProjectScreen() {
   const handleSave = async () => {
     if (!project) return;
 
+    console.log('EditProject: Saving project changes');
+    Keyboard.dismiss();
+
     const updatedProject: Project = {
       ...project,
       title: title.trim() || 'Untitled Project',
@@ -63,6 +68,7 @@ export default function EditProjectScreen() {
   };
 
   const handleDelete = () => {
+    console.log('EditProject: Delete button pressed');
     Alert.alert(
       'Delete Project',
       'This will permanently delete the project and all its data. This action cannot be undone.',
@@ -73,6 +79,7 @@ export default function EditProjectScreen() {
           style: 'destructive',
           onPress: async () => {
             if (project) {
+              console.log('EditProject: Deleting project', project.id);
               await deleteProject(project.id);
               router.back();
             }
@@ -135,6 +142,9 @@ export default function EditProjectScreen() {
               numberOfLines={3}
               maxLength={150}
               textAlignVertical="top"
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
+              blurOnSubmit={true}
             />
           </View>
 
@@ -169,7 +179,11 @@ export default function EditProjectScreen() {
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              console.log('EditProject: Cancel button pressed');
+              Keyboard.dismiss();
+              router.back();
+            }}
           >
             <Text style={styles.secondaryButtonText}>Cancel</Text>
           </TouchableOpacity>
