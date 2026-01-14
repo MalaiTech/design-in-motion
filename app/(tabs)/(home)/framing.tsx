@@ -16,7 +16,7 @@ import {
   Keyboard,
   Linking,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -63,6 +63,11 @@ export default function FramingScreen() {
   const newCertaintyTextRef = useRef('');
   const newDesignSpaceTextRef = useRef('');
   const newQuestionTextRef = useRef('');
+  
+  // FIXED: Add state to force re-render of input fields
+  const [certaintyInputKey, setCertaintyInputKey] = useState(0);
+  const [designSpaceInputKey, setDesignSpaceInputKey] = useState(0);
+  const [questionInputKey, setQuestionInputKey] = useState(0);
   
   // Ref for ScrollView to enable programmatic scrolling
   const scrollViewRef = useRef<ScrollView>(null);
@@ -229,28 +234,40 @@ export default function FramingScreen() {
     await updateAndSaveProject({ artifacts: updatedArtifacts });
   };
 
-  // UPDATED: Open artifact in external app
+  // FIXED: Improved error handling for opening artifacts
   const handleOpenArtifact = async (artifact: Artifact) => {
-    if (artifact.type === 'url') {
-      console.log('Framing: Opening URL', artifact.uri);
-      const canOpen = await Linking.canOpenURL(artifact.uri);
-      if (canOpen) {
-        await Linking.openURL(artifact.uri);
-      } else {
-        Alert.alert('Error', 'Cannot open this URL.');
+    console.log('Framing: Attempting to open artifact', artifact.type, artifact.uri);
+    
+    try {
+      if (artifact.type === 'url') {
+        // Validate URL format
+        let url = artifact.uri.trim();
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        
+        const canOpen = await Linking.canOpenURL(url);
+        if (canOpen) {
+          await Linking.openURL(url);
+        } else {
+          Alert.alert('Error', 'Cannot open this URL. Please check the URL format.');
+        }
+      } else if (artifact.type === 'document') {
+        // For documents, try to open with system handler
+        const canOpen = await Linking.canOpenURL(artifact.uri);
+        if (canOpen) {
+          await Linking.openURL(artifact.uri);
+        } else {
+          Alert.alert('Error', 'Cannot open this document. The file may not be accessible.');
+        }
       }
-    } else if (artifact.type === 'document') {
-      console.log('Framing: Opening document', artifact.uri);
-      const canOpen = await Linking.canOpenURL(artifact.uri);
-      if (canOpen) {
-        await Linking.openURL(artifact.uri);
-      } else {
-        Alert.alert('Error', 'Cannot open this document.');
-      }
+    } catch (error) {
+      console.error('Framing: Error opening artifact:', error);
+      Alert.alert('Error', 'Failed to open artifact. Please try again.');
     }
   };
 
-  // Certainty items
+  // FIXED: Clear input after adding certainty item
   const handleAddCertaintyItem = async () => {
     if (!project || !newCertaintyTextRef.current.trim()) return;
     
@@ -263,7 +280,10 @@ export default function FramingScreen() {
     
     const updatedItems = [...(project.certaintyItems || []), newItem];
     await updateAndSaveProject({ certaintyItems: updatedItems });
+    
+    // FIXED: Clear ref and force input re-render
     newCertaintyTextRef.current = '';
+    setCertaintyInputKey(prev => prev + 1);
     Keyboard.dismiss();
   };
 
@@ -283,7 +303,7 @@ export default function FramingScreen() {
     await updateAndSaveProject({ certaintyItems: updatedItems });
   };
 
-  // Design space items
+  // FIXED: Clear input after adding design space item
   const handleAddDesignSpaceItem = async () => {
     if (!project || !newDesignSpaceTextRef.current.trim()) return;
     
@@ -295,7 +315,10 @@ export default function FramingScreen() {
     
     const updatedItems = [...(project.designSpaceItems || []), newItem];
     await updateAndSaveProject({ designSpaceItems: updatedItems });
+    
+    // FIXED: Clear ref and force input re-render
     newDesignSpaceTextRef.current = '';
+    setDesignSpaceInputKey(prev => prev + 1);
     Keyboard.dismiss();
   };
 
@@ -315,7 +338,7 @@ export default function FramingScreen() {
     await updateAndSaveProject({ designSpaceItems: updatedItems });
   };
 
-  // Exploration questions - UPDATED to create Draft Exploration Loop when favorited
+  // FIXED: Clear input after adding exploration question
   const handleAddExplorationQuestion = async () => {
     if (!project || !newQuestionTextRef.current.trim()) return;
     
@@ -328,7 +351,10 @@ export default function FramingScreen() {
     
     const updatedQuestions = [...(project.explorationQuestions || []), newQuestion];
     await updateAndSaveProject({ explorationQuestions: updatedQuestions });
+    
+    // FIXED: Clear ref and force input re-render
     newQuestionTextRef.current = '';
+    setQuestionInputKey(prev => prev + 1);
     Keyboard.dismiss();
   };
 
@@ -470,6 +496,13 @@ export default function FramingScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
+        <Stack.Screen 
+          options={{
+            headerStyle: {
+              backgroundColor: colors.surfaceFraming,
+            },
+          }}
+        />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -481,6 +514,7 @@ export default function FramingScreen() {
     return (project.certaintyItems || []).filter(item => item.category === category);
   };
 
+  // FIXED: Updated helper text for unknown section
   const getCertaintyHelperText = (category: CertaintyCategory) => {
     switch (category) {
       case 'known':
@@ -488,7 +522,7 @@ export default function FramingScreen() {
       case 'assumed':
         return 'Things you believe are true, but are not confirmed';
       case 'unknown':
-        return 'Things you don&apos;t understand or still need to learn.';
+        return 'Things you do not understand or still need to learn.';
       default:
         return '';
     }
@@ -496,6 +530,13 @@ export default function FramingScreen() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen 
+        options={{
+          headerStyle: {
+            backgroundColor: colors.surfaceFraming,
+          },
+        }}
+      />
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
@@ -702,9 +743,10 @@ export default function FramingScreen() {
               />
             ))}
             
-            {/* Add new item */}
+            {/* FIXED: Add key prop to force re-render */}
             <View style={styles.addItemRow}>
               <TextInput
+                key={certaintyInputKey}
                 style={styles.addItemInput}
                 placeholder={`Add ${selectedCertaintyCategory} item...`}
                 placeholderTextColor={colors.textSecondary}
@@ -743,9 +785,10 @@ export default function FramingScreen() {
               />
             ))}
             
-            {/* Add new item */}
+            {/* FIXED: Add key prop to force re-render */}
             <View style={styles.addItemRow}>
               <TextInput
+                key={designSpaceInputKey}
                 style={styles.addItemInput}
                 placeholder="Add constraint or possibility..."
                 placeholderTextColor={colors.textSecondary}
@@ -786,9 +829,10 @@ export default function FramingScreen() {
               />
             ))}
             
-            {/* Add new question */}
+            {/* FIXED: Add key prop to force re-render */}
             <View style={styles.addItemRow}>
               <TextInput
+                key={questionInputKey}
                 style={styles.addItemInput}
                 placeholder="Add exploration question..."
                 placeholderTextColor={colors.textSecondary}
