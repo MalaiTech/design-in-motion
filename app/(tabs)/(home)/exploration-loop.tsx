@@ -13,6 +13,7 @@ import {
   Image,
   Alert,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -33,6 +34,21 @@ import {
 } from '@/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+
+const THUMBNAIL_SIZE = 80;
+
+interface TimeEntry {
+  id: string;
+  reason: string;
+  hours: number;
+}
+
+interface CostEntry {
+  id: string;
+  reason: string;
+  amount: number;
+}
 
 export default function ExplorationLoopScreen() {
   const router = useRouter();
@@ -52,20 +68,30 @@ export default function ExplorationLoopScreen() {
   const [buildItems, setBuildItems] = useState<BuildItem[]>([]);
   const [buildArtifactIds, setBuildArtifactIds] = useState<string[]>([]);
   const [checkItems, setCheckItems] = useState<CheckItem[]>([]);
+  const [checkArtifactIds, setCheckArtifactIds] = useState<string[]>([]);
   const [adaptItems, setAdaptItems] = useState<AdaptItem[]>([]);
+  const [adaptArtifactIds, setAdaptArtifactIds] = useState<string[]>([]);
   const [explorationDecisions, setExplorationDecisions] = useState<ExplorationDecision[]>([]);
   const [nextExplorationQuestions, setNextExplorationQuestions] = useState<ExplorationQuestion[]>([]);
-  const [timeSpent, setTimeSpent] = useState('0');
-  const [costs, setCosts] = useState('0');
-  const [invoicesArtifactIds, setInvoicesArtifactIds] = useState<string[]>([]);
+  
+  // Time and costs tracking
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
+  
+  // Section collapse states
+  const [buildExpanded, setBuildExpanded] = useState(false);
+  const [checkExpanded, setCheckExpanded] = useState(false);
+  const [adaptExpanded, setAdaptExpanded] = useState(false);
   
   // UI state
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
-  const [artifactSection, setArtifactSection] = useState<'explore' | 'build' | 'invoices'>('explore');
+  const [artifactSection, setArtifactSection] = useState<'explore' | 'build' | 'check' | 'adapt'>('explore');
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
+  const [showTimeEntryOverlay, setShowTimeEntryOverlay] = useState(false);
+  const [showCostEntryOverlay, setShowCostEntryOverlay] = useState(false);
   
   // Edit states
   const [editingExploreId, setEditingExploreId] = useState<string | null>(null);
@@ -83,6 +109,12 @@ export default function ExplorationLoopScreen() {
   
   // Decision overlay
   const [decisionSummary, setDecisionSummary] = useState('');
+  
+  // Time/Cost entry overlays
+  const [timeEntryReason, setTimeEntryReason] = useState('');
+  const [timeEntryHours, setTimeEntryHours] = useState('');
+  const [costEntryReason, setCostEntryReason] = useState('');
+  const [costEntryAmount, setCostEntryAmount] = useState('');
   
   const hasUnsavedChanges = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -106,12 +138,22 @@ export default function ExplorationLoopScreen() {
           setBuildItems(foundLoop.buildItems || []);
           setBuildArtifactIds(foundLoop.buildArtifactIds || []);
           setCheckItems(foundLoop.checkItems || []);
+          setCheckArtifactIds(foundLoop.checkArtifactIds || []);
           setAdaptItems(foundLoop.adaptItems || []);
+          setAdaptArtifactIds(foundLoop.adaptArtifactIds || []);
           setExplorationDecisions(foundLoop.explorationDecisions || []);
           setNextExplorationQuestions(foundLoop.nextExplorationQuestions || []);
-          setTimeSpent(foundLoop.timeSpent?.toString() || '0');
-          setCosts(foundLoop.costs?.toString() || '0');
-          setInvoicesArtifactIds(foundLoop.invoicesArtifactIds || []);
+          
+          // Load time and cost entries (stored in custom format)
+          const timeData = (foundLoop as any).timeEntries || [];
+          const costData = (foundLoop as any).costEntries || [];
+          setTimeEntries(timeData);
+          setCostEntries(costData);
+          
+          // Auto-expand sections with content
+          setBuildExpanded((foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0);
+          setCheckExpanded((foundLoop.checkItems?.length || 0) > 0 || (foundLoop.checkArtifactIds?.length || 0) > 0);
+          setAdaptExpanded((foundLoop.adaptItems?.length || 0) > 0 || (foundLoop.adaptArtifactIds?.length || 0) > 0);
         } else {
           Alert.alert('Loop Not Found', 'This exploration loop no longer exists.', [
             { text: 'OK', onPress: () => router.back() }
@@ -145,12 +187,17 @@ export default function ExplorationLoopScreen() {
     if (!project) return;
     
     console.log('Saving exploration loop changes with status:', status);
+    
+    // Calculate totals from entries
+    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    const totalCosts = costEntries.reduce((sum, entry) => sum + entry.amount, 0);
+    
     const updatedLoop: ExplorationLoop = {
       id: loopId || Date.now().toString(),
       question,
       status,
       updatedDate: new Date().toISOString(),
-      artifactIds: [...exploreArtifactIds, ...buildArtifactIds, ...invoicesArtifactIds],
+      artifactIds: [...exploreArtifactIds, ...buildArtifactIds, ...checkArtifactIds, ...adaptArtifactIds],
       exploreItems,
       exploreArtifactIds,
       buildItems,
@@ -159,10 +206,14 @@ export default function ExplorationLoopScreen() {
       adaptItems,
       explorationDecisions,
       nextExplorationQuestions,
-      timeSpent: parseFloat(timeSpent) || 0,
-      costs: parseFloat(costs) || 0,
-      invoicesArtifactIds,
-    };
+      timeSpent: totalHours,
+      costs: totalCosts,
+      invoicesArtifactIds: [],
+      ...(checkArtifactIds.length > 0 && { checkArtifactIds }),
+      ...(adaptArtifactIds.length > 0 && { adaptArtifactIds }),
+      ...(timeEntries.length > 0 && { timeEntries }),
+      ...(costEntries.length > 0 && { costEntries }),
+    } as any;
     
     let updatedLoops = project.explorationLoops || [];
     if (isNewLoop) {
@@ -179,7 +230,7 @@ export default function ExplorationLoopScreen() {
     
     await updateProject(updatedProject);
     hasUnsavedChanges.current = false;
-  }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, adaptItems, explorationDecisions, nextExplorationQuestions, timeSpent, costs, invoicesArtifactIds]);
+  }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, checkArtifactIds, adaptItems, adaptArtifactIds, explorationDecisions, nextExplorationQuestions, timeEntries, costEntries]);
 
   const markAsChanged = useCallback(() => {
     hasUnsavedChanges.current = true;
@@ -193,7 +244,7 @@ export default function ExplorationLoopScreen() {
     }, 500);
   }, [saveChanges]);
 
-  // Artifact management
+  // Artifact management (same as Framing screen)
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project) return;
     
@@ -204,7 +255,7 @@ export default function ExplorationLoopScreen() {
           'Enter the URL of the artifact',
           async (url) => {
             if (url && url.trim()) {
-              console.log('Adding URL artifact:', url);
+              console.log('User adding URL artifact:', url);
               const newArtifact: Artifact = {
                 id: Date.now().toString(),
                 type: 'url',
@@ -227,8 +278,10 @@ export default function ExplorationLoopScreen() {
                 setExploreArtifactIds([...exploreArtifactIds, newArtifact.id]);
               } else if (artifactSection === 'build') {
                 setBuildArtifactIds([...buildArtifactIds, newArtifact.id]);
+              } else if (artifactSection === 'check') {
+                setCheckArtifactIds([...checkArtifactIds, newArtifact.id]);
               } else {
-                setInvoicesArtifactIds([...invoicesArtifactIds, newArtifact.id]);
+                setAdaptArtifactIds([...adaptArtifactIds, newArtifact.id]);
               }
               
               markAsChanged();
@@ -260,6 +313,7 @@ export default function ExplorationLoopScreen() {
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.8,
+          allowsMultipleSelection: true,
         });
       } else {
         result = await DocumentPicker.getDocumentAsync({
@@ -269,16 +323,15 @@ export default function ExplorationLoopScreen() {
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        console.log('Adding artifact:', asset.name);
-        const newArtifact: Artifact = {
-          id: Date.now().toString(),
+        console.log('User adding', result.assets.length, 'artifacts');
+        const newArtifacts: Artifact[] = result.assets.map((asset: any) => ({
+          id: `${Date.now()}_${Math.random()}`,
           type: type === 'document' ? 'document' : 'image',
           uri: asset.uri,
           name: asset.name || 'Untitled',
-        };
+        }));
         
-        const updatedArtifacts = [...project.artifacts, newArtifact];
+        const updatedArtifacts = [...project.artifacts, ...newArtifacts];
         const updatedProject = {
           ...project,
           artifacts: updatedArtifacts,
@@ -289,12 +342,15 @@ export default function ExplorationLoopScreen() {
         setProject(updatedProject);
         
         // Add to appropriate section
+        const newIds = newArtifacts.map(a => a.id);
         if (artifactSection === 'explore') {
-          setExploreArtifactIds([...exploreArtifactIds, newArtifact.id]);
+          setExploreArtifactIds([...exploreArtifactIds, ...newIds]);
         } else if (artifactSection === 'build') {
-          setBuildArtifactIds([...buildArtifactIds, newArtifact.id]);
+          setBuildArtifactIds([...buildArtifactIds, ...newIds]);
+        } else if (artifactSection === 'check') {
+          setCheckArtifactIds([...checkArtifactIds, ...newIds]);
         } else {
-          setInvoicesArtifactIds([...invoicesArtifactIds, newArtifact.id]);
+          setAdaptArtifactIds([...adaptArtifactIds, ...newIds]);
         }
         
         markAsChanged();
@@ -318,7 +374,7 @@ export default function ExplorationLoopScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            console.log('Deleting artifact:', artifactId);
+            console.log('User deleting artifact:', artifactId);
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
             const updatedProject = {
               ...project,
@@ -332,7 +388,8 @@ export default function ExplorationLoopScreen() {
             // Remove from section lists
             setExploreArtifactIds(exploreArtifactIds.filter(id => id !== artifactId));
             setBuildArtifactIds(buildArtifactIds.filter(id => id !== artifactId));
-            setInvoicesArtifactIds(invoicesArtifactIds.filter(id => id !== artifactId));
+            setCheckArtifactIds(checkArtifactIds.filter(id => id !== artifactId));
+            setAdaptArtifactIds(adaptArtifactIds.filter(id => id !== artifactId));
             
             markAsChanged();
             setShowArtifactViewer(false);
@@ -345,9 +402,9 @@ export default function ExplorationLoopScreen() {
   const handleToggleArtifactFavorite = async (artifactId: string) => {
     if (!project) return;
     
-    console.log('Toggling artifact favorite:', artifactId);
+    console.log('User toggling artifact favorite:', artifactId);
     const updatedArtifacts = project.artifacts.map(a => 
-      a.id === artifactId ? { ...a, caption: a.caption === 'favorite' ? undefined : 'favorite' } : a
+      a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
     );
     
     const updatedProject = {
@@ -358,13 +415,48 @@ export default function ExplorationLoopScreen() {
     
     await updateProject(updatedProject);
     setProject(updatedProject);
+    
+    // Update selected artifact if viewing
+    if (selectedArtifact?.id === artifactId) {
+      setSelectedArtifact(updatedArtifacts.find(a => a.id === artifactId) || null);
+    }
+  };
+
+  const handleOpenArtifact = async (artifact: Artifact) => {
+    console.log('User opening artifact:', artifact.name, artifact.type);
+    
+    if (artifact.type === 'url') {
+      try {
+        const canOpen = await Linking.canOpenURL(artifact.uri);
+        if (canOpen) {
+          await Linking.openURL(artifact.uri);
+        } else {
+          Alert.alert('Error', 'Cannot open this URL.');
+        }
+      } catch (error) {
+        console.error('Error opening URL:', error);
+        Alert.alert('Error', 'Failed to open URL.');
+      }
+    } else if (artifact.type === 'document') {
+      try {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(artifact.uri);
+        } else {
+          Alert.alert('Not Available', 'Sharing is not available on this device.');
+        }
+      } catch (error) {
+        console.error('Error opening document:', error);
+        Alert.alert('Error', 'Failed to open document.');
+      }
+    }
   };
 
   // Explore items
   const handleAddExploreItem = () => {
     if (!newExploreText.trim()) return;
     
-    console.log('Adding explore item:', newExploreText);
+    console.log('User adding explore item:', newExploreText);
     const newItem: ExploreItem = {
       id: Date.now().toString(),
       text: newExploreText.trim(),
@@ -377,13 +469,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteExploreItem = (id: string) => {
-    console.log('Deleting explore item:', id);
+    console.log('User deleting explore item:', id);
     setExploreItems(exploreItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditExploreItem = (id: string, newText: string) => {
-    console.log('Editing explore item:', id, newText);
+    console.log('User editing explore item:', id);
     setExploreItems(exploreItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -392,7 +484,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleExploreFavorite = (id: string) => {
-    console.log('Toggling explore favorite:', id);
+    console.log('User toggling explore favorite:', id);
     setExploreItems(exploreItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -403,7 +495,7 @@ export default function ExplorationLoopScreen() {
   const handleAddBuildItem = () => {
     if (!newBuildText.trim()) return;
     
-    console.log('Adding build item:', newBuildText);
+    console.log('User adding build item:', newBuildText);
     const newItem: BuildItem = {
       id: Date.now().toString(),
       text: newBuildText.trim(),
@@ -416,13 +508,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteBuildItem = (id: string) => {
-    console.log('Deleting build item:', id);
+    console.log('User deleting build item:', id);
     setBuildItems(buildItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditBuildItem = (id: string, newText: string) => {
-    console.log('Editing build item:', id, newText);
+    console.log('User editing build item:', id);
     setBuildItems(buildItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -431,7 +523,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleBuildFavorite = (id: string) => {
-    console.log('Toggling build favorite:', id);
+    console.log('User toggling build favorite:', id);
     setBuildItems(buildItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -442,7 +534,7 @@ export default function ExplorationLoopScreen() {
   const handleAddCheckItem = () => {
     if (!newCheckText.trim()) return;
     
-    console.log('Adding check item:', newCheckText);
+    console.log('User adding check item:', newCheckText);
     const newItem: CheckItem = {
       id: Date.now().toString(),
       text: newCheckText.trim(),
@@ -455,13 +547,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteCheckItem = (id: string) => {
-    console.log('Deleting check item:', id);
+    console.log('User deleting check item:', id);
     setCheckItems(checkItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditCheckItem = (id: string, newText: string) => {
-    console.log('Editing check item:', id, newText);
+    console.log('User editing check item:', id);
     setCheckItems(checkItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -470,7 +562,7 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleCheckFavorite = (id: string) => {
-    console.log('Toggling check favorite:', id);
+    console.log('User toggling check favorite:', id);
     setCheckItems(checkItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
@@ -481,7 +573,7 @@ export default function ExplorationLoopScreen() {
   const handleAddAdaptItem = () => {
     if (!newAdaptText.trim()) return;
     
-    console.log('Adding adapt item:', newAdaptText);
+    console.log('User adding adapt item:', newAdaptText);
     const newItem: AdaptItem = {
       id: Date.now().toString(),
       text: newAdaptText.trim(),
@@ -494,13 +586,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteAdaptItem = (id: string) => {
-    console.log('Deleting adapt item:', id);
+    console.log('User deleting adapt item:', id);
     setAdaptItems(adaptItems.filter(item => item.id !== id));
     markAsChanged();
   };
 
   const handleEditAdaptItem = (id: string, newText: string) => {
-    console.log('Editing adapt item:', id, newText);
+    console.log('User editing adapt item:', id);
     setAdaptItems(adaptItems.map(item => 
       item.id === id ? { ...item, text: newText } : item
     ));
@@ -509,18 +601,18 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleToggleAdaptFavorite = (id: string) => {
-    console.log('Toggling adapt favorite:', id);
+    console.log('User toggling adapt favorite:', id);
     setAdaptItems(adaptItems.map(item => 
       item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
     ));
     markAsChanged();
   };
 
-  // Next exploration questions
+  // Next exploration questions (same as Framing screen)
   const handleAddNextQuestion = () => {
     if (!newQuestionText.trim()) return;
     
-    console.log('Adding next exploration question:', newQuestionText);
+    console.log('User adding next exploration question:', newQuestionText);
     const newQuestion: ExplorationQuestion = {
       id: Date.now().toString(),
       text: newQuestionText.trim(),
@@ -533,13 +625,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const handleDeleteNextQuestion = (id: string) => {
-    console.log('Deleting next exploration question:', id);
+    console.log('User deleting next exploration question:', id);
     setNextExplorationQuestions(nextExplorationQuestions.filter(q => q.id !== id));
     markAsChanged();
   };
 
   const handleEditNextQuestion = (id: string, newText: string) => {
-    console.log('Editing next exploration question:', id, newText);
+    console.log('User editing next exploration question:', id);
     setNextExplorationQuestions(nextExplorationQuestions.map(q => 
       q.id === id ? { ...q, text: newText } : q
     ));
@@ -547,8 +639,49 @@ export default function ExplorationLoopScreen() {
     markAsChanged();
   };
 
-  const handleToggleNextQuestionFavorite = (id: string) => {
-    console.log('Toggling next question favorite:', id);
+  const handleToggleNextQuestionFavorite = async (id: string) => {
+    console.log('User toggling next question favorite:', id);
+    const question = nextExplorationQuestions.find(q => q.id === id);
+    
+    if (question && !question.isFavorite && project) {
+      // Create new exploration loop in Draft status
+      console.log('Creating new exploration loop from favorited question');
+      const newLoop: ExplorationLoop = {
+        id: Date.now().toString(),
+        question: question.text,
+        status: 'draft',
+        updatedDate: new Date().toISOString(),
+        artifactIds: [],
+        exploreItems: [],
+        exploreArtifactIds: [],
+        buildItems: [],
+        buildArtifactIds: [],
+        checkItems: [],
+        adaptItems: [],
+        explorationDecisions: [],
+        nextExplorationQuestions: [],
+        timeSpent: 0,
+        costs: 0,
+        invoicesArtifactIds: [],
+      };
+      
+      const updatedLoops = [...(project.explorationLoops || []), newLoop];
+      const updatedProject = {
+        ...project,
+        explorationLoops: updatedLoops,
+        updatedDate: new Date().toISOString(),
+      };
+      
+      await updateProject(updatedProject);
+      setProject(updatedProject);
+      
+      Alert.alert(
+        'Loop Created',
+        'A new exploration loop has been created in Draft status.',
+        [{ text: 'OK' }]
+      );
+    }
+    
     setNextExplorationQuestions(nextExplorationQuestions.map(q => 
       q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
     ));
@@ -562,7 +695,7 @@ export default function ExplorationLoopScreen() {
       return;
     }
     
-    console.log('Saving exploration decision:', decisionSummary);
+    console.log('User saving exploration decision:', decisionSummary);
     const newDecision: ExplorationDecision = {
       id: Date.now().toString(),
       summary: decisionSummary.trim(),
@@ -575,9 +708,82 @@ export default function ExplorationLoopScreen() {
     markAsChanged();
   };
 
+  // Time and cost tracking
+  const handleAddTimeEntry = () => {
+    if (!timeEntryReason.trim() || !timeEntryHours.trim()) {
+      Alert.alert('Required', 'Please enter both reason and hours.');
+      return;
+    }
+    
+    const hours = parseFloat(timeEntryHours);
+    if (isNaN(hours) || hours <= 0) {
+      Alert.alert('Invalid', 'Please enter a valid number of hours.');
+      return;
+    }
+    
+    console.log('User adding time entry:', timeEntryReason, hours);
+    const newEntry: TimeEntry = {
+      id: Date.now().toString(),
+      reason: timeEntryReason.trim(),
+      hours,
+    };
+    
+    setTimeEntries([...timeEntries, newEntry]);
+    setTimeEntryReason('');
+    setTimeEntryHours('');
+    setShowTimeEntryOverlay(false);
+    markAsChanged();
+  };
+
+  const handleDeleteTimeEntry = (id: string) => {
+    console.log('User deleting time entry:', id);
+    setTimeEntries(timeEntries.filter(e => e.id !== id));
+    markAsChanged();
+  };
+
+  const handleAddCostEntry = () => {
+    if (!costEntryReason.trim() || !costEntryAmount.trim()) {
+      Alert.alert('Required', 'Please enter both reason and amount.');
+      return;
+    }
+    
+    const amount = parseFloat(costEntryAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Invalid', 'Please enter a valid amount.');
+      return;
+    }
+    
+    console.log('User adding cost entry:', costEntryReason, amount);
+    const newEntry: CostEntry = {
+      id: Date.now().toString(),
+      reason: costEntryReason.trim(),
+      amount,
+    };
+    
+    setCostEntries([...costEntries, newEntry]);
+    setCostEntryReason('');
+    setCostEntryAmount('');
+    setShowCostEntryOverlay(false);
+    markAsChanged();
+  };
+
+  const handleDeleteCostEntry = (id: string) => {
+    console.log('User deleting cost entry:', id);
+    setCostEntries(costEntries.filter(e => e.id !== id));
+    markAsChanged();
+  };
+
   const getArtifactsByIds = (ids: string[]): Artifact[] => {
     if (!project) return [];
     return project.artifacts.filter(a => ids.includes(a.id));
+  };
+
+  const getTotalHours = () => {
+    return timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+  };
+
+  const getTotalCosts = () => {
+    return costEntries.reduce((sum, entry) => sum + entry.amount, 0);
   };
 
   if (!project) {
@@ -713,330 +919,489 @@ export default function ExplorationLoopScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            
+            {/* Explore Visuals */}
+            <View style={styles.visualsSection}>
+              <TouchableOpacity 
+                style={styles.addVisualsButton}
+                onPress={() => {
+                  setArtifactSection('explore');
+                  setShowArtifactOverlay(true);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addVisualsText}>Visuals</Text>
+              </TouchableOpacity>
+              
+              {exploreArtifactIds.length > 0 && (
+                <View style={styles.thumbnailGrid}>
+                  {getArtifactsByIds(exploreArtifactIds).map((artifact, index) => (
+                    <TouchableOpacity
+                      key={artifact.id}
+                      style={styles.thumbnail}
+                      onPress={() => {
+                        setSelectedArtifact(artifact);
+                        setShowArtifactViewer(true);
+                      }}
+                    >
+                      {artifact.type === 'image' ? (
+                        <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
+                      ) : (
+                        <View style={styles.thumbnailDoc}>
+                          <IconSymbol 
+                            ios_icon_name="doc" 
+                            android_material_icon_name="description" 
+                            size={32} 
+                            color={colors.textSecondary} 
+                          />
+                        </View>
+                      )}
+                      {artifact.isFavorite && (
+                        <View style={styles.favoriteBadge}>
+                          <IconSymbol 
+                            ios_icon_name="star.fill" 
+                            android_material_icon_name="star" 
+                            size={12} 
+                            color="#FFD700" 
+                          />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
 
-          {/* Explore Artifacts */}
+          {/* 4. Build (Collapsible) */}
           <View style={styles.section}>
             <TouchableOpacity 
-              style={styles.addVisualsButton}
-              onPress={() => {
-                setArtifactSection('explore');
-                setShowArtifactOverlay(true);
-              }}
+              style={styles.collapsibleHeader}
+              onPress={() => setBuildExpanded(!buildExpanded)}
             >
+              <Text style={styles.sectionTitle}>Build</Text>
               <IconSymbol 
-                ios_icon_name="plus.circle" 
-                android_material_icon_name="add-circle" 
-                size={20} 
+                ios_icon_name={buildExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={buildExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
                 color={colors.phaseExploration} 
               />
-              <Text style={styles.addVisualsText}>Visuals</Text>
             </TouchableOpacity>
             
-            {exploreArtifactIds.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactStrip}>
-                {getArtifactsByIds(exploreArtifactIds).map((artifact, index) => (
-                  <TouchableOpacity
-                    key={artifact.id}
-                    style={styles.artifactThumb}
+            {buildExpanded && (
+              <>
+                <View style={styles.listContainer}>
+                  {buildItems.map((item, index) => (
+                    <View key={item.id} style={styles.listItem}>
+                      {editingBuildId === item.id ? (
+                        <TextInput
+                          style={styles.listItemInput}
+                          value={item.text}
+                          onChangeText={(text) => handleEditBuildItem(item.id, text)}
+                          onBlur={() => setEditingBuildId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <React.Fragment key={index}>
+                          <Text style={styles.listItemText}>{item.text}</Text>
+                          <View style={styles.listItemActions}>
+                            <TouchableOpacity onPress={() => handleToggleBuildFavorite(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                                android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                                size={20} 
+                                color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEditingBuildId(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="pencil" 
+                                android_material_icon_name="edit" 
+                                size={20} 
+                                color={colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteBuildItem(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="trash" 
+                                android_material_icon_name="delete" 
+                                size={20} 
+                                color={colors.phaseFinish} 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </React.Fragment>
+                      )}
+                    </View>
+                  ))}
+                  
+                  <View style={styles.addItemRow}>
+                    <TextInput
+                      style={styles.addItemInput}
+                      placeholder="Add build note..."
+                      placeholderTextColor={colors.textSecondary}
+                      value={newBuildText}
+                      onChangeText={setNewBuildText}
+                      onSubmitEditing={handleAddBuildItem}
+                    />
+                    <TouchableOpacity onPress={handleAddBuildItem}>
+                      <IconSymbol 
+                        ios_icon_name="plus.circle.fill" 
+                        android_material_icon_name="add-circle" 
+                        size={28} 
+                        color={colors.phaseExploration} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                {/* Build Visuals */}
+                <View style={styles.visualsSection}>
+                  <TouchableOpacity 
+                    style={styles.addVisualsButton}
                     onPress={() => {
-                      setSelectedArtifact(artifact);
-                      setShowArtifactViewer(true);
+                      setArtifactSection('build');
+                      setShowArtifactOverlay(true);
                     }}
                   >
-                    {artifact.type === 'image' ? (
-                      <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                    ) : (
-                      <View style={styles.artifactDoc}>
-                        <IconSymbol 
-                          ios_icon_name="doc" 
-                          android_material_icon_name="description" 
-                          size={32} 
-                          color={colors.textSecondary} 
-                        />
-                      </View>
-                    )}
-                    {artifact.caption === 'favorite' && (
-                      <View style={styles.favoriteBadge}>
-                        <IconSymbol 
-                          ios_icon_name="star.fill" 
-                          android_material_icon_name="star" 
-                          size={16} 
-                          color="#FFD700" 
-                        />
-                      </View>
-                    )}
+                    <IconSymbol 
+                      ios_icon_name="plus.circle" 
+                      android_material_icon_name="add-circle" 
+                      size={20} 
+                      color={colors.phaseExploration} 
+                    />
+                    <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                  
+                  {buildArtifactIds.length > 0 && (
+                    <View style={styles.thumbnailGrid}>
+                      {getArtifactsByIds(buildArtifactIds).map((artifact, index) => (
+                        <TouchableOpacity
+                          key={artifact.id}
+                          style={styles.thumbnail}
+                          onPress={() => {
+                            setSelectedArtifact(artifact);
+                            setShowArtifactViewer(true);
+                          }}
+                        >
+                          {artifact.type === 'image' ? (
+                            <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
+                          ) : (
+                            <View style={styles.thumbnailDoc}>
+                              <IconSymbol 
+                                ios_icon_name="doc" 
+                                android_material_icon_name="description" 
+                                size={32} 
+                                color={colors.textSecondary} 
+                              />
+                            </View>
+                          )}
+                          {artifact.isFavorite && (
+                            <View style={styles.favoriteBadge}>
+                              <IconSymbol 
+                                ios_icon_name="star.fill" 
+                                android_material_icon_name="star" 
+                                size={12} 
+                                color="#FFD700" 
+                              />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </>
             )}
           </View>
 
-          {/* 4. Build */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Build</Text>
-            
-            <View style={styles.listContainer}>
-              {buildItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingBuildId === item.id ? (
-                    <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditBuildItem(item.id, text)}
-                      onBlur={() => setEditingBuildId(null)}
-                      autoFocus
-                    />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleBuildFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingBuildId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteBuildItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
-                </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  style={styles.addItemInput}
-                  placeholder="Add build note..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={newBuildText}
-                  onChangeText={setNewBuildText}
-                  onSubmitEditing={handleAddBuildItem}
-                />
-                <TouchableOpacity onPress={handleAddBuildItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* Build Artifacts */}
+          {/* 5. Check (Collapsible) */}
           <View style={styles.section}>
             <TouchableOpacity 
-              style={styles.addVisualsButton}
-              onPress={() => {
-                setArtifactSection('build');
-                setShowArtifactOverlay(true);
-              }}
+              style={styles.collapsibleHeader}
+              onPress={() => setCheckExpanded(!checkExpanded)}
             >
+              <Text style={styles.sectionTitle}>Check</Text>
               <IconSymbol 
-                ios_icon_name="plus.circle" 
-                android_material_icon_name="add-circle" 
-                size={20} 
+                ios_icon_name={checkExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={checkExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
                 color={colors.phaseExploration} 
               />
-              <Text style={styles.addVisualsText}>Visuals</Text>
             </TouchableOpacity>
             
-            {buildArtifactIds.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactStrip}>
-                {getArtifactsByIds(buildArtifactIds).map((artifact, index) => (
-                  <TouchableOpacity
-                    key={artifact.id}
-                    style={styles.artifactThumb}
+            {checkExpanded && (
+              <>
+                <View style={styles.listContainer}>
+                  {checkItems.map((item, index) => (
+                    <View key={item.id} style={styles.listItem}>
+                      {editingCheckId === item.id ? (
+                        <TextInput
+                          style={styles.listItemInput}
+                          value={item.text}
+                          onChangeText={(text) => handleEditCheckItem(item.id, text)}
+                          onBlur={() => setEditingCheckId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <React.Fragment key={index}>
+                          <Text style={styles.listItemText}>{item.text}</Text>
+                          <View style={styles.listItemActions}>
+                            <TouchableOpacity onPress={() => handleToggleCheckFavorite(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                                android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                                size={20} 
+                                color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEditingCheckId(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="pencil" 
+                                android_material_icon_name="edit" 
+                                size={20} 
+                                color={colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteCheckItem(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="trash" 
+                                android_material_icon_name="delete" 
+                                size={20} 
+                                color={colors.phaseFinish} 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </React.Fragment>
+                      )}
+                    </View>
+                  ))}
+                  
+                  <View style={styles.addItemRow}>
+                    <TextInput
+                      style={styles.addItemInput}
+                      placeholder="Add check note..."
+                      placeholderTextColor={colors.textSecondary}
+                      value={newCheckText}
+                      onChangeText={setNewCheckText}
+                      onSubmitEditing={handleAddCheckItem}
+                    />
+                    <TouchableOpacity onPress={handleAddCheckItem}>
+                      <IconSymbol 
+                        ios_icon_name="plus.circle.fill" 
+                        android_material_icon_name="add-circle" 
+                        size={28} 
+                        color={colors.phaseExploration} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                {/* Check Visuals */}
+                <View style={styles.visualsSection}>
+                  <TouchableOpacity 
+                    style={styles.addVisualsButton}
                     onPress={() => {
-                      setSelectedArtifact(artifact);
-                      setShowArtifactViewer(true);
+                      setArtifactSection('check');
+                      setShowArtifactOverlay(true);
                     }}
                   >
-                    {artifact.type === 'image' ? (
-                      <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                    ) : (
-                      <View style={styles.artifactDoc}>
-                        <IconSymbol 
-                          ios_icon_name="doc" 
-                          android_material_icon_name="description" 
-                          size={32} 
-                          color={colors.textSecondary} 
-                        />
-                      </View>
-                    )}
-                    {artifact.caption === 'favorite' && (
-                      <View style={styles.favoriteBadge}>
-                        <IconSymbol 
-                          ios_icon_name="star.fill" 
-                          android_material_icon_name="star" 
-                          size={16} 
-                          color="#FFD700" 
-                        />
-                      </View>
-                    )}
+                    <IconSymbol 
+                      ios_icon_name="plus.circle" 
+                      android_material_icon_name="add-circle" 
+                      size={20} 
+                      color={colors.phaseExploration} 
+                    />
+                    <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                  
+                  {checkArtifactIds.length > 0 && (
+                    <View style={styles.thumbnailGrid}>
+                      {getArtifactsByIds(checkArtifactIds).map((artifact, index) => (
+                        <TouchableOpacity
+                          key={artifact.id}
+                          style={styles.thumbnail}
+                          onPress={() => {
+                            setSelectedArtifact(artifact);
+                            setShowArtifactViewer(true);
+                          }}
+                        >
+                          {artifact.type === 'image' ? (
+                            <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
+                          ) : (
+                            <View style={styles.thumbnailDoc}>
+                              <IconSymbol 
+                                ios_icon_name="doc" 
+                                android_material_icon_name="description" 
+                                size={32} 
+                                color={colors.textSecondary} 
+                              />
+                            </View>
+                          )}
+                          {artifact.isFavorite && (
+                            <View style={styles.favoriteBadge}>
+                              <IconSymbol 
+                                ios_icon_name="star.fill" 
+                                android_material_icon_name="star" 
+                                size={12} 
+                                color="#FFD700" 
+                              />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </>
             )}
           </View>
 
-          {/* 5. Check */}
+          {/* 6. Adapt (Collapsible) */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Check</Text>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setAdaptExpanded(!adaptExpanded)}
+            >
+              <Text style={styles.sectionTitle}>Adapt</Text>
+              <IconSymbol 
+                ios_icon_name={adaptExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={adaptExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
             
-            <View style={styles.listContainer}>
-              {checkItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingCheckId === item.id ? (
+            {adaptExpanded && (
+              <>
+                <View style={styles.listContainer}>
+                  {adaptItems.map((item, index) => (
+                    <View key={item.id} style={styles.listItem}>
+                      {editingAdaptId === item.id ? (
+                        <TextInput
+                          style={styles.listItemInput}
+                          value={item.text}
+                          onChangeText={(text) => handleEditAdaptItem(item.id, text)}
+                          onBlur={() => setEditingAdaptId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <React.Fragment key={index}>
+                          <Text style={styles.listItemText}>{item.text}</Text>
+                          <View style={styles.listItemActions}>
+                            <TouchableOpacity onPress={() => handleToggleAdaptFavorite(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                                android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                                size={20} 
+                                color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEditingAdaptId(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="pencil" 
+                                android_material_icon_name="edit" 
+                                size={20} 
+                                color={colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteAdaptItem(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="trash" 
+                                android_material_icon_name="delete" 
+                                size={20} 
+                                color={colors.phaseFinish} 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </React.Fragment>
+                      )}
+                    </View>
+                  ))}
+                  
+                  <View style={styles.addItemRow}>
                     <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditCheckItem(item.id, text)}
-                      onBlur={() => setEditingCheckId(null)}
-                      autoFocus
+                      style={styles.addItemInput}
+                      placeholder="Add adapt note..."
+                      placeholderTextColor={colors.textSecondary}
+                      value={newAdaptText}
+                      onChangeText={setNewAdaptText}
+                      onSubmitEditing={handleAddAdaptItem}
                     />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleCheckFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
+                    <TouchableOpacity onPress={handleAddAdaptItem}>
+                      <IconSymbol 
+                        ios_icon_name="plus.circle.fill" 
+                        android_material_icon_name="add-circle" 
+                        size={28} 
+                        color={colors.phaseExploration} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                {/* Adapt Visuals */}
+                <View style={styles.visualsSection}>
+                  <TouchableOpacity 
+                    style={styles.addVisualsButton}
+                    onPress={() => {
+                      setArtifactSection('adapt');
+                      setShowArtifactOverlay(true);
+                    }}
+                  >
+                    <IconSymbol 
+                      ios_icon_name="plus.circle" 
+                      android_material_icon_name="add-circle" 
+                      size={20} 
+                      color={colors.phaseExploration} 
+                    />
+                    <Text style={styles.addVisualsText}>Visuals</Text>
+                  </TouchableOpacity>
+                  
+                  {adaptArtifactIds.length > 0 && (
+                    <View style={styles.thumbnailGrid}>
+                      {getArtifactsByIds(adaptArtifactIds).map((artifact, index) => (
+                        <TouchableOpacity
+                          key={artifact.id}
+                          style={styles.thumbnail}
+                          onPress={() => {
+                            setSelectedArtifact(artifact);
+                            setShowArtifactViewer(true);
+                          }}
+                        >
+                          {artifact.type === 'image' ? (
+                            <Image source={{ uri: artifact.uri }} style={styles.thumbnailImage} />
+                          ) : (
+                            <View style={styles.thumbnailDoc}>
+                              <IconSymbol 
+                                ios_icon_name="doc" 
+                                android_material_icon_name="description" 
+                                size={32} 
+                                color={colors.textSecondary} 
+                              />
+                            </View>
+                          )}
+                          {artifact.isFavorite && (
+                            <View style={styles.favoriteBadge}>
+                              <IconSymbol 
+                                ios_icon_name="star.fill" 
+                                android_material_icon_name="star" 
+                                size={12} 
+                                color="#FFD700" 
+                              />
+                            </View>
+                          )}
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingCheckId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteCheckItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
+                      ))}
+                    </View>
                   )}
                 </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  style={styles.addItemInput}
-                  placeholder="Add check note..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={newCheckText}
-                  onChangeText={setNewCheckText}
-                  onSubmitEditing={handleAddCheckItem}
-                />
-                <TouchableOpacity onPress={handleAddCheckItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* 6. Adapt */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Adapt</Text>
-            
-            <View style={styles.listContainer}>
-              {adaptItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingAdaptId === item.id ? (
-                    <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditAdaptItem(item.id, text)}
-                      onBlur={() => setEditingAdaptId(null)}
-                      autoFocus
-                    />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleAdaptFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingAdaptId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteAdaptItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
-                </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  style={styles.addItemInput}
-                  placeholder="Add adapt note..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={newAdaptText}
-                  onChangeText={setNewAdaptText}
-                  onSubmitEditing={handleAddAdaptItem}
-                />
-                <TouchableOpacity onPress={handleAddAdaptItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
+              </>
+            )}
           </View>
 
           {/* 7. Exploration Decisions */}
@@ -1076,6 +1441,9 @@ export default function ExplorationLoopScreen() {
           {/* 8. Next Exploration Questions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Next Exploration Questions</Text>
+            <Text style={styles.helperText}>
+              Favorite a question to create a new exploration loop in Draft status
+            </Text>
             
             <View style={styles.listContainer}>
               {nextExplorationQuestions.map((question, index) => (
@@ -1147,94 +1515,89 @@ export default function ExplorationLoopScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Time and Costs</Text>
             
-            <View style={styles.inputRow}>
-              <Text style={styles.inputLabel}>Hours Spent</Text>
-              <TextInput
-                style={styles.numberInput}
-                placeholder="0"
-                placeholderTextColor={colors.textSecondary}
-                value={timeSpent}
-                onChangeText={(text) => {
-                  setTimeSpent(text);
-                  markAsChanged();
-                }}
-                keyboardType="numeric"
-              />
+            {/* Time Tracking */}
+            <View style={styles.trackingSection}>
+              <View style={styles.trackingHeader}>
+                <Text style={styles.trackingTitle}>Hours</Text>
+                <Text style={styles.trackingTotal}>{getTotalHours().toFixed(1)} hrs</Text>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.addTrackingButton}
+                onPress={() => setShowTimeEntryOverlay(true)}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addTrackingText}>Add Time Entry</Text>
+              </TouchableOpacity>
+              
+              {timeEntries.length > 0 && (
+                <View style={styles.trackingList}>
+                  {timeEntries.map((entry, index) => (
+                    <View key={entry.id} style={styles.trackingItem}>
+                      <View style={styles.trackingItemContent}>
+                        <Text style={styles.trackingItemReason}>{entry.reason}</Text>
+                        <Text style={styles.trackingItemValue}>{entry.hours} hrs</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleDeleteTimeEntry(entry.id)}>
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={20} 
+                          color={colors.phaseFinish} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
             
-            <View style={styles.inputRow}>
-              <Text style={styles.inputLabel}>Costs</Text>
-              <TextInput
-                style={styles.numberInput}
-                placeholder="0"
-                placeholderTextColor={colors.textSecondary}
-                value={costs}
-                onChangeText={(text) => {
-                  setCosts(text);
-                  markAsChanged();
-                }}
-                keyboardType="numeric"
-              />
+            {/* Cost Tracking */}
+            <View style={styles.trackingSection}>
+              <View style={styles.trackingHeader}>
+                <Text style={styles.trackingTitle}>Costs</Text>
+                <Text style={styles.trackingTotal}>${getTotalCosts().toFixed(2)}</Text>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.addTrackingButton}
+                onPress={() => setShowCostEntryOverlay(true)}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addTrackingText}>Add Cost Entry</Text>
+              </TouchableOpacity>
+              
+              {costEntries.length > 0 && (
+                <View style={styles.trackingList}>
+                  {costEntries.map((entry, index) => (
+                    <View key={entry.id} style={styles.trackingItem}>
+                      <View style={styles.trackingItemContent}>
+                        <Text style={styles.trackingItemReason}>{entry.reason}</Text>
+                        <Text style={styles.trackingItemValue}>${entry.amount.toFixed(2)}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleDeleteCostEntry(entry.id)}>
+                        <IconSymbol 
+                          ios_icon_name="trash" 
+                          android_material_icon_name="delete" 
+                          size={20} 
+                          color={colors.phaseFinish} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
-          </View>
-
-          {/* 10. Invoices and Receipts */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Invoices and Receipts</Text>
-            
-            <TouchableOpacity 
-              style={styles.addVisualsButton}
-              onPress={() => {
-                setArtifactSection('invoices');
-                setShowArtifactOverlay(true);
-              }}
-            >
-              <IconSymbol 
-                ios_icon_name="plus.circle" 
-                android_material_icon_name="add-circle" 
-                size={20} 
-                color={colors.phaseExploration} 
-              />
-              <Text style={styles.addVisualsText}>Visuals</Text>
-            </TouchableOpacity>
-            
-            {invoicesArtifactIds.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactStrip}>
-                {getArtifactsByIds(invoicesArtifactIds).map((artifact, index) => (
-                  <TouchableOpacity
-                    key={artifact.id}
-                    style={styles.artifactThumb}
-                    onPress={() => {
-                      setSelectedArtifact(artifact);
-                      setShowArtifactViewer(true);
-                    }}
-                  >
-                    {artifact.type === 'image' ? (
-                      <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
-                    ) : (
-                      <View style={styles.artifactDoc}>
-                        <IconSymbol 
-                          ios_icon_name="doc" 
-                          android_material_icon_name="description" 
-                          size={32} 
-                          color={colors.textSecondary} 
-                        />
-                      </View>
-                    )}
-                    {artifact.caption === 'favorite' && (
-                      <View style={styles.favoriteBadge}>
-                        <IconSymbol 
-                          ios_icon_name="star.fill" 
-                          android_material_icon_name="star" 
-                          size={16} 
-                          color="#FFD700" 
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1254,53 +1617,22 @@ export default function ExplorationLoopScreen() {
           <View style={styles.overlayContent}>
             <Text style={styles.overlayTitle}>Select Status</Text>
             
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => {
-                console.log('User selected Draft status');
-                setStatus('draft');
-                markAsChanged();
-                setShowStatusPicker(false);
-              }}
-            >
-              <Text style={styles.overlayOptionText}>Draft</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => {
-                console.log('User selected Active status');
-                setStatus('active');
-                markAsChanged();
-                setShowStatusPicker(false);
-              }}
-            >
-              <Text style={styles.overlayOptionText}>Active</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => {
-                console.log('User selected Paused status');
-                setStatus('paused');
-                markAsChanged();
-                setShowStatusPicker(false);
-              }}
-            >
-              <Text style={styles.overlayOptionText}>Paused</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.overlayOption}
-              onPress={() => {
-                console.log('User selected Completed status');
-                setStatus('completed');
-                markAsChanged();
-                setShowStatusPicker(false);
-              }}
-            >
-              <Text style={styles.overlayOptionText}>Completed</Text>
-            </TouchableOpacity>
+            {['draft', 'active', 'paused', 'completed'].map((statusOption) => (
+              <TouchableOpacity 
+                key={statusOption}
+                style={styles.overlayOption}
+                onPress={() => {
+                  console.log('User selected status:', statusOption);
+                  setStatus(statusOption as any);
+                  markAsChanged();
+                  setShowStatusPicker(false);
+                }}
+              >
+                <Text style={styles.overlayOptionText}>
+                  {statusOption.charAt(0).toUpperCase() + statusOption.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
             
             <TouchableOpacity 
               style={styles.overlayCancelButton}
@@ -1408,15 +1740,43 @@ export default function ExplorationLoopScreen() {
             </TouchableOpacity>
             
             <View style={styles.artifactViewerActions}>
+              {selectedArtifact?.type === 'url' && (
+                <TouchableOpacity 
+                  onPress={() => selectedArtifact && handleOpenArtifact(selectedArtifact)}
+                  style={styles.artifactViewerAction}
+                >
+                  <IconSymbol 
+                    ios_icon_name="safari" 
+                    android_material_icon_name="open-in-new" 
+                    size={28} 
+                    color="#FFFFFF" 
+                  />
+                </TouchableOpacity>
+              )}
+              
+              {selectedArtifact?.type === 'document' && (
+                <TouchableOpacity 
+                  onPress={() => selectedArtifact && handleOpenArtifact(selectedArtifact)}
+                  style={styles.artifactViewerAction}
+                >
+                  <IconSymbol 
+                    ios_icon_name="doc" 
+                    android_material_icon_name="open-in-new" 
+                    size={28} 
+                    color="#FFFFFF" 
+                  />
+                </TouchableOpacity>
+              )}
+              
               <TouchableOpacity 
                 onPress={() => selectedArtifact && handleToggleArtifactFavorite(selectedArtifact.id)}
                 style={styles.artifactViewerAction}
               >
                 <IconSymbol 
-                  ios_icon_name={selectedArtifact?.caption === 'favorite' ? "star.fill" : "star"} 
-                  android_material_icon_name={selectedArtifact?.caption === 'favorite' ? "star" : "star-border"} 
+                  ios_icon_name={selectedArtifact?.isFavorite ? "star.fill" : "star"} 
+                  android_material_icon_name={selectedArtifact?.isFavorite ? "star" : "star-border"} 
                   size={28} 
-                  color={selectedArtifact?.caption === 'favorite' ? "#FFD700" : "#FFFFFF"} 
+                  color={selectedArtifact?.isFavorite ? "#FFD700" : "#FFFFFF"} 
                 />
               </TouchableOpacity>
               
@@ -1444,12 +1804,12 @@ export default function ExplorationLoopScreen() {
             ) : (
               <View style={styles.artifactViewerDoc}>
                 <IconSymbol 
-                  ios_icon_name="doc" 
-                  android_material_icon_name="description" 
+                  ios_icon_name={selectedArtifact?.type === 'url' ? "link" : "doc"} 
+                  android_material_icon_name={selectedArtifact?.type === 'url' ? "link" : "description"} 
                   size={64} 
                   color="#FFFFFF" 
                 />
-                <Text style={styles.artifactViewerDocName}>{selectedArtifact?.name}</Text>
+                <Text style={styles.artifactViewerDocName}>{selectedArtifact?.name || selectedArtifact?.uri}</Text>
               </View>
             )}
           </View>
@@ -1508,6 +1868,130 @@ export default function ExplorationLoopScreen() {
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Add Time Entry Overlay */}
+      <Modal
+        visible={showTimeEntryOverlay}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTimeEntryOverlay(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.overlayBackground}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowTimeEntryOverlay(false)}
+          >
+            <View style={styles.decisionOverlay}>
+              <Text style={styles.overlayTitle}>Add Time Entry</Text>
+              
+              <Text style={styles.inputLabel}>Reason</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="What did you work on?"
+                placeholderTextColor={colors.textSecondary}
+                value={timeEntryReason}
+                onChangeText={setTimeEntryReason}
+              />
+              
+              <Text style={styles.inputLabel}>Hours</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor={colors.textSecondary}
+                value={timeEntryHours}
+                onChangeText={setTimeEntryHours}
+                keyboardType="decimal-pad"
+              />
+              
+              <View style={styles.decisionButtons}>
+                <TouchableOpacity 
+                  style={styles.decisionCancelButton}
+                  onPress={() => {
+                    setTimeEntryReason('');
+                    setTimeEntryHours('');
+                    setShowTimeEntryOverlay(false);
+                  }}
+                >
+                  <Text style={styles.decisionCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.decisionSaveButton}
+                  onPress={handleAddTimeEntry}
+                >
+                  <Text style={styles.decisionSaveText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add Cost Entry Overlay */}
+      <Modal
+        visible={showCostEntryOverlay}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCostEntryOverlay(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.overlayBackground}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowCostEntryOverlay(false)}
+          >
+            <View style={styles.decisionOverlay}>
+              <Text style={styles.overlayTitle}>Add Cost Entry</Text>
+              
+              <Text style={styles.inputLabel}>Reason</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="What was the expense for?"
+                placeholderTextColor={colors.textSecondary}
+                value={costEntryReason}
+                onChangeText={setCostEntryReason}
+              />
+              
+              <Text style={styles.inputLabel}>Amount ($)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0.00"
+                placeholderTextColor={colors.textSecondary}
+                value={costEntryAmount}
+                onChangeText={setCostEntryAmount}
+                keyboardType="decimal-pad"
+              />
+              
+              <View style={styles.decisionButtons}>
+                <TouchableOpacity 
+                  style={styles.decisionCancelButton}
+                  onPress={() => {
+                    setCostEntryReason('');
+                    setCostEntryAmount('');
+                    setShowCostEntryOverlay(false);
+                  }}
+                >
+                  <Text style={styles.decisionCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.decisionSaveButton}
+                  onPress={handleAddCostEntry}
+                >
+                  <Text style={styles.decisionSaveText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1515,7 +1999,7 @@ export default function ExplorationLoopScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surfaceExploration,
+    backgroundColor: '#FFF6D8',
   },
   scrollContent: {
     padding: 16,
@@ -1537,6 +2021,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.phaseExploration,
+    marginBottom: 12,
+  },
+  helperText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   statusButton: {
@@ -1604,6 +2100,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  visualsSection: {
+    marginTop: 12,
+  },
   addVisualsButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1617,22 +2116,23 @@ const styles = StyleSheet.create({
     color: colors.phaseExploration,
     fontWeight: '600',
   },
-  artifactStrip: {
+  thumbnailGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: 12,
+    gap: 8,
   },
-  artifactThumb: {
-    width: 100,
-    height: 100,
+  thumbnail: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
     backgroundColor: colors.divider,
-    marginRight: 8,
     position: 'relative',
   },
-  artifactImage: {
+  thumbnailImage: {
     width: '100%',
     height: '100%',
   },
-  artifactDoc: {
+  thumbnailDoc: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
@@ -1643,8 +2143,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 10,
     padding: 4,
   },
   addDecisionButton: {
@@ -1689,27 +2189,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
   },
-  inputRow: {
+  trackingSection: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    marginBottom: 16,
+  },
+  trackingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  trackingTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  trackingTotal: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.phaseExploration,
+  },
+  addTrackingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  addTrackingText: {
+    fontSize: 16,
+    color: colors.phaseExploration,
+    fontWeight: '600',
+  },
+  trackingList: {
+    marginTop: 12,
+  },
+  trackingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    marginBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
   },
-  inputLabel: {
+  trackingItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginRight: 12,
+  },
+  trackingItemReason: {
+    fontSize: 16,
+    color: colors.text,
+    flex: 1,
+  },
+  trackingItemValue: {
     fontSize: 16,
     color: colors.text,
     fontWeight: '600',
-  },
-  numberInput: {
-    fontSize: 16,
-    color: colors.text,
-    textAlign: 'right',
-    minWidth: 80,
   },
   overlayBackground: {
     flex: 1,
@@ -1781,6 +2320,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#FFFFFF',
     marginTop: 16,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
   decisionOverlay: {
     backgroundColor: colors.background,
@@ -1796,11 +2337,18 @@ const styles = StyleSheet.create({
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.divider,
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   decisionButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+    marginTop: 8,
   },
   decisionCancelButton: {
     flex: 1,
