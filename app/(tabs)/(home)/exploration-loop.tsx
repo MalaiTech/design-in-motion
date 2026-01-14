@@ -60,28 +60,11 @@ export default function ExplorationLoopScreen() {
   const loopId = params.loopId as string | undefined;
   const isNewLoop = !loopId;
 
+  // SIMPLIFIED: Single source of truth for project data
   const [project, setProject] = useState<Project | null>(null);
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
   
-  // Loop fields
-  const [status, setStatus] = useState<'draft' | 'active' | 'paused' | 'completed'>('draft');
-  const [question, setQuestion] = useState('');
-  const [exploreItems, setExploreItems] = useState<ExploreItem[]>([]);
-  const [exploreArtifactIds, setExploreArtifactIds] = useState<string[]>([]);
-  const [buildItems, setBuildItems] = useState<BuildItem[]>([]);
-  const [buildArtifactIds, setBuildArtifactIds] = useState<string[]>([]);
-  const [checkItems, setCheckItems] = useState<CheckItem[]>([]);
-  const [checkArtifactIds, setCheckArtifactIds] = useState<string[]>([]);
-  const [adaptItems, setAdaptItems] = useState<AdaptItem[]>([]);
-  const [adaptArtifactIds, setAdaptArtifactIds] = useState<string[]>([]);
-  const [explorationDecisions, setExplorationDecisions] = useState<ExplorationDecision[]>([]);
-  const [nextExplorationQuestions, setNextExplorationQuestions] = useState<ExplorationQuestion[]>([]);
-  
-  // Time and costs tracking
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
-  const [costEntries, setCostEntry] = useState<CostEntry[]>([]);
-  
-  // Section collapse states - auto-expand when content exists
+  // Section collapse states
   const [buildExpanded, setBuildExpanded] = useState(false);
   const [checkExpanded, setCheckExpanded] = useState(false);
   const [adaptExpanded, setAdaptExpanded] = useState(false);
@@ -103,12 +86,20 @@ export default function ExplorationLoopScreen() {
   const [editingAdaptId, setEditingAdaptId] = useState<string | null>(null);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   
-  // New item inputs
-  const [newExploreText, setNewExploreText] = useState('');
-  const [newBuildText, setNewBuildText] = useState('');
-  const [newCheckText, setNewCheckText] = useState('');
-  const [newAdaptText, setNewAdaptText] = useState('');
-  const [newQuestionText, setNewQuestionText] = useState('');
+  // Refs for input values (prevents re-renders)
+  const questionRef = useRef('');
+  const newExploreTextRef = useRef('');
+  const newBuildTextRef = useRef('');
+  const newCheckTextRef = useRef('');
+  const newAdaptTextRef = useRef('');
+  const newQuestionTextRef = useRef('');
+  
+  // Keys to force input re-render after adding items
+  const [exploreInputKey, setExploreInputKey] = useState(0);
+  const [buildInputKey, setBuildInputKey] = useState(0);
+  const [checkInputKey, setCheckInputKey] = useState(0);
+  const [adaptInputKey, setAdaptInputKey] = useState(0);
+  const [questionInputKey, setQuestionInputKey] = useState(0);
   
   // Decision overlay
   const [decisionSummary, setDecisionSummary] = useState('');
@@ -118,12 +109,9 @@ export default function ExplorationLoopScreen() {
   const [timeEntryHours, setTimeEntryHours] = useState('');
   const [costEntryReason, setCostEntryReason] = useState('');
   const [costEntryAmount, setCostEntryAmount] = useState('');
-  
-  const hasUnsavedChanges = useRef(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadProject = useCallback(async () => {
-    console.log('Loading project for exploration loop:', projectId, loopId);
+    console.log('Exploration Loop: Loading project', projectId, loopId);
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
     if (found) {
@@ -132,26 +120,9 @@ export default function ExplorationLoopScreen() {
       if (loopId) {
         const foundLoop = found.explorationLoops?.find(l => l.id === loopId);
         if (foundLoop) {
-          console.log('Found exploration loop:', foundLoop);
+          console.log('Exploration Loop: Found loop', foundLoop.id);
           setLoop(foundLoop);
-          setStatus(foundLoop.status);
-          setQuestion(foundLoop.question);
-          setExploreItems(foundLoop.exploreItems || []);
-          setExploreArtifactIds(foundLoop.exploreArtifactIds || []);
-          setBuildItems(foundLoop.buildItems || []);
-          setBuildArtifactIds(foundLoop.buildArtifactIds || []);
-          setCheckItems(foundLoop.checkItems || []);
-          setCheckArtifactIds(foundLoop.checkArtifactIds || []);
-          setAdaptItems(foundLoop.adaptItems || []);
-          setAdaptArtifactIds(foundLoop.adaptArtifactIds || []);
-          setExplorationDecisions(foundLoop.explorationDecisions || []);
-          setNextExplorationQuestions(foundLoop.nextExplorationQuestions || []);
-          
-          // Load time and cost entries (stored in custom format)
-          const timeData = (foundLoop as any).timeEntries || [];
-          const costData = (foundLoop as any).costEntries || [];
-          setTimeEntries(timeData);
-          setCostEntry(costData);
+          questionRef.current = foundLoop.question;
           
           // Auto-expand sections with content
           const hasBuildContent = (foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0;
@@ -161,15 +132,35 @@ export default function ExplorationLoopScreen() {
           setBuildExpanded(hasBuildContent);
           setCheckExpanded(hasCheckContent);
           setAdaptExpanded(hasAdaptContent);
-          
-          console.log('Loaded artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length);
         } else {
           Alert.alert('Loop Not Found', 'This exploration loop no longer exists.', [
             { text: 'OK', onPress: () => router.back() }
           ]);
         }
       } else {
-        console.log('Creating new exploration loop with draft status');
+        console.log('Exploration Loop: Creating new loop');
+        // Initialize new loop
+        const newLoop: ExplorationLoop = {
+          id: Date.now().toString(),
+          question: '',
+          status: 'draft',
+          updatedDate: new Date().toISOString(),
+          artifactIds: [],
+          exploreItems: [],
+          exploreArtifactIds: [],
+          buildItems: [],
+          buildArtifactIds: [],
+          checkItems: [],
+          checkArtifactIds: [],
+          adaptItems: [],
+          adaptArtifactIds: [],
+          explorationDecisions: [],
+          nextExplorationQuestions: [],
+          timeSpent: 0,
+          costs: 0,
+          invoicesArtifactIds: [],
+        };
+        setLoop(newLoop);
       }
     } else {
       Alert.alert('Project Not Found', 'This project no longer exists.', [
@@ -181,57 +172,29 @@ export default function ExplorationLoopScreen() {
   useFocusEffect(
     useCallback(() => {
       loadProject();
-      return () => {
-        if (hasUnsavedChanges.current) {
-          saveChanges();
-        }
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-      };
     }, [loadProject])
   );
 
-  const saveChanges = useCallback(async () => {
-    if (!project) return;
+  // FIXED: Use same pattern as Framing screen - single atomic update
+  const updateAndSaveLoop = useCallback(async (updates: Partial<ExplorationLoop>) => {
+    if (!project || !loop) return;
     
-    console.log('Saving exploration loop changes with status:', status);
-    console.log('Artifact IDs - Explore:', exploreArtifactIds.length, 'Build:', buildArtifactIds.length, 'Check:', checkArtifactIds.length, 'Adapt:', adaptArtifactIds.length);
-    
-    // Calculate totals from entries
-    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
-    const totalCosts = costEntries.reduce((sum, entry) => sum + entry.amount, 0);
+    console.log('Exploration Loop: Updating loop with', Object.keys(updates));
     
     const updatedLoop: ExplorationLoop = {
-      id: loopId || Date.now().toString(),
-      question,
-      status,
+      ...loop,
+      ...updates,
       updatedDate: new Date().toISOString(),
-      artifactIds: [...exploreArtifactIds, ...buildArtifactIds, ...checkArtifactIds, ...adaptArtifactIds],
-      exploreItems,
-      exploreArtifactIds,
-      buildItems,
-      buildArtifactIds,
-      checkItems,
-      checkArtifactIds,
-      adaptItems,
-      adaptArtifactIds,
-      explorationDecisions,
-      nextExplorationQuestions,
-      timeSpent: totalHours,
-      costs: totalCosts,
-      invoicesArtifactIds: [],
-      ...(timeEntries.length > 0 && { timeEntries }),
-      ...(costEntries.length > 0 && { costEntries }),
-    } as any;
+    };
     
+    // Update loops array in project
     let updatedLoops = project.explorationLoops || [];
     if (isNewLoop) {
       updatedLoops = [...updatedLoops, updatedLoop];
-      console.log('Adding new loop to project. Total loops:', updatedLoops.length);
+      console.log('Exploration Loop: Adding new loop to project');
     } else {
-      updatedLoops = updatedLoops.map(l => l.id === loopId ? updatedLoop : l);
-      console.log('Updating existing loop in project');
+      updatedLoops = updatedLoops.map(l => l.id === loop.id ? updatedLoop : l);
+      console.log('Exploration Loop: Updating existing loop in project');
     }
     
     const updatedProject: Project = {
@@ -240,27 +203,22 @@ export default function ExplorationLoopScreen() {
       updatedDate: new Date().toISOString(),
     };
     
-    await updateProject(updatedProject);
+    // Update both state and AsyncStorage
     setProject(updatedProject);
-    hasUnsavedChanges.current = false;
-    console.log('Exploration loop saved successfully');
-  }, [project, loopId, isNewLoop, question, status, exploreItems, exploreArtifactIds, buildItems, buildArtifactIds, checkItems, checkArtifactIds, adaptItems, adaptArtifactIds, explorationDecisions, nextExplorationQuestions, timeEntries, costEntries]);
+    setLoop(updatedLoop);
+    await updateProject(updatedProject);
+  }, [project, loop, isNewLoop]);
 
-  const markAsChanged = useCallback(() => {
-    hasUnsavedChanges.current = true;
-    
-    // Debounced auto-save
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      saveChanges();
-    }, 500);
-  }, [saveChanges]);
+  // Save text field immediately
+  const saveTextField = useCallback(async (field: 'question', value: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Saving question field');
+    await updateAndSaveLoop({ [field]: value });
+  }, [loop, updateAndSaveLoop]);
 
-  // Artifact management (same as Framing screen)
+  // Artifact management
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
-    if (!project) return;
+    if (!project || !loop) return;
     
     try {
       if (type === 'url') {
@@ -269,7 +227,7 @@ export default function ExplorationLoopScreen() {
           'Enter the URL of the artifact',
           async (url) => {
             if (url && url.trim()) {
-              console.log('User adding URL artifact:', url);
+              console.log('Exploration Loop: Adding URL artifact');
               const newArtifact: Artifact = {
                 id: Date.now().toString(),
                 type: 'url',
@@ -288,20 +246,16 @@ export default function ExplorationLoopScreen() {
               setProject(updatedProject);
               
               // Add to appropriate section
-              if (artifactSection === 'explore') {
-                setExploreArtifactIds([...exploreArtifactIds, newArtifact.id]);
-              } else if (artifactSection === 'build') {
-                setBuildArtifactIds([...buildArtifactIds, newArtifact.id]);
-                setBuildExpanded(true);
-              } else if (artifactSection === 'check') {
-                setCheckArtifactIds([...checkArtifactIds, newArtifact.id]);
-                setCheckExpanded(true);
-              } else {
-                setAdaptArtifactIds([...adaptArtifactIds, newArtifact.id]);
-                setAdaptExpanded(true);
+              const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
+              const currentIds = (loop[sectionField] as string[]) || [];
+              await updateAndSaveLoop({ [sectionField]: [...currentIds, newArtifact.id] });
+              
+              if (artifactSection !== 'explore') {
+                if (artifactSection === 'build') setBuildExpanded(true);
+                if (artifactSection === 'check') setCheckExpanded(true);
+                if (artifactSection === 'adapt') setAdaptExpanded(true);
               }
               
-              markAsChanged();
               setShowArtifactOverlay(false);
             }
           }
@@ -334,15 +288,15 @@ export default function ExplorationLoopScreen() {
         });
       } else {
         result = await DocumentPicker.getDocumentAsync({
-          type: '*/*',
+          type: 'application/pdf',
           copyToCacheDirectory: true,
         });
       }
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        console.log('User adding', result.assets.length, 'artifacts to', artifactSection);
-        const newArtifacts: Artifact[] = result.assets.map((asset: any) => ({
-          id: `${Date.now()}_${Math.random()}`,
+        console.log('Exploration Loop: Adding', result.assets.length, 'artifacts');
+        const newArtifacts: Artifact[] = result.assets.map((asset: any, index: number) => ({
+          id: `${Date.now()}_${index}`,
           type: type === 'document' ? 'document' : 'image',
           uri: asset.uri,
           name: asset.name || 'Untitled',
@@ -359,31 +313,27 @@ export default function ExplorationLoopScreen() {
         setProject(updatedProject);
         
         // Add to appropriate section
+        const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
+        const currentIds = (loop[sectionField] as string[]) || [];
         const newIds = newArtifacts.map(a => a.id);
-        if (artifactSection === 'explore') {
-          setExploreArtifactIds([...exploreArtifactIds, ...newIds]);
-        } else if (artifactSection === 'build') {
-          setBuildArtifactIds([...buildArtifactIds, ...newIds]);
-          setBuildExpanded(true);
-        } else if (artifactSection === 'check') {
-          setCheckArtifactIds([...checkArtifactIds, ...newIds]);
-          setCheckExpanded(true);
-        } else {
-          setAdaptArtifactIds([...adaptArtifactIds, ...newIds]);
-          setAdaptExpanded(true);
+        await updateAndSaveLoop({ [sectionField]: [...currentIds, ...newIds] });
+        
+        if (artifactSection !== 'explore') {
+          if (artifactSection === 'build') setBuildExpanded(true);
+          if (artifactSection === 'check') setCheckExpanded(true);
+          if (artifactSection === 'adapt') setAdaptExpanded(true);
         }
         
-        markAsChanged();
         setShowArtifactOverlay(false);
       }
     } catch (error) {
-      console.error('Error adding artifact:', error);
+      console.error('Exploration Loop: Error adding artifact:', error);
       Alert.alert('Error', 'Failed to add artifact.');
     }
   };
 
   const handleDeleteArtifact = async (artifactId: string) => {
-    if (!project) return;
+    if (!project || !loop) return;
     
     Alert.alert(
       'Delete Artifact',
@@ -394,7 +344,7 @@ export default function ExplorationLoopScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            console.log('User deleting artifact:', artifactId);
+            console.log('Exploration Loop: Deleting artifact', artifactId);
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
             const updatedProject = {
               ...project,
@@ -405,13 +355,14 @@ export default function ExplorationLoopScreen() {
             await updateProject(updatedProject);
             setProject(updatedProject);
             
-            // Remove from section lists
-            setExploreArtifactIds(exploreArtifactIds.filter(id => id !== artifactId));
-            setBuildArtifactIds(buildArtifactIds.filter(id => id !== artifactId));
-            setCheckArtifactIds(checkArtifactIds.filter(id => id !== artifactId));
-            setAdaptArtifactIds(adaptArtifactIds.filter(id => id !== artifactId));
+            // Remove from all section lists
+            await updateAndSaveLoop({
+              exploreArtifactIds: loop.exploreArtifactIds.filter(id => id !== artifactId),
+              buildArtifactIds: loop.buildArtifactIds.filter(id => id !== artifactId),
+              checkArtifactIds: loop.checkArtifactIds.filter(id => id !== artifactId),
+              adaptArtifactIds: loop.adaptArtifactIds.filter(id => id !== artifactId),
+            });
             
-            markAsChanged();
             setShowArtifactViewer(false);
           }
         }
@@ -422,7 +373,7 @@ export default function ExplorationLoopScreen() {
   const handleToggleArtifactFavorite = async (artifactId: string) => {
     if (!project) return;
     
-    console.log('User toggling artifact favorite:', artifactId);
+    console.log('Exploration Loop: Toggling artifact favorite', artifactId);
     const updatedArtifacts = project.artifacts.map(a => 
       a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
     );
@@ -436,19 +387,18 @@ export default function ExplorationLoopScreen() {
     await updateProject(updatedProject);
     setProject(updatedProject);
     
-    // Update selected artifact if viewing
     if (selectedArtifact?.id === artifactId) {
       setSelectedArtifact(updatedArtifacts.find(a => a.id === artifactId) || null);
     }
   };
 
   const handleOpenArtifact = async (artifact: Artifact) => {
-    console.log('User opening artifact:', artifact.name, artifact.type);
+    console.log('Exploration Loop: Opening artifact', artifact.type);
     
-    if (artifact.type === 'url') {
-      try {
-        let url = artifact.uri;
-        if (!url.startsWith('https://') && !url.startsWith('http://')) {
+    try {
+      if (artifact.type === 'url') {
+        let url = artifact.uri.trim();
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
           url = 'https://' + url;
         }
         const canOpen = await Linking.canOpenURL(url);
@@ -457,241 +407,243 @@ export default function ExplorationLoopScreen() {
         } else {
           Alert.alert('Error', 'Cannot open this URL.');
         }
-      } catch (error) {
-        console.error('Error opening URL:', error);
-        Alert.alert('Error', 'Failed to open URL.');
-      }
-    } else if (artifact.type === 'document') {
-      try {
+      } else if (artifact.type === 'document') {
         const isAvailable = await Sharing.isAvailableAsync();
         if (isAvailable) {
           await Sharing.shareAsync(artifact.uri);
         } else {
           Alert.alert('Not Available', 'Sharing is not available on this device.');
         }
-      } catch (error) {
-        console.error('Error opening document:', error);
-        Alert.alert('Error', 'Failed to open document.');
       }
+    } catch (error) {
+      console.error('Exploration Loop: Error opening artifact:', error);
+      Alert.alert('Error', 'Failed to open artifact.');
     }
   };
 
   // Explore items
-  const handleAddExploreItem = () => {
-    if (!newExploreText.trim()) return;
+  const handleAddExploreItem = async () => {
+    if (!loop || !newExploreTextRef.current.trim()) return;
     
-    console.log('User adding explore item:', newExploreText);
+    console.log('Exploration Loop: Adding explore item');
     const newItem: ExploreItem = {
       id: Date.now().toString(),
-      text: newExploreText.trim(),
+      text: newExploreTextRef.current.trim(),
       isFavorite: false,
     };
     
-    setExploreItems([...exploreItems, newItem]);
-    setNewExploreText('');
-    markAsChanged();
+    await updateAndSaveLoop({ exploreItems: [...loop.exploreItems, newItem] });
+    newExploreTextRef.current = '';
+    setExploreInputKey(prev => prev + 1);
   };
 
-  const handleDeleteExploreItem = (id: string) => {
-    console.log('User deleting explore item:', id);
-    setExploreItems(exploreItems.filter(item => item.id !== id));
-    markAsChanged();
+  const handleDeleteExploreItem = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting explore item', id);
+    await updateAndSaveLoop({ exploreItems: loop.exploreItems.filter(item => item.id !== id) });
   };
 
-  const handleEditExploreItem = (id: string, newText: string) => {
-    console.log('User editing explore item:', id);
-    setExploreItems(exploreItems.map(item => 
-      item.id === id ? { ...item, text: newText } : item
-    ));
+  const handleEditExploreItem = async (id: string, newText: string) => {
+    if (!loop || !newText.trim()) return;
+    console.log('Exploration Loop: Editing explore item', id);
+    await updateAndSaveLoop({ 
+      exploreItems: loop.exploreItems.map(item => 
+        item.id === id ? { ...item, text: newText.trim() } : item
+      )
+    });
     setEditingExploreId(null);
-    markAsChanged();
   };
 
-  const handleToggleExploreFavorite = (id: string) => {
-    console.log('User toggling explore favorite:', id);
-    setExploreItems(exploreItems.map(item => 
-      item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
-    ));
-    markAsChanged();
+  const handleToggleExploreFavorite = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Toggling explore favorite', id);
+    await updateAndSaveLoop({ 
+      exploreItems: loop.exploreItems.map(item => 
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    });
   };
 
   // Build items
-  const handleAddBuildItem = () => {
-    if (!newBuildText.trim()) return;
+  const handleAddBuildItem = async () => {
+    if (!loop || !newBuildTextRef.current.trim()) return;
     
-    console.log('User adding build item:', newBuildText);
+    console.log('Exploration Loop: Adding build item');
     const newItem: BuildItem = {
       id: Date.now().toString(),
-      text: newBuildText.trim(),
+      text: newBuildTextRef.current.trim(),
       isFavorite: false,
     };
     
-    setBuildItems([...buildItems, newItem]);
-    setNewBuildText('');
+    await updateAndSaveLoop({ buildItems: [...loop.buildItems, newItem] });
+    newBuildTextRef.current = '';
+    setBuildInputKey(prev => prev + 1);
     setBuildExpanded(true);
-    markAsChanged();
   };
 
-  const handleDeleteBuildItem = (id: string) => {
-    console.log('User deleting build item:', id);
-    setBuildItems(buildItems.filter(item => item.id !== id));
-    markAsChanged();
+  const handleDeleteBuildItem = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting build item', id);
+    await updateAndSaveLoop({ buildItems: loop.buildItems.filter(item => item.id !== id) });
   };
 
-  const handleEditBuildItem = (id: string, newText: string) => {
-    console.log('User editing build item:', id);
-    setBuildItems(buildItems.map(item => 
-      item.id === id ? { ...item, text: newText } : item
-    ));
+  const handleEditBuildItem = async (id: string, newText: string) => {
+    if (!loop || !newText.trim()) return;
+    console.log('Exploration Loop: Editing build item', id);
+    await updateAndSaveLoop({ 
+      buildItems: loop.buildItems.map(item => 
+        item.id === id ? { ...item, text: newText.trim() } : item
+      )
+    });
     setEditingBuildId(null);
-    markAsChanged();
   };
 
-  const handleToggleBuildFavorite = (id: string) => {
-    console.log('User toggling build favorite:', id);
-    setBuildItems(buildItems.map(item => 
-      item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
-    ));
-    markAsChanged();
+  const handleToggleBuildFavorite = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Toggling build favorite', id);
+    await updateAndSaveLoop({ 
+      buildItems: loop.buildItems.map(item => 
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    });
   };
 
   // Check items
-  const handleAddCheckItem = () => {
-    if (!newCheckText.trim()) return;
+  const handleAddCheckItem = async () => {
+    if (!loop || !newCheckTextRef.current.trim()) return;
     
-    console.log('User adding check item:', newCheckText);
+    console.log('Exploration Loop: Adding check item');
     const newItem: CheckItem = {
       id: Date.now().toString(),
-      text: newCheckText.trim(),
+      text: newCheckTextRef.current.trim(),
       isFavorite: false,
     };
     
-    setCheckItems([...checkItems, newItem]);
-    setNewCheckText('');
+    await updateAndSaveLoop({ checkItems: [...loop.checkItems, newItem] });
+    newCheckTextRef.current = '';
+    setCheckInputKey(prev => prev + 1);
     setCheckExpanded(true);
-    markAsChanged();
   };
 
-  const handleDeleteCheckItem = (id: string) => {
-    console.log('User deleting check item:', id);
-    setCheckItems(checkItems.filter(item => item.id !== id));
-    markAsChanged();
+  const handleDeleteCheckItem = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting check item', id);
+    await updateAndSaveLoop({ checkItems: loop.checkItems.filter(item => item.id !== id) });
   };
 
-  const handleEditCheckItem = (id: string, newText: string) => {
-    console.log('User editing check item:', id);
-    setCheckItems(checkItems.map(item => 
-      item.id === id ? { ...item, text: newText } : item
-    ));
+  const handleEditCheckItem = async (id: string, newText: string) => {
+    if (!loop || !newText.trim()) return;
+    console.log('Exploration Loop: Editing check item', id);
+    await updateAndSaveLoop({ 
+      checkItems: loop.checkItems.map(item => 
+        item.id === id ? { ...item, text: newText.trim() } : item
+      )
+    });
     setEditingCheckId(null);
-    markAsChanged();
   };
 
-  const handleToggleCheckFavorite = (id: string) => {
-    console.log('User toggling check favorite:', id);
-    setCheckItems(checkItems.map(item => 
-      item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
-    ));
-    markAsChanged();
+  const handleToggleCheckFavorite = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Toggling check favorite', id);
+    await updateAndSaveLoop({ 
+      checkItems: loop.checkItems.map(item => 
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    });
   };
 
   // Adapt items
-  const handleAddAdaptItem = () => {
-    if (!newAdaptText.trim()) return;
+  const handleAddAdaptItem = async () => {
+    if (!loop || !newAdaptTextRef.current.trim()) return;
     
-    console.log('User adding adapt item:', newAdaptText);
+    console.log('Exploration Loop: Adding adapt item');
     const newItem: AdaptItem = {
       id: Date.now().toString(),
-      text: newAdaptText.trim(),
+      text: newAdaptTextRef.current.trim(),
       isFavorite: false,
     };
     
-    setAdaptItems([...adaptItems, newItem]);
-    setNewAdaptText('');
+    await updateAndSaveLoop({ adaptItems: [...loop.adaptItems, newItem] });
+    newAdaptTextRef.current = '';
+    setAdaptInputKey(prev => prev + 1);
     setAdaptExpanded(true);
-    markAsChanged();
   };
 
-  const handleDeleteAdaptItem = (id: string) => {
-    console.log('User deleting adapt item:', id);
-    setAdaptItems(adaptItems.filter(item => item.id !== id));
-    markAsChanged();
+  const handleDeleteAdaptItem = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting adapt item', id);
+    await updateAndSaveLoop({ adaptItems: loop.adaptItems.filter(item => item.id !== id) });
   };
 
-  const handleEditAdaptItem = (id: string, newText: string) => {
-    console.log('User editing adapt item:', id);
-    setAdaptItems(adaptItems.map(item => 
-      item.id === id ? { ...item, text: newText } : item
-    ));
+  const handleEditAdaptItem = async (id: string, newText: string) => {
+    if (!loop || !newText.trim()) return;
+    console.log('Exploration Loop: Editing adapt item', id);
+    await updateAndSaveLoop({ 
+      adaptItems: loop.adaptItems.map(item => 
+        item.id === id ? { ...item, text: newText.trim() } : item
+      )
+    });
     setEditingAdaptId(null);
-    markAsChanged();
   };
 
-  const handleToggleAdaptFavorite = (id: string) => {
-    console.log('User toggling adapt favorite:', id);
-    setAdaptItems(adaptItems.map(item => 
-      item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
-    ));
-    markAsChanged();
+  const handleToggleAdaptFavorite = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Toggling adapt favorite', id);
+    await updateAndSaveLoop({ 
+      adaptItems: loop.adaptItems.map(item => 
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    });
   };
 
-  // Next exploration questions (same as Framing screen)
-  const handleAddNextQuestion = () => {
-    if (!newQuestionText.trim()) return;
+  // Next exploration questions
+  const handleAddNextQuestion = async () => {
+    if (!loop || !newQuestionTextRef.current.trim()) return;
     
-    console.log('User adding next exploration question:', newQuestionText);
+    console.log('Exploration Loop: Adding next exploration question');
     const newQuestion: ExplorationQuestion = {
       id: Date.now().toString(),
-      text: newQuestionText.trim(),
+      text: newQuestionTextRef.current.trim(),
       isFavorite: false,
     };
     
-    setNextExplorationQuestions([...nextExplorationQuestions, newQuestion]);
-    setNewQuestionText('');
-    markAsChanged();
+    await updateAndSaveLoop({ nextExplorationQuestions: [...loop.nextExplorationQuestions, newQuestion] });
+    newQuestionTextRef.current = '';
+    setQuestionInputKey(prev => prev + 1);
   };
 
-  const handleDeleteNextQuestion = (id: string) => {
-    console.log('User deleting next exploration question:', id);
-    setNextExplorationQuestions(nextExplorationQuestions.filter(q => q.id !== id));
-    markAsChanged();
+  const handleDeleteNextQuestion = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting next exploration question', id);
+    await updateAndSaveLoop({ 
+      nextExplorationQuestions: loop.nextExplorationQuestions.filter(q => q.id !== id) 
+    });
   };
 
-  const handleEditNextQuestion = (id: string, newText: string) => {
-    console.log('User editing next exploration question:', id);
-    setNextExplorationQuestions(nextExplorationQuestions.map(q => 
-      q.id === id ? { ...q, text: newText } : q
-    ));
+  const handleEditNextQuestion = async (id: string, newText: string) => {
+    if (!loop || !newText.trim()) return;
+    console.log('Exploration Loop: Editing next exploration question', id);
+    await updateAndSaveLoop({ 
+      nextExplorationQuestions: loop.nextExplorationQuestions.map(q => 
+        q.id === id ? { ...q, text: newText.trim() } : q
+      )
+    });
     setEditingQuestionId(null);
-    markAsChanged();
   };
 
-  // FIXED: Apply same approach as Framing screen - update both questions and loops in single operation
+  // FIXED: Use same pattern as Framing screen - single atomic operation
   const handleToggleNextQuestionFavorite = async (id: string) => {
-    if (!project) return;
+    if (!project || !loop) return;
     
-    const question = nextExplorationQuestions.find(q => q.id === id);
+    const question = loop.nextExplorationQuestions.find(q => q.id === id);
     if (!question) return;
     
-    console.log('User toggling next question favorite:', id, 'Current favorite status:', question.isFavorite);
+    console.log('Exploration Loop: Toggling next question favorite', id, 'Current:', question.isFavorite);
     
     // If marking as favorite, create a new Draft Exploration Loop
     if (!question.isFavorite) {
-      console.log('Creating new exploration loop from favorited question:', question.text);
+      console.log('Exploration Loop: Creating new loop from favorited question');
       
-      // First, save current loop changes to ensure we have the latest state
-      await saveChanges();
-      
-      // Reload project to get fresh state
-      const projects = await getProjects();
-      const freshProject = projects.find(p => p.id === projectId);
-      
-      if (!freshProject) {
-        console.error('Project not found after reload');
-        return;
-      }
-      
-      // Create new exploration loop in Draft status
       const newLoop: ExplorationLoop = {
         id: Date.now().toString(),
         question: question.text,
@@ -713,45 +665,37 @@ export default function ExplorationLoopScreen() {
         invoicesArtifactIds: [],
       };
       
-      // Update the question's favorite status in the current loop
-      const updatedQuestions = nextExplorationQuestions.map(q => 
+      // Update question favorite status in current loop
+      const updatedQuestions = loop.nextExplorationQuestions.map(q => 
         q.id === id ? { ...q, isFavorite: true } : q
       );
-      setNextExplorationQuestions(updatedQuestions);
       
-      // Get the current loop from fresh project
-      const currentLoop = freshProject.explorationLoops?.find(l => l.id === loopId);
-      
-      // Build updated loops array
-      let updatedLoops = [...(freshProject.explorationLoops || [])];
+      // Build updated loops array - update current loop AND add new loop
+      let updatedLoops = project.explorationLoops || [];
       
       // Update current loop with new question favorite status
-      if (currentLoop) {
-        updatedLoops = updatedLoops.map(l => 
-          l.id === loopId 
-            ? { ...l, nextExplorationQuestions: updatedQuestions }
-            : l
-        );
-      }
+      updatedLoops = updatedLoops.map(l => 
+        l.id === loop.id 
+          ? { ...l, nextExplorationQuestions: updatedQuestions, updatedDate: new Date().toISOString() }
+          : l
+      );
       
       // Add new loop
       updatedLoops = [...updatedLoops, newLoop];
       
-      // Save to project
+      // Single atomic update to project
       const updatedProject = {
-        ...freshProject,
+        ...project,
         explorationLoops: updatedLoops,
         updatedDate: new Date().toISOString(),
       };
       
-      console.log('Saving project with', updatedLoops.length, 'exploration loops');
+      console.log('Exploration Loop: Saving project with', updatedLoops.length, 'loops');
       await updateProject(updatedProject);
       
       // Update local state
       setProject(updatedProject);
-      
-      // Mark as changed to trigger save of current loop
-      markAsChanged();
+      setLoop({ ...loop, nextExplorationQuestions: updatedQuestions });
       
       Alert.alert(
         'Loop Created',
@@ -760,37 +704,36 @@ export default function ExplorationLoopScreen() {
       );
     } else {
       // Just toggle favorite off
-      const updatedQuestions = nextExplorationQuestions.map(q => 
-        q.id === id ? { ...q, isFavorite: false } : q
-      );
-      setNextExplorationQuestions(updatedQuestions);
-      markAsChanged();
+      await updateAndSaveLoop({ 
+        nextExplorationQuestions: loop.nextExplorationQuestions.map(q => 
+          q.id === id ? { ...q, isFavorite: false } : q
+        )
+      });
     }
   };
 
   // Exploration decisions
   const handleSaveDecision = async () => {
-    if (!decisionSummary.trim()) {
+    if (!loop || !decisionSummary.trim()) {
       Alert.alert('Required', 'Please enter a decision summary.');
       return;
     }
     
-    console.log('User saving exploration decision:', decisionSummary);
+    console.log('Exploration Loop: Saving decision');
     const newDecision: ExplorationDecision = {
       id: Date.now().toString(),
       summary: decisionSummary.trim(),
       timestamp: new Date().toISOString(),
     };
     
-    setExplorationDecisions([...explorationDecisions, newDecision]);
+    await updateAndSaveLoop({ explorationDecisions: [...loop.explorationDecisions, newDecision] });
     setDecisionSummary('');
     setShowDecisionOverlay(false);
-    markAsChanged();
   };
 
   // Time and cost tracking
-  const handleAddTimeEntry = () => {
-    if (!timeEntryReason.trim() || !timeEntryHours.trim()) {
+  const handleAddTimeEntry = async () => {
+    if (!loop || !timeEntryReason.trim() || !timeEntryHours.trim()) {
       Alert.alert('Required', 'Please enter both reason and hours.');
       return;
     }
@@ -801,28 +744,43 @@ export default function ExplorationLoopScreen() {
       return;
     }
     
-    console.log('User adding time entry:', timeEntryReason, hours);
+    console.log('Exploration Loop: Adding time entry');
     const newEntry: TimeEntry = {
       id: Date.now().toString(),
       reason: timeEntryReason.trim(),
       hours,
     };
     
-    setTimeEntries([...timeEntries, newEntry]);
+    const currentEntries = (loop as any).timeEntries || [];
+    const updatedEntries = [...currentEntries, newEntry];
+    const totalHours = updatedEntries.reduce((sum, e) => sum + e.hours, 0);
+    
+    await updateAndSaveLoop({ 
+      timeSpent: totalHours,
+      ...(updatedEntries.length > 0 && { timeEntries: updatedEntries } as any)
+    });
+    
     setTimeEntryReason('');
     setTimeEntryHours('');
     setShowTimeEntryOverlay(false);
-    markAsChanged();
   };
 
-  const handleDeleteTimeEntry = (id: string) => {
-    console.log('User deleting time entry:', id);
-    setTimeEntries(timeEntries.filter(e => e.id !== id));
-    markAsChanged();
+  const handleDeleteTimeEntry = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting time entry', id);
+    
+    const currentEntries = (loop as any).timeEntries || [];
+    const updatedEntries = currentEntries.filter((e: TimeEntry) => e.id !== id);
+    const totalHours = updatedEntries.reduce((sum: number, e: TimeEntry) => sum + e.hours, 0);
+    
+    await updateAndSaveLoop({ 
+      timeSpent: totalHours,
+      ...(updatedEntries.length > 0 && { timeEntries: updatedEntries } as any)
+    });
   };
 
-  const handleAddCostEntry = () => {
-    if (!costEntryReason.trim() || !costEntryAmount.trim()) {
+  const handleAddCostEntry = async () => {
+    if (!loop || !costEntryReason.trim() || !costEntryAmount.trim()) {
       Alert.alert('Required', 'Please enter both reason and amount.');
       return;
     }
@@ -833,24 +791,39 @@ export default function ExplorationLoopScreen() {
       return;
     }
     
-    console.log('User adding cost entry:', costEntryReason, amount);
+    console.log('Exploration Loop: Adding cost entry');
     const newEntry: CostEntry = {
       id: Date.now().toString(),
       reason: costEntryReason.trim(),
       amount,
     };
     
-    setCostEntry([...costEntries, newEntry]);
+    const currentEntries = (loop as any).costEntries || [];
+    const updatedEntries = [...currentEntries, newEntry];
+    const totalCosts = updatedEntries.reduce((sum, e) => sum + e.amount, 0);
+    
+    await updateAndSaveLoop({ 
+      costs: totalCosts,
+      ...(updatedEntries.length > 0 && { costEntries: updatedEntries } as any)
+    });
+    
     setCostEntryReason('');
     setCostEntryAmount('');
     setShowCostEntryOverlay(false);
-    markAsChanged();
   };
 
-  const handleDeleteCostEntry = (id: string) => {
-    console.log('User deleting cost entry:', id);
-    setCostEntry(costEntries.filter(e => e.id !== id));
-    markAsChanged();
+  const handleDeleteCostEntry = async (id: string) => {
+    if (!loop) return;
+    console.log('Exploration Loop: Deleting cost entry', id);
+    
+    const currentEntries = (loop as any).costEntries || [];
+    const updatedEntries = currentEntries.filter((e: CostEntry) => e.id !== id);
+    const totalCosts = updatedEntries.reduce((sum: number, e: CostEntry) => sum + e.amount, 0);
+    
+    await updateAndSaveLoop({ 
+      costs: totalCosts,
+      ...(updatedEntries.length > 0 && { costEntries: updatedEntries } as any)
+    });
   };
 
   const getArtifactsByIds = (ids: string[]): Artifact[] => {
@@ -859,11 +832,15 @@ export default function ExplorationLoopScreen() {
   };
 
   const getTotalHours = () => {
-    return timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    if (!loop) return 0;
+    const entries = (loop as any).timeEntries || [];
+    return entries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
   };
 
   const getTotalCosts = () => {
-    return costEntries.reduce((sum, entry) => sum + entry.amount, 0);
+    if (!loop) return 0;
+    const entries = (loop as any).costEntries || [];
+    return entries.reduce((sum: number, entry: CostEntry) => sum + entry.amount, 0);
   };
 
   const renderThumbnailGrid = (artifactIds: string[]) => {
@@ -875,7 +852,7 @@ export default function ExplorationLoopScreen() {
     
     return (
       <View style={styles.thumbnailGrid}>
-        {artifacts.map((artifact, index) => (
+        {artifacts.map((artifact) => (
           <TouchableOpacity
             key={artifact.id}
             style={styles.thumbnail}
@@ -912,7 +889,6 @@ export default function ExplorationLoopScreen() {
               </View>
             )}
             
-            {/* Action icons in upper right corner */}
             <View style={styles.thumbnailActions}>
               <TouchableOpacity 
                 style={styles.thumbnailActionButton}
@@ -949,16 +925,19 @@ export default function ExplorationLoopScreen() {
     );
   };
 
-  if (!project) {
+  if (!project || !loop) {
     return (
       <View style={styles.container}>
         <Stack.Screen options={{ title: '', headerShown: true, headerStyle: { backgroundColor: '#FFF6D8' } }} />
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Loading project...</Text>
+          <Text style={styles.emptyText}>Loading...</Text>
         </View>
       </View>
     );
   }
+
+  const timeEntries = (loop as any).timeEntries || [];
+  const costEntries = (loop as any).costEntries || [];
 
   return (
     <View style={styles.container}>
@@ -988,7 +967,7 @@ export default function ExplorationLoopScreen() {
               onPress={() => setShowStatusPicker(true)}
             >
               <Text style={styles.statusButtonText}>
-                {status.charAt(0).toUpperCase() + status.slice(1)}
+                {loop.status.charAt(0).toUpperCase() + loop.status.slice(1)}
               </Text>
               <IconSymbol 
                 ios_icon_name="chevron.down" 
@@ -1006,10 +985,13 @@ export default function ExplorationLoopScreen() {
               style={styles.textArea}
               placeholder="What are you exploring or learning?"
               placeholderTextColor={colors.textSecondary}
-              value={question}
+              defaultValue={loop.question}
               onChangeText={(text) => {
-                setQuestion(text);
-                markAsChanged();
+                questionRef.current = text;
+              }}
+              onBlur={() => {
+                console.log('Exploration Loop: Question blur, saving');
+                saveTextField('question', questionRef.current);
               }}
               multiline
               numberOfLines={3}
@@ -1021,7 +1003,7 @@ export default function ExplorationLoopScreen() {
             <Text style={styles.sectionTitle}>Explore</Text>
             
             <View style={styles.listContainer}>
-              {exploreItems.map((item, index) => (
+              {loop.exploreItems.map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingExploreId === item.id ? (
                     <TextInput
@@ -1067,11 +1049,14 @@ export default function ExplorationLoopScreen() {
               
               <View style={styles.addItemRow}>
                 <TextInput
+                  key={exploreInputKey}
                   style={styles.addItemInput}
                   placeholder="Add exploration note..."
                   placeholderTextColor={colors.textSecondary}
-                  value={newExploreText}
-                  onChangeText={setNewExploreText}
+                  defaultValue=""
+                  onChangeText={(text) => {
+                    newExploreTextRef.current = text;
+                  }}
                   onSubmitEditing={handleAddExploreItem}
                 />
                 <TouchableOpacity onPress={handleAddExploreItem}>
@@ -1085,7 +1070,6 @@ export default function ExplorationLoopScreen() {
               </View>
             </View>
             
-            {/* Explore Visuals */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -1103,7 +1087,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderThumbnailGrid(exploreArtifactIds)}
+              {renderThumbnailGrid(loop.exploreArtifactIds)}
             </View>
           </View>
 
@@ -1125,7 +1109,7 @@ export default function ExplorationLoopScreen() {
             {buildExpanded && (
               <>
                 <View style={styles.listContainer}>
-                  {buildItems.map((item, index) => (
+                  {loop.buildItems.map((item, index) => (
                     <View key={item.id} style={styles.listItem}>
                       {editingBuildId === item.id ? (
                         <TextInput
@@ -1171,11 +1155,14 @@ export default function ExplorationLoopScreen() {
                   
                   <View style={styles.addItemRow}>
                     <TextInput
+                      key={buildInputKey}
                       style={styles.addItemInput}
                       placeholder="Add build note..."
                       placeholderTextColor={colors.textSecondary}
-                      value={newBuildText}
-                      onChangeText={setNewBuildText}
+                      defaultValue=""
+                      onChangeText={(text) => {
+                        newBuildTextRef.current = text;
+                      }}
                       onSubmitEditing={handleAddBuildItem}
                     />
                     <TouchableOpacity onPress={handleAddBuildItem}>
@@ -1189,7 +1176,6 @@ export default function ExplorationLoopScreen() {
                   </View>
                 </View>
                 
-                {/* Build Visuals */}
                 <View style={styles.visualsSection}>
                   <TouchableOpacity 
                     style={styles.addVisualsButton}
@@ -1207,7 +1193,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {renderThumbnailGrid(buildArtifactIds)}
+                  {renderThumbnailGrid(loop.buildArtifactIds)}
                 </View>
               </>
             )}
@@ -1231,7 +1217,7 @@ export default function ExplorationLoopScreen() {
             {checkExpanded && (
               <>
                 <View style={styles.listContainer}>
-                  {checkItems.map((item, index) => (
+                  {loop.checkItems.map((item, index) => (
                     <View key={item.id} style={styles.listItem}>
                       {editingCheckId === item.id ? (
                         <TextInput
@@ -1277,11 +1263,14 @@ export default function ExplorationLoopScreen() {
                   
                   <View style={styles.addItemRow}>
                     <TextInput
+                      key={checkInputKey}
                       style={styles.addItemInput}
                       placeholder="Add check note..."
                       placeholderTextColor={colors.textSecondary}
-                      value={newCheckText}
-                      onChangeText={setNewCheckText}
+                      defaultValue=""
+                      onChangeText={(text) => {
+                        newCheckTextRef.current = text;
+                      }}
                       onSubmitEditing={handleAddCheckItem}
                     />
                     <TouchableOpacity onPress={handleAddCheckItem}>
@@ -1295,7 +1284,6 @@ export default function ExplorationLoopScreen() {
                   </View>
                 </View>
                 
-                {/* Check Visuals */}
                 <View style={styles.visualsSection}>
                   <TouchableOpacity 
                     style={styles.addVisualsButton}
@@ -1313,7 +1301,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {renderThumbnailGrid(checkArtifactIds)}
+                  {renderThumbnailGrid(loop.checkArtifactIds)}
                 </View>
               </>
             )}
@@ -1337,7 +1325,7 @@ export default function ExplorationLoopScreen() {
             {adaptExpanded && (
               <>
                 <View style={styles.listContainer}>
-                  {adaptItems.map((item, index) => (
+                  {loop.adaptItems.map((item, index) => (
                     <View key={item.id} style={styles.listItem}>
                       {editingAdaptId === item.id ? (
                         <TextInput
@@ -1383,11 +1371,14 @@ export default function ExplorationLoopScreen() {
                   
                   <View style={styles.addItemRow}>
                     <TextInput
+                      key={adaptInputKey}
                       style={styles.addItemInput}
                       placeholder="Add adapt note..."
                       placeholderTextColor={colors.textSecondary}
-                      value={newAdaptText}
-                      onChangeText={setNewAdaptText}
+                      defaultValue=""
+                      onChangeText={(text) => {
+                        newAdaptTextRef.current = text;
+                      }}
                       onSubmitEditing={handleAddAdaptItem}
                     />
                     <TouchableOpacity onPress={handleAddAdaptItem}>
@@ -1401,7 +1392,6 @@ export default function ExplorationLoopScreen() {
                   </View>
                 </View>
                 
-                {/* Adapt Visuals */}
                 <View style={styles.visualsSection}>
                   <TouchableOpacity 
                     style={styles.addVisualsButton}
@@ -1419,7 +1409,7 @@ export default function ExplorationLoopScreen() {
                     <Text style={styles.addVisualsText}>Visuals</Text>
                   </TouchableOpacity>
                   
-                  {renderThumbnailGrid(adaptArtifactIds)}
+                  {renderThumbnailGrid(loop.adaptArtifactIds)}
                 </View>
               </>
             )}
@@ -1442,9 +1432,9 @@ export default function ExplorationLoopScreen() {
               <Text style={styles.addDecisionText}>Add Decision</Text>
             </TouchableOpacity>
             
-            {explorationDecisions.length > 0 && (
+            {loop.explorationDecisions.length > 0 && (
               <View style={styles.decisionsTimeline}>
-                {explorationDecisions.map((decision, index) => (
+                {loop.explorationDecisions.map((decision) => (
                   <View key={decision.id} style={styles.decisionItem}>
                     <View style={styles.decisionDot} />
                     <View style={styles.decisionContent}>
@@ -1467,7 +1457,7 @@ export default function ExplorationLoopScreen() {
             </Text>
             
             <View style={styles.listContainer}>
-              {nextExplorationQuestions.map((question, index) => (
+              {loop.nextExplorationQuestions.map((question, index) => (
                 <View key={question.id} style={styles.listItem}>
                   {editingQuestionId === question.id ? (
                     <TextInput
@@ -1513,11 +1503,14 @@ export default function ExplorationLoopScreen() {
               
               <View style={styles.addItemRow}>
                 <TextInput
+                  key={questionInputKey}
                   style={styles.addItemInput}
                   placeholder="Add next exploration question..."
                   placeholderTextColor={colors.textSecondary}
-                  value={newQuestionText}
-                  onChangeText={setNewQuestionText}
+                  defaultValue=""
+                  onChangeText={(text) => {
+                    newQuestionTextRef.current = text;
+                  }}
                   onSubmitEditing={handleAddNextQuestion}
                 />
                 <TouchableOpacity onPress={handleAddNextQuestion}>
@@ -1536,7 +1529,6 @@ export default function ExplorationLoopScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Time and Costs</Text>
             
-            {/* Time Tracking */}
             <View style={styles.trackingSection}>
               <View style={styles.trackingHeader}>
                 <Text style={styles.trackingTitle}>Hours</Text>
@@ -1558,7 +1550,7 @@ export default function ExplorationLoopScreen() {
               
               {timeEntries.length > 0 && (
                 <View style={styles.trackingList}>
-                  {timeEntries.map((entry, index) => (
+                  {timeEntries.map((entry: TimeEntry) => (
                     <View key={entry.id} style={styles.trackingItem}>
                       <View style={styles.trackingItemContent}>
                         <Text style={styles.trackingItemReason}>{entry.reason}</Text>
@@ -1578,7 +1570,6 @@ export default function ExplorationLoopScreen() {
               )}
             </View>
             
-            {/* Cost Tracking */}
             <View style={styles.trackingSection}>
               <View style={styles.trackingHeader}>
                 <Text style={styles.trackingTitle}>Costs</Text>
@@ -1600,7 +1591,7 @@ export default function ExplorationLoopScreen() {
               
               {costEntries.length > 0 && (
                 <View style={styles.trackingList}>
-                  {costEntries.map((entry, index) => (
+                  {costEntries.map((entry: CostEntry) => (
                     <View key={entry.id} style={styles.trackingItem}>
                       <View style={styles.trackingItemContent}>
                         <Text style={styles.trackingItemReason}>{entry.reason}</Text>
@@ -1642,10 +1633,9 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 key={statusOption}
                 style={styles.overlayOption}
-                onPress={() => {
-                  console.log('User selected status:', statusOption);
-                  setStatus(statusOption as any);
-                  markAsChanged();
+                onPress={async () => {
+                  console.log('Exploration Loop: Selected status', statusOption);
+                  await updateAndSaveLoop({ status: statusOption as any });
                   setShowStatusPicker(false);
                 }}
               >
@@ -1716,7 +1706,7 @@ export default function ExplorationLoopScreen() {
                 size={24} 
                 color={colors.text} 
               />
-              <Text style={styles.overlayOptionText}>Documents</Text>
+              <Text style={styles.overlayOptionText}>PDF Documents</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
