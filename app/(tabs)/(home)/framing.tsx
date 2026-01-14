@@ -396,7 +396,7 @@ export default function FramingScreen() {
       const newLoop: ExplorationLoop = {
         id: Date.now().toString(),
         question: question.text,
-        status: 'paused', // Draft status
+        status: 'draft', // FIXED: Changed from 'paused' to 'draft'
         updatedDate: new Date().toISOString(),
         artifactIds: [],
         exploreItems: [],
