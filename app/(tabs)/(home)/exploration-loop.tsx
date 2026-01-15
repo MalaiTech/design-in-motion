@@ -105,9 +105,8 @@ export default function ExplorationLoopScreen() {
   const [adaptInputKey, setAdaptInputKey] = useState(0);
   const [questionInputKey, setQuestionInputKey] = useState(0);
   
-  // NEW: Decision overlay with artifact support
+  // Decision overlay
   const [decisionSummary, setDecisionSummary] = useState('');
-  const [decisionArtifactIds, setDecisionArtifactIds] = useState<string[]>([]);
   
   // Time/Cost entry overlays
   const [timeEntryReason, setTimeEntryReason] = useState('');
@@ -240,9 +239,6 @@ export default function ExplorationLoopScreen() {
     
     console.log('Exploration Loop: User tapped Add Artifact -', type, 'for section', artifactSection);
     
-    // FIXED: Close the artifact overlay immediately before launching picker
-    setShowArtifactOverlay(false);
-    
     try {
       if (type === 'url') {
         // Show in-app modal instead of Alert.prompt
@@ -314,28 +310,6 @@ export default function ExplorationLoopScreen() {
         name: asset.name || asset.fileName || 'Untitled',
       }));
       
-      // NEW: If adding to decision overlay, just update the temporary state
-      if (artifactSection === 'decisions' && showDecisionOverlay) {
-        const newArtifactIds = newArtifacts.map(a => a.id);
-        
-        // Add artifacts to project
-        const updatedProjectArtifacts = [...(project.artifacts || []), ...newArtifacts];
-        const updatedProject: Project = {
-          ...project,
-          artifacts: updatedProjectArtifacts,
-          updatedDate: new Date().toISOString(),
-        };
-        
-        await updateProject(updatedProject);
-        setProject(updatedProject);
-        
-        // Add to temporary decision artifact list
-        setDecisionArtifactIds(prev => [...prev, ...newArtifactIds]);
-        
-        console.log('Exploration Loop: Added artifacts to decision overlay. Total:', decisionArtifactIds.length + newArtifactIds.length);
-        return;
-      }
-      
       // FIXED: Single atomic operation - update both project artifacts AND loop section IDs
       const updatedProjectArtifacts = [...(project.artifacts || []), ...newArtifacts];
       const newArtifactIds = newArtifacts.map(a => a.id);
@@ -390,6 +364,8 @@ export default function ExplorationLoopScreen() {
         projectArtifacts: updatedProject.artifacts.length,
         sectionArtifactIds: updatedSectionIds.length,
       });
+      
+      setShowArtifactOverlay(false);
     } catch (error) {
       console.error('Exploration Loop: Error adding artifact:', error);
       Alert.alert('Error', 'Failed to add artifact.');
@@ -412,28 +388,6 @@ export default function ExplorationLoopScreen() {
         uri: urlInput.trim(),
         name: 'URL Artifact',
       };
-      
-      // NEW: If adding to decision overlay, just update the temporary state
-      if (artifactSection === 'decisions' && showDecisionOverlay) {
-        // Add artifact to project
-        const updatedProjectArtifacts = [...(project.artifacts || []), newArtifact];
-        const updatedProject: Project = {
-          ...project,
-          artifacts: updatedProjectArtifacts,
-          updatedDate: new Date().toISOString(),
-        };
-        
-        await updateProject(updatedProject);
-        setProject(updatedProject);
-        
-        // Add to temporary decision artifact list
-        setDecisionArtifactIds(prev => [...prev, newArtifact.id]);
-        
-        console.log('Exploration Loop: Added URL artifact to decision overlay');
-        setUrlInput('');
-        setShowUrlInputModal(false);
-        return;
-      }
       
       // FIXED: Single atomic operation
       const updatedProjectArtifacts = [...(project.artifacts || []), newArtifact];
@@ -481,6 +435,7 @@ export default function ExplorationLoopScreen() {
       
       setUrlInput('');
       setShowUrlInputModal(false);
+      setShowArtifactOverlay(false);
     } catch (error) {
       console.error('Exploration Loop: Error adding URL artifact:', error);
       Alert.alert('Error', 'Failed to add URL.');
@@ -500,14 +455,6 @@ export default function ExplorationLoopScreen() {
           style: 'destructive',
           onPress: async () => {
             console.log('Exploration Loop: Deleting artifact', artifactId);
-            
-            // NEW: If in decision overlay, just remove from temporary list
-            if (showDecisionOverlay) {
-              setDecisionArtifactIds(prev => prev.filter(id => id !== artifactId));
-              setShowArtifactViewer(false);
-              return;
-            }
-            
             const updatedArtifacts = (project.artifacts || []).filter(a => a.id !== artifactId);
             const updatedProject = {
               ...project,
@@ -919,24 +866,23 @@ export default function ExplorationLoopScreen() {
     }
   };
 
-  // NEW: Exploration decisions with artifact support
+  // Exploration decisions
   const handleSaveDecision = async () => {
     if (!loop || !decisionSummary.trim()) {
       Alert.alert('Required', 'Please enter a decision summary.');
       return;
     }
     
-    console.log('Exploration Loop: Saving decision with', decisionArtifactIds.length, 'artifacts');
+    console.log('Exploration Loop: Saving decision');
     const newDecision: ExplorationDecision = {
       id: Date.now().toString(),
       summary: decisionSummary.trim(),
       timestamp: new Date().toISOString(),
-      artifactIds: decisionArtifactIds,
+      artifactIds: [],
     };
     
     await updateAndSaveLoop({ explorationDecisions: [...(loop.explorationDecisions || []), newDecision] });
     setDecisionSummary('');
-    setDecisionArtifactIds([]);
     setShowDecisionOverlay(false);
   };
 
@@ -1595,17 +1541,14 @@ export default function ExplorationLoopScreen() {
             </View>
           </View>
 
-          {/* 7. Exploration Decisions - NEW: Integrated visual artifacts in decision overlay */}
+          {/* 7. Exploration Decisions - NEW: With visual artifacts support */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Decisions</Text>
             <Text style={styles.helperText}>What are the decisions made as a result of this loop?</Text>
             
             <TouchableOpacity 
               style={styles.addDecisionButton}
-              onPress={() => {
-                console.log('Exploration Loop: User tapped Add Decision');
-                setShowDecisionOverlay(true);
-              }}
+              onPress={() => setShowDecisionOverlay(true)}
             >
               <IconSymbol 
                 ios_icon_name="plus.circle" 
@@ -1638,6 +1581,28 @@ export default function ExplorationLoopScreen() {
                 ))}
               </View>
             )}
+            
+            {/* NEW: Add visuals for decisions section */}
+            <View style={styles.visualsSection}>
+              <TouchableOpacity 
+                style={styles.addVisualsButton}
+                onPress={() => {
+                  console.log('Exploration Loop: User tapped Add Visuals for Decisions section');
+                  setArtifactSection('decisions');
+                  setShowArtifactOverlay(true);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addVisualsText}>Visuals</Text>
+              </TouchableOpacity>
+              
+              {renderArtifactGrid(loop.decisionsArtifactIds || [])}
+            </View>
           </View>
 
           {/* 8. Next Exploration Questions */}
@@ -2103,16 +2068,12 @@ export default function ExplorationLoopScreen() {
         </View>
       </Modal>
 
-      {/* NEW: Add Decision Overlay with integrated visual artifacts */}
+      {/* Add Decision Overlay */}
       <Modal
         visible={showDecisionOverlay}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setDecisionSummary('');
-          setDecisionArtifactIds([]);
-          setShowDecisionOverlay(false);
-        }}
+        onRequestClose={() => setShowDecisionOverlay(false)}
       >
         <KeyboardAvoidingView 
           style={styles.overlayBackground}
@@ -2121,17 +2082,9 @@ export default function ExplorationLoopScreen() {
           <TouchableOpacity 
             style={{ flex: 1 }}
             activeOpacity={1}
-            onPress={() => {
-              setDecisionSummary('');
-              setDecisionArtifactIds([]);
-              setShowDecisionOverlay(false);
-            }}
+            onPress={() => setShowDecisionOverlay(false)}
           >
-            <ScrollView 
-              style={styles.decisionOverlayScroll}
-              contentContainerStyle={styles.decisionOverlay}
-              keyboardShouldPersistTaps="handled"
-            >
+            <View style={styles.decisionOverlay}>
               <Text style={styles.overlayTitle}>Add Decision</Text>
               
               <Text style={styles.inputLabel}>Decision / Change Summary</Text>
@@ -2145,36 +2098,11 @@ export default function ExplorationLoopScreen() {
                 numberOfLines={4}
               />
               
-              {/* NEW: Add visuals section within decision overlay */}
-              <View style={styles.decisionVisualsSection}>
-                <Text style={styles.inputLabel}>Related Visuals</Text>
-                <TouchableOpacity 
-                  style={styles.addVisualsButton}
-                  onPress={() => {
-                    console.log('Exploration Loop: User tapped Add Visuals in decision overlay');
-                    setArtifactSection('decisions');
-                    setShowArtifactOverlay(true);
-                  }}
-                >
-                  <IconSymbol 
-                    ios_icon_name="plus.circle" 
-                    android_material_icon_name="add-circle" 
-                    size={20} 
-                    color={colors.phaseExploration} 
-                  />
-                  <Text style={styles.addVisualsText}>Add Visuals</Text>
-                </TouchableOpacity>
-                
-                {/* Display currently selected artifacts */}
-                {decisionArtifactIds.length > 0 && renderArtifactGrid(decisionArtifactIds)}
-              </View>
-              
               <View style={styles.decisionButtons}>
                 <TouchableOpacity 
                   style={styles.decisionCancelButton}
                   onPress={() => {
                     setDecisionSummary('');
-                    setDecisionArtifactIds([]);
                     setShowDecisionOverlay(false);
                   }}
                 >
@@ -2188,7 +2116,7 @@ export default function ExplorationLoopScreen() {
                   <Text style={styles.decisionSaveText}>Save</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </View>
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
@@ -2485,8 +2413,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     gap: 8,
-    borderWidth: 1,
-    borderColor: colors.divider,
   },
   addDecisionText: {
     fontSize: 16,
@@ -2497,8 +2423,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     backgroundColor: '#FFFFFF',
     padding: 16,
-    borderWidth: 1,
-    borderColor: colors.divider,
   },
   decisionItem: {
     flexDirection: 'row',
@@ -2675,9 +2599,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
-  decisionOverlayScroll: {
-    flex: 1,
-  },
   decisionOverlay: {
     backgroundColor: colors.background,
     padding: 24,
@@ -2699,9 +2620,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
     marginBottom: 8,
-  },
-  decisionVisualsSection: {
-    marginBottom: 16,
   },
   decisionButtons: {
     flexDirection: 'row',
