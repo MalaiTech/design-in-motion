@@ -138,7 +138,7 @@ export default function ExplorationLoopsScreen() {
         comparison = new Date(aDate).getTime() - new Date(bDate).getTime();
       } else if (sortOption === 'updatedDate') {
         comparison = new Date(a.updatedDate).getTime() - new Date(b.updatedDate).getTime();
-      } else {
+      } else if (sortOption === 'status') {
         comparison = a.status.localeCompare(b.status);
       }
       
@@ -264,7 +264,6 @@ export default function ExplorationLoopsScreen() {
 
         {favoriteQuestions.length > 0 && (
           <View style={styles.nextQuestionsSection}>
-            <Text style={styles.nextQuestionsLabel}>Next Exploration:</Text>
             {favoriteQuestions.map((question, index) => (
               <Text key={index} style={styles.nextQuestionText}>
                 {question}
@@ -292,6 +291,9 @@ export default function ExplorationLoopsScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
+          headerStyle: {
+            backgroundColor: '#FFF6D8',
+          },
           headerRight: () => (
             <TouchableOpacity
               style={styles.headerFilterButton}
@@ -362,11 +364,13 @@ export default function ExplorationLoopsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surfaceExploration,
+    backgroundColor: '#FFF6D8',
   },
   headerFilterButton: {
     padding: 8,
     marginRight: 8,
+    backgroundColor: '#FFF6D8',
+    borderRadius: 4,
   },
   scrollContent: {
     padding: 16,
@@ -472,11 +476,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: colors.divider,
-  },
-  nextQuestionsLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginBottom: 6,
   },
   nextQuestionText: {
     fontSize: 12,
