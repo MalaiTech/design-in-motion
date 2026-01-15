@@ -19,6 +19,7 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import ZoomableImage from '@/components/ZoomableImage';
 import {
   getProjects,
   updateProject,
@@ -35,6 +36,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const THUMBNAIL_GAP = 12;
@@ -490,6 +492,36 @@ export default function ExplorationLoopScreen() {
     
     if (selectedArtifact?.id === artifactId) {
       setSelectedArtifact(updatedArtifacts.find(a => a.id === artifactId) || null);
+    }
+  };
+
+  // NEW: Download artifact to device
+  const handleDownloadArtifact = async (artifact: Artifact) => {
+    if (artifact.type !== 'image') {
+      Alert.alert('Not Supported', 'Only images can be downloaded to your photo library.');
+      return;
+    }
+    
+    console.log('Exploration Loop: User tapped Download for artifact', artifact.id);
+    
+    try {
+      // Request permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Photo library permission is needed to save images.');
+        return;
+      }
+      
+      console.log('Exploration Loop: Saving image to library:', artifact.uri);
+      
+      // Save to library
+      await MediaLibrary.saveToLibraryAsync(artifact.uri);
+      
+      Alert.alert('Success', 'Image saved to your photo library.');
+      console.log('Exploration Loop: Image saved successfully');
+    } catch (error) {
+      console.error('Exploration Loop: Error downloading artifact:', error);
+      Alert.alert('Error', 'Failed to save image to photo library.');
     }
   };
 
@@ -1886,7 +1918,7 @@ export default function ExplorationLoopScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Artifact Viewer */}
+      {/* Artifact Viewer - NEW: With zoom and download */}
       <Modal
         visible={showArtifactViewer}
         transparent
@@ -1905,6 +1937,21 @@ export default function ExplorationLoopScreen() {
             </TouchableOpacity>
             
             <View style={styles.artifactViewerActions}>
+              {/* NEW: Download button for images */}
+              {selectedArtifact?.type === 'image' && (
+                <TouchableOpacity 
+                  onPress={() => selectedArtifact && handleDownloadArtifact(selectedArtifact)}
+                  style={styles.artifactViewerAction}
+                >
+                  <IconSymbol 
+                    ios_icon_name="arrow.down.circle" 
+                    android_material_icon_name="download" 
+                    size={28} 
+                    color="#FFFFFF" 
+                  />
+                </TouchableOpacity>
+              )}
+              
               {selectedArtifact?.type === 'url' && (
                 <TouchableOpacity 
                   onPress={() => selectedArtifact && handleOpenArtifact(selectedArtifact)}
@@ -1961,11 +2008,7 @@ export default function ExplorationLoopScreen() {
           
           <View style={styles.artifactViewerContent}>
             {selectedArtifact?.type === 'image' ? (
-              <Image 
-                source={{ uri: selectedArtifact.uri }} 
-                style={styles.artifactViewerImage}
-                resizeMode="contain"
-              />
+              <ZoomableImage uri={selectedArtifact.uri} />
             ) : (
               <View style={styles.artifactViewerDoc}>
                 <IconSymbol 
@@ -2498,10 +2541,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  artifactViewerImage: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height - 100,
   },
   artifactViewerDoc: {
     alignItems: 'center',
