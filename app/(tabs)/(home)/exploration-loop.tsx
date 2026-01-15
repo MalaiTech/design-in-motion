@@ -73,6 +73,8 @@ export default function ExplorationLoopScreen() {
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
   const [showTimeEntryOverlay, setShowTimeEntryOverlay] = useState(false);
   const [showCostEntryOverlay, setShowCostEntryOverlay] = useState(false);
+  const [showUrlInputModal, setShowUrlInputModal] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
   
   // Edit states
   const [editingExploreId, setEditingExploreId] = useState<string | null>(null);
@@ -116,6 +118,7 @@ export default function ExplorationLoopScreen() {
         const foundLoop = found.explorationLoops?.find(l => l.id === loopId);
         if (foundLoop) {
           console.log('Exploration Loop: Found loop', foundLoop.id, 'Status:', foundLoop.status);
+          console.log('Exploration Loop: Artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length);
           setLoop(foundLoop);
           questionRef.current = foundLoop.question;
         } else {
@@ -161,7 +164,7 @@ export default function ExplorationLoopScreen() {
     }, [loadProject])
   );
 
-  // FIXED: Use same pattern as Framing screen - single atomic update
+  // FIXED: Atomic update function - updates both project and loop in one operation
   const updateAndSaveLoop = useCallback(async (updates: Partial<ExplorationLoop>) => {
     if (!project || !loop) return;
     
@@ -189,10 +192,19 @@ export default function ExplorationLoopScreen() {
       updatedDate: new Date().toISOString(),
     };
     
-    // Update both state and AsyncStorage atomically
+    // CRITICAL: Single atomic save to AsyncStorage
     await updateProject(updatedProject);
+    
+    // Update state after successful save
     setProject(updatedProject);
     setLoop(updatedLoop);
+    
+    console.log('Exploration Loop: Save complete. Project artifacts:', updatedProject.artifacts?.length, 'Loop artifact IDs:', {
+      explore: updatedLoop.exploreArtifactIds?.length,
+      build: updatedLoop.buildArtifactIds?.length,
+      check: updatedLoop.checkArtifactIds?.length,
+      adapt: updatedLoop.adaptArtifactIds?.length,
+    });
   }, [project, loop, isNewLoop]);
 
   // Save text field immediately
@@ -202,44 +214,16 @@ export default function ExplorationLoopScreen() {
     await updateAndSaveLoop({ [field]: value });
   }, [loop, updateAndSaveLoop]);
 
-  // Artifact management - FIXED: Match Framing screen approach
+  // FIXED: Atomic artifact addition - single operation for both project and loop
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project || !loop) return;
     
+    console.log('Exploration Loop: User tapped Add Artifact -', type, 'for section', artifactSection);
+    
     try {
       if (type === 'url') {
-        Alert.prompt(
-          'Add URL',
-          'Enter the URL of the artifact',
-          async (url) => {
-            if (url && url.trim()) {
-              console.log('Exploration Loop: Adding URL artifact to', artifactSection);
-              const newArtifact: Artifact = {
-                id: Date.now().toString(),
-                type: 'url',
-                uri: url.trim(),
-                name: 'URL Artifact',
-              };
-              
-              const updatedArtifacts = [...project.artifacts, newArtifact];
-              const updatedProject = {
-                ...project,
-                artifacts: updatedArtifacts,
-                updatedDate: new Date().toISOString(),
-              };
-              
-              await updateProject(updatedProject);
-              setProject(updatedProject);
-              
-              // Add to appropriate section
-              const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
-              const currentIds = (loop[sectionField] as string[]) || [];
-              await updateAndSaveLoop({ [sectionField]: [...currentIds, newArtifact.id] });
-              
-              setShowArtifactOverlay(false);
-            }
-          }
-        );
+        // Show in-app modal instead of Alert.prompt
+        setShowUrlInputModal(true);
         return;
       }
       
@@ -273,36 +257,149 @@ export default function ExplorationLoopScreen() {
         });
       }
       
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        console.log('Exploration Loop: Adding', result.assets.length, 'artifacts to', artifactSection);
-        const newArtifacts: Artifact[] = result.assets.map((asset: any, index: number) => ({
-          id: `${Date.now()}_${index}`,
-          type: type === 'document' ? 'document' : 'image',
-          uri: asset.uri,
-          name: asset.name || 'Untitled',
-        }));
-        
-        const updatedArtifacts = [...project.artifacts, ...newArtifacts];
-        const updatedProject = {
-          ...project,
-          artifacts: updatedArtifacts,
-          updatedDate: new Date().toISOString(),
-        };
-        
-        await updateProject(updatedProject);
-        setProject(updatedProject);
-        
-        // Add to appropriate section
-        const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
-        const currentIds = (loop[sectionField] as string[]) || [];
-        const newIds = newArtifacts.map(a => a.id);
-        await updateAndSaveLoop({ [sectionField]: [...currentIds, ...newIds] });
-        
-        setShowArtifactOverlay(false);
+      // Handle result - check for both .assets and direct properties
+      if (!result || result.canceled) {
+        console.log('Exploration Loop: User canceled picker');
+        return;
       }
+      
+      // FIXED: Handle both result shapes (assets array vs direct properties)
+      let assets: any[] = [];
+      if (result.assets && Array.isArray(result.assets)) {
+        assets = result.assets;
+      } else if (result.uri) {
+        // Fallback for older DocumentPicker format
+        assets = [{
+          uri: result.uri,
+          name: result.name || 'Untitled',
+          mimeType: result.mimeType,
+        }];
+      }
+      
+      if (assets.length === 0) {
+        console.log('Exploration Loop: No assets selected');
+        return;
+      }
+      
+      console.log('Exploration Loop: Adding', assets.length, 'artifacts to', artifactSection);
+      
+      // Create new artifacts
+      const newArtifacts: Artifact[] = assets.map((asset: any, index: number) => ({
+        id: `${Date.now()}_${index}`,
+        type: type === 'document' ? 'document' : 'image',
+        uri: asset.uri,
+        name: asset.name || asset.fileName || 'Untitled',
+      }));
+      
+      // FIXED: Single atomic operation - update both project artifacts AND loop section IDs
+      const updatedProjectArtifacts = [...(project.artifacts || []), ...newArtifacts];
+      const newArtifactIds = newArtifacts.map(a => a.id);
+      
+      // Determine which section field to update
+      const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
+      const currentSectionIds = (loop[sectionField] as string[]) || [];
+      const updatedSectionIds = [...currentSectionIds, ...newArtifactIds];
+      
+      // Build complete updated project with both artifacts and loop
+      let updatedLoops = project.explorationLoops || [];
+      const updatedLoop: ExplorationLoop = {
+        ...loop,
+        [sectionField]: updatedSectionIds,
+        updatedDate: new Date().toISOString(),
+      };
+      
+      if (isNewLoop) {
+        updatedLoops = [...updatedLoops, updatedLoop];
+      } else {
+        updatedLoops = updatedLoops.map(l => l.id === loop.id ? updatedLoop : l);
+      }
+      
+      const updatedProject: Project = {
+        ...project,
+        artifacts: updatedProjectArtifacts,
+        explorationLoops: updatedLoops,
+        updatedDate: new Date().toISOString(),
+      };
+      
+      console.log('Exploration Loop: Saving project with', updatedProjectArtifacts.length, 'total artifacts');
+      console.log('Exploration Loop: Section', artifactSection, 'now has', updatedSectionIds.length, 'artifact IDs');
+      
+      // CRITICAL: Single atomic save
+      await updateProject(updatedProject);
+      
+      // Update state after successful save
+      setProject(updatedProject);
+      setLoop(updatedLoop);
+      
+      console.log('Exploration Loop: Artifact addition complete. Verify counts:', {
+        projectArtifacts: updatedProject.artifacts.length,
+        sectionArtifactIds: updatedSectionIds.length,
+      });
+      
+      setShowArtifactOverlay(false);
     } catch (error) {
       console.error('Exploration Loop: Error adding artifact:', error);
       Alert.alert('Error', 'Failed to add artifact.');
+    }
+  };
+
+  // FIXED: Handle URL input from in-app modal
+  const handleUrlSubmit = async () => {
+    if (!project || !loop || !urlInput.trim()) {
+      Alert.alert('Required', 'Please enter a URL.');
+      return;
+    }
+    
+    console.log('Exploration Loop: Adding URL artifact to', artifactSection);
+    
+    try {
+      const newArtifact: Artifact = {
+        id: Date.now().toString(),
+        type: 'url',
+        uri: urlInput.trim(),
+        name: 'URL Artifact',
+      };
+      
+      // FIXED: Single atomic operation
+      const updatedProjectArtifacts = [...(project.artifacts || []), newArtifact];
+      
+      const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
+      const currentSectionIds = (loop[sectionField] as string[]) || [];
+      const updatedSectionIds = [...currentSectionIds, newArtifact.id];
+      
+      let updatedLoops = project.explorationLoops || [];
+      const updatedLoop: ExplorationLoop = {
+        ...loop,
+        [sectionField]: updatedSectionIds,
+        updatedDate: new Date().toISOString(),
+      };
+      
+      if (isNewLoop) {
+        updatedLoops = [...updatedLoops, updatedLoop];
+      } else {
+        updatedLoops = updatedLoops.map(l => l.id === loop.id ? updatedLoop : l);
+      }
+      
+      const updatedProject: Project = {
+        ...project,
+        artifacts: updatedProjectArtifacts,
+        explorationLoops: updatedLoops,
+        updatedDate: new Date().toISOString(),
+      };
+      
+      console.log('Exploration Loop: Saving URL artifact. Section', artifactSection, 'now has', updatedSectionIds.length, 'IDs');
+      
+      await updateProject(updatedProject);
+      
+      setProject(updatedProject);
+      setLoop(updatedLoop);
+      
+      setUrlInput('');
+      setShowUrlInputModal(false);
+      setShowArtifactOverlay(false);
+    } catch (error) {
+      console.error('Exploration Loop: Error adding URL artifact:', error);
+      Alert.alert('Error', 'Failed to add URL.');
     }
   };
 
@@ -319,7 +416,7 @@ export default function ExplorationLoopScreen() {
           style: 'destructive',
           onPress: async () => {
             console.log('Exploration Loop: Deleting artifact', artifactId);
-            const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
+            const updatedArtifacts = (project.artifacts || []).filter(a => a.id !== artifactId);
             const updatedProject = {
               ...project,
               artifacts: updatedArtifacts,
@@ -331,10 +428,10 @@ export default function ExplorationLoopScreen() {
             
             // Remove from all section lists
             await updateAndSaveLoop({
-              exploreArtifactIds: loop.exploreArtifactIds.filter(id => id !== artifactId),
-              buildArtifactIds: loop.buildArtifactIds.filter(id => id !== artifactId),
-              checkArtifactIds: loop.checkArtifactIds.filter(id => id !== artifactId),
-              adaptArtifactIds: loop.adaptArtifactIds.filter(id => id !== artifactId),
+              exploreArtifactIds: (loop.exploreArtifactIds || []).filter(id => id !== artifactId),
+              buildArtifactIds: (loop.buildArtifactIds || []).filter(id => id !== artifactId),
+              checkArtifactIds: (loop.checkArtifactIds || []).filter(id => id !== artifactId),
+              adaptArtifactIds: (loop.adaptArtifactIds || []).filter(id => id !== artifactId),
             });
             
             setShowArtifactViewer(false);
@@ -348,7 +445,7 @@ export default function ExplorationLoopScreen() {
     if (!project) return;
     
     console.log('Exploration Loop: Toggling artifact favorite', artifactId);
-    const updatedArtifacts = project.artifacts.map(a => 
+    const updatedArtifacts = (project.artifacts || []).map(a => 
       a.id === artifactId ? { ...a, isFavorite: !a.isFavorite } : a
     );
     
@@ -406,7 +503,7 @@ export default function ExplorationLoopScreen() {
       isFavorite: false,
     };
     
-    await updateAndSaveLoop({ exploreItems: [...loop.exploreItems, newItem] });
+    await updateAndSaveLoop({ exploreItems: [...(loop.exploreItems || []), newItem] });
     newExploreTextRef.current = '';
     setExploreInputKey(prev => prev + 1);
   };
@@ -414,14 +511,14 @@ export default function ExplorationLoopScreen() {
   const handleDeleteExploreItem = async (id: string) => {
     if (!loop) return;
     console.log('Exploration Loop: Deleting explore item', id);
-    await updateAndSaveLoop({ exploreItems: loop.exploreItems.filter(item => item.id !== id) });
+    await updateAndSaveLoop({ exploreItems: (loop.exploreItems || []).filter(item => item.id !== id) });
   };
 
   const handleEditExploreItem = async (id: string, newText: string) => {
     if (!loop || !newText.trim()) return;
     console.log('Exploration Loop: Editing explore item', id);
     await updateAndSaveLoop({ 
-      exploreItems: loop.exploreItems.map(item => 
+      exploreItems: (loop.exploreItems || []).map(item => 
         item.id === id ? { ...item, text: newText.trim() } : item
       )
     });
@@ -432,7 +529,7 @@ export default function ExplorationLoopScreen() {
     if (!loop) return;
     console.log('Exploration Loop: Toggling explore favorite', id);
     await updateAndSaveLoop({ 
-      exploreItems: loop.exploreItems.map(item => 
+      exploreItems: (loop.exploreItems || []).map(item => 
         item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
       )
     });
@@ -449,7 +546,7 @@ export default function ExplorationLoopScreen() {
       isFavorite: false,
     };
     
-    await updateAndSaveLoop({ buildItems: [...loop.buildItems, newItem] });
+    await updateAndSaveLoop({ buildItems: [...(loop.buildItems || []), newItem] });
     newBuildTextRef.current = '';
     setBuildInputKey(prev => prev + 1);
   };
@@ -457,14 +554,14 @@ export default function ExplorationLoopScreen() {
   const handleDeleteBuildItem = async (id: string) => {
     if (!loop) return;
     console.log('Exploration Loop: Deleting build item', id);
-    await updateAndSaveLoop({ buildItems: loop.buildItems.filter(item => item.id !== id) });
+    await updateAndSaveLoop({ buildItems: (loop.buildItems || []).filter(item => item.id !== id) });
   };
 
   const handleEditBuildItem = async (id: string, newText: string) => {
     if (!loop || !newText.trim()) return;
     console.log('Exploration Loop: Editing build item', id);
     await updateAndSaveLoop({ 
-      buildItems: loop.buildItems.map(item => 
+      buildItems: (loop.buildItems || []).map(item => 
         item.id === id ? { ...item, text: newText.trim() } : item
       )
     });
@@ -475,7 +572,7 @@ export default function ExplorationLoopScreen() {
     if (!loop) return;
     console.log('Exploration Loop: Toggling build favorite', id);
     await updateAndSaveLoop({ 
-      buildItems: loop.buildItems.map(item => 
+      buildItems: (loop.buildItems || []).map(item => 
         item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
       )
     });
@@ -492,7 +589,7 @@ export default function ExplorationLoopScreen() {
       isFavorite: false,
     };
     
-    await updateAndSaveLoop({ checkItems: [...loop.checkItems, newItem] });
+    await updateAndSaveLoop({ checkItems: [...(loop.checkItems || []), newItem] });
     newCheckTextRef.current = '';
     setCheckInputKey(prev => prev + 1);
   };
@@ -500,14 +597,14 @@ export default function ExplorationLoopScreen() {
   const handleDeleteCheckItem = async (id: string) => {
     if (!loop) return;
     console.log('Exploration Loop: Deleting check item', id);
-    await updateAndSaveLoop({ checkItems: loop.checkItems.filter(item => item.id !== id) });
+    await updateAndSaveLoop({ checkItems: (loop.checkItems || []).filter(item => item.id !== id) });
   };
 
   const handleEditCheckItem = async (id: string, newText: string) => {
     if (!loop || !newText.trim()) return;
     console.log('Exploration Loop: Editing check item', id);
     await updateAndSaveLoop({ 
-      checkItems: loop.checkItems.map(item => 
+      checkItems: (loop.checkItems || []).map(item => 
         item.id === id ? { ...item, text: newText.trim() } : item
       )
     });
@@ -518,7 +615,7 @@ export default function ExplorationLoopScreen() {
     if (!loop) return;
     console.log('Exploration Loop: Toggling check favorite', id);
     await updateAndSaveLoop({ 
-      checkItems: loop.checkItems.map(item => 
+      checkItems: (loop.checkItems || []).map(item => 
         item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
       )
     });
@@ -535,7 +632,7 @@ export default function ExplorationLoopScreen() {
       isFavorite: false,
     };
     
-    await updateAndSaveLoop({ adaptItems: [...loop.adaptItems, newItem] });
+    await updateAndSaveLoop({ adaptItems: [...(loop.adaptItems || []), newItem] });
     newAdaptTextRef.current = '';
     setAdaptInputKey(prev => prev + 1);
   };
@@ -543,14 +640,14 @@ export default function ExplorationLoopScreen() {
   const handleDeleteAdaptItem = async (id: string) => {
     if (!loop) return;
     console.log('Exploration Loop: Deleting adapt item', id);
-    await updateAndSaveLoop({ adaptItems: loop.adaptItems.filter(item => item.id !== id) });
+    await updateAndSaveLoop({ adaptItems: (loop.adaptItems || []).filter(item => item.id !== id) });
   };
 
   const handleEditAdaptItem = async (id: string, newText: string) => {
     if (!loop || !newText.trim()) return;
     console.log('Exploration Loop: Editing adapt item', id);
     await updateAndSaveLoop({ 
-      adaptItems: loop.adaptItems.map(item => 
+      adaptItems: (loop.adaptItems || []).map(item => 
         item.id === id ? { ...item, text: newText.trim() } : item
       )
     });
@@ -561,7 +658,7 @@ export default function ExplorationLoopScreen() {
     if (!loop) return;
     console.log('Exploration Loop: Toggling adapt favorite', id);
     await updateAndSaveLoop({ 
-      adaptItems: loop.adaptItems.map(item => 
+      adaptItems: (loop.adaptItems || []).map(item => 
         item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
       )
     });
@@ -578,7 +675,7 @@ export default function ExplorationLoopScreen() {
       isFavorite: false,
     };
     
-    await updateAndSaveLoop({ nextExplorationQuestions: [...loop.nextExplorationQuestions, newQuestion] });
+    await updateAndSaveLoop({ nextExplorationQuestions: [...(loop.nextExplorationQuestions || []), newQuestion] });
     newQuestionTextRef.current = '';
     setQuestionInputKey(prev => prev + 1);
   };
@@ -587,7 +684,7 @@ export default function ExplorationLoopScreen() {
     if (!loop) return;
     console.log('Exploration Loop: Deleting next exploration question', id);
     await updateAndSaveLoop({ 
-      nextExplorationQuestions: loop.nextExplorationQuestions.filter(q => q.id !== id) 
+      nextExplorationQuestions: (loop.nextExplorationQuestions || []).filter(q => q.id !== id) 
     });
   };
 
@@ -595,18 +692,17 @@ export default function ExplorationLoopScreen() {
     if (!loop || !newText.trim()) return;
     console.log('Exploration Loop: Editing next exploration question', id);
     await updateAndSaveLoop({ 
-      nextExplorationQuestions: loop.nextExplorationQuestions.map(q => 
+      nextExplorationQuestions: (loop.nextExplorationQuestions || []).map(q => 
         q.id === id ? { ...q, text: newText.trim() } : q
       )
     });
     setEditingQuestionId(null);
   };
 
-  // FIXED: Match Framing screen pattern - single atomic operation
   const handleToggleNextQuestionFavorite = async (id: string) => {
     if (!project || !loop) return;
     
-    const question = loop.nextExplorationQuestions.find(q => q.id === id);
+    const question = (loop.nextExplorationQuestions || []).find(q => q.id === id);
     if (!question) return;
     
     console.log('Exploration Loop: Toggling next question favorite', id, 'Current:', question.isFavorite);
@@ -637,7 +733,7 @@ export default function ExplorationLoopScreen() {
       };
       
       // Update question favorite status in current loop
-      const updatedQuestions = loop.nextExplorationQuestions.map(q => 
+      const updatedQuestions = (loop.nextExplorationQuestions || []).map(q => 
         q.id === id ? { ...q, isFavorite: true } : q
       );
       
@@ -668,7 +764,6 @@ export default function ExplorationLoopScreen() {
       
       console.log('Exploration Loop: Saving project with', updatedLoops.length, 'loops');
       
-      // FIXED: Save to AsyncStorage first, then update state
       await updateProject(updatedProject);
       setProject(updatedProject);
       setLoop(updatedCurrentLoop);
@@ -681,7 +776,7 @@ export default function ExplorationLoopScreen() {
     } else {
       // Just toggle favorite off
       await updateAndSaveLoop({ 
-        nextExplorationQuestions: loop.nextExplorationQuestions.map(q => 
+        nextExplorationQuestions: (loop.nextExplorationQuestions || []).map(q => 
           q.id === id ? { ...q, isFavorite: false } : q
         )
       });
@@ -702,7 +797,7 @@ export default function ExplorationLoopScreen() {
       timestamp: new Date().toISOString(),
     };
     
-    await updateAndSaveLoop({ explorationDecisions: [...loop.explorationDecisions, newDecision] });
+    await updateAndSaveLoop({ explorationDecisions: [...(loop.explorationDecisions || []), newDecision] });
     setDecisionSummary('');
     setShowDecisionOverlay(false);
   };
@@ -803,8 +898,13 @@ export default function ExplorationLoopScreen() {
   };
 
   const getArtifactsByIds = (ids: string[]): Artifact[] => {
-    if (!project || !project.artifacts) return [];
-    return project.artifacts.filter(a => ids.includes(a.id));
+    if (!project || !project.artifacts) {
+      console.log('Exploration Loop: No project artifacts available');
+      return [];
+    }
+    const artifacts = project.artifacts.filter(a => ids.includes(a.id));
+    console.log('Exploration Loop: Retrieved', artifacts.length, 'artifacts from', ids.length, 'IDs');
+    return artifacts;
   };
 
   const getTotalHours = () => {
@@ -821,7 +921,7 @@ export default function ExplorationLoopScreen() {
 
   // FIXED: Match Framing screen artifact grid layout - ALWAYS render grid container
   const renderArtifactGrid = (artifactIds: string[]) => {
-    const artifacts = getArtifactsByIds(artifactIds);
+    const artifacts = getArtifactsByIds(artifactIds || []);
     
     return (
       <View style={styles.artifactGrid}>
@@ -830,6 +930,7 @@ export default function ExplorationLoopScreen() {
             key={artifact.id}
             style={styles.artifactGridItem}
             onPress={() => {
+              console.log('Exploration Loop: User tapped artifact', artifact.id, artifact.type);
               if (artifact.type === 'url' || artifact.type === 'document') {
                 handleOpenArtifact(artifact);
               } else {
@@ -976,7 +1077,7 @@ export default function ExplorationLoopScreen() {
             <Text style={styles.sectionTitle}>Explore</Text>
             
             <View style={styles.listContainer}>
-              {loop.exploreItems.map((item, index) => (
+              {(loop.exploreItems || []).map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingExploreId === item.id ? (
                     <TextInput
@@ -1048,7 +1149,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
-                  console.log('Exploration Loop: Opening artifact overlay for Explore section');
+                  console.log('Exploration Loop: User tapped Add Visuals for Explore section');
                   setArtifactSection('explore');
                   setShowArtifactOverlay(true);
                 }}
@@ -1062,7 +1163,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderArtifactGrid(loop.exploreArtifactIds)}
+              {renderArtifactGrid(loop.exploreArtifactIds || [])}
             </View>
           </View>
 
@@ -1071,7 +1172,7 @@ export default function ExplorationLoopScreen() {
             <Text style={styles.sectionTitle}>Build</Text>
             
             <View style={styles.listContainer}>
-              {loop.buildItems.map((item, index) => (
+              {(loop.buildItems || []).map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingBuildId === item.id ? (
                     <TextInput
@@ -1143,7 +1244,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
-                  console.log('Exploration Loop: Opening artifact overlay for Build section');
+                  console.log('Exploration Loop: User tapped Add Visuals for Build section');
                   setArtifactSection('build');
                   setShowArtifactOverlay(true);
                 }}
@@ -1157,7 +1258,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderArtifactGrid(loop.buildArtifactIds)}
+              {renderArtifactGrid(loop.buildArtifactIds || [])}
             </View>
           </View>
 
@@ -1166,7 +1267,7 @@ export default function ExplorationLoopScreen() {
             <Text style={styles.sectionTitle}>Check</Text>
             
             <View style={styles.listContainer}>
-              {loop.checkItems.map((item, index) => (
+              {(loop.checkItems || []).map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingCheckId === item.id ? (
                     <TextInput
@@ -1238,7 +1339,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
-                  console.log('Exploration Loop: Opening artifact overlay for Check section');
+                  console.log('Exploration Loop: User tapped Add Visuals for Check section');
                   setArtifactSection('check');
                   setShowArtifactOverlay(true);
                 }}
@@ -1252,7 +1353,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderArtifactGrid(loop.checkArtifactIds)}
+              {renderArtifactGrid(loop.checkArtifactIds || [])}
             </View>
           </View>
 
@@ -1261,7 +1362,7 @@ export default function ExplorationLoopScreen() {
             <Text style={styles.sectionTitle}>Adapt</Text>
             
             <View style={styles.listContainer}>
-              {loop.adaptItems.map((item, index) => (
+              {(loop.adaptItems || []).map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
                   {editingAdaptId === item.id ? (
                     <TextInput
@@ -1333,7 +1434,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
-                  console.log('Exploration Loop: Opening artifact overlay for Adapt section');
+                  console.log('Exploration Loop: User tapped Add Visuals for Adapt section');
                   setArtifactSection('adapt');
                   setShowArtifactOverlay(true);
                 }}
@@ -1347,7 +1448,7 @@ export default function ExplorationLoopScreen() {
                 <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
-              {renderArtifactGrid(loop.adaptArtifactIds)}
+              {renderArtifactGrid(loop.adaptArtifactIds || [])}
             </View>
           </View>
 
@@ -1368,9 +1469,9 @@ export default function ExplorationLoopScreen() {
               <Text style={styles.addDecisionText}>Add Decision</Text>
             </TouchableOpacity>
             
-            {loop.explorationDecisions.length > 0 && (
+            {(loop.explorationDecisions || []).length > 0 && (
               <View style={styles.decisionsTimeline}>
-                {loop.explorationDecisions.map((decision) => (
+                {(loop.explorationDecisions || []).map((decision) => (
                   <View key={decision.id} style={styles.decisionItem}>
                     <View style={styles.decisionDot} />
                     <View style={styles.decisionContent}>
@@ -1393,7 +1494,7 @@ export default function ExplorationLoopScreen() {
             </Text>
             
             <View style={styles.listContainer}>
-              {loop.nextExplorationQuestions.map((question, index) => (
+              {(loop.nextExplorationQuestions || []).map((question, index) => (
                 <View key={question.id} style={styles.listItem}>
                   {editingQuestionId === question.id ? (
                     <TextInput
@@ -1666,6 +1767,60 @@ export default function ExplorationLoopScreen() {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* URL Input Modal - FIXED: In-app modal instead of Alert.prompt */}
+      <Modal
+        visible={showUrlInputModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowUrlInputModal(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.overlayBackground}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowUrlInputModal(false)}
+          >
+            <View style={styles.decisionOverlay}>
+              <Text style={styles.overlayTitle}>Add URL</Text>
+              
+              <Text style={styles.inputLabel}>URL</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="https://example.com"
+                placeholderTextColor={colors.textSecondary}
+                value={urlInput}
+                onChangeText={setUrlInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              
+              <View style={styles.decisionButtons}>
+                <TouchableOpacity 
+                  style={styles.decisionCancelButton}
+                  onPress={() => {
+                    setUrlInput('');
+                    setShowUrlInputModal(false);
+                  }}
+                >
+                  <Text style={styles.decisionCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.decisionSaveButton}
+                  onPress={handleUrlSubmit}
+                >
+                  <Text style={styles.decisionSaveText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Artifact Viewer */}
