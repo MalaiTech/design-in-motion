@@ -1048,6 +1048,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
+                  console.log('Exploration Loop: Opening artifact overlay for Explore section');
                   setArtifactSection('explore');
                   setShowArtifactOverlay(true);
                 }}
@@ -1142,6 +1143,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
+                  console.log('Exploration Loop: Opening artifact overlay for Build section');
                   setArtifactSection('build');
                   setShowArtifactOverlay(true);
                 }}
@@ -1236,6 +1238,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
+                  console.log('Exploration Loop: Opening artifact overlay for Check section');
                   setArtifactSection('check');
                   setShowArtifactOverlay(true);
                 }}
@@ -1330,6 +1333,7 @@ export default function ExplorationLoopScreen() {
               <TouchableOpacity 
                 style={styles.addVisualsButton}
                 onPress={() => {
+                  console.log('Exploration Loop: Opening artifact overlay for Adapt section');
                   setArtifactSection('adapt');
                   setShowArtifactOverlay(true);
                 }}
@@ -2047,13 +2051,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
     gap: 8,
+    borderWidth: 1,
+    borderColor: colors.divider,
   },
   addVisualsText: {
     fontSize: 16,
     color: colors.phaseExploration,
     fontWeight: '600',
   },
-  // FIXED: Match Framing screen artifact grid
+  // FIXED: Match Framing screen artifact grid - exact same layout
   artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
