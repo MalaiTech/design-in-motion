@@ -34,6 +34,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import ZoomableImage from '@/components/ZoomableImage';
+import * as MediaLibrary from 'expo-media-library';
 
 type CertaintyCategory = 'known' | 'assumed' | 'unknown';
 
@@ -234,6 +236,33 @@ export default function FramingScreen() {
     );
     
     await updateAndSaveProject({ artifacts: updatedArtifacts });
+  };
+
+  // Download artifact to device photo library
+  const handleDownloadArtifact = async (artifact: Artifact) => {
+    if (artifact.type !== 'image') {
+      Alert.alert('Not Supported', 'Only images can be downloaded to your photo library.');
+      return;
+    }
+    
+    console.log('Framing: Downloading artifact to photo library', artifact.uri);
+    
+    try {
+      // Request permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Photo library permission is needed to save images.');
+        return;
+      }
+      
+      // Save to library
+      await MediaLibrary.saveToLibraryAsync(artifact.uri);
+      Alert.alert('Success', 'Image saved to your photo library.');
+      console.log('Framing: Image saved successfully');
+    } catch (error) {
+      console.error('Framing: Error downloading artifact:', error);
+      Alert.alert('Error', 'Failed to save image to photo library.');
+    }
   };
 
   // FIXED: Use same approach as Project Overview screen for opening documents
@@ -1001,7 +1030,7 @@ export default function FramingScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Artifact Viewer */}
+      {/* Artifact Viewer with Zoom and Download */}
       <Modal
         visible={showArtifactViewer}
         transparent
@@ -1020,6 +1049,18 @@ export default function FramingScreen() {
             </TouchableOpacity>
             
             <View style={styles.artifactViewerActions}>
+              <TouchableOpacity 
+                onPress={() => selectedArtifact && handleDownloadArtifact(selectedArtifact)}
+                style={styles.artifactViewerAction}
+              >
+                <IconSymbol 
+                  ios_icon_name="arrow.down.circle" 
+                  android_material_icon_name="download" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </TouchableOpacity>
+              
               <TouchableOpacity 
                 onPress={() => selectedArtifact && handleToggleArtifactFavorite(selectedArtifact.id)}
                 style={styles.artifactViewerAction}
@@ -1048,11 +1089,7 @@ export default function FramingScreen() {
           
           <View style={styles.artifactViewerContent}>
             {selectedArtifact?.type === 'image' ? (
-              <Image 
-                source={{ uri: selectedArtifact.uri }} 
-                style={styles.artifactViewerImage}
-                resizeMode="contain"
-              />
+              <ZoomableImage uri={selectedArtifact.uri} />
             ) : (
               <View style={styles.artifactViewerDoc}>
                 <IconSymbol 
