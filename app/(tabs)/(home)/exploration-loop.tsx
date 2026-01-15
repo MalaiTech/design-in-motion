@@ -58,11 +58,14 @@ export default function ExplorationLoopScreen() {
   const params = useLocalSearchParams();
   const projectId = params.projectId as string;
   const loopId = params.loopId as string | undefined;
-  const isNewLoop = !loopId;
 
   // SIMPLIFIED: Single source of truth for project data
   const [project, setProject] = useState<Project | null>(null);
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
+  
+  // FIXED: Track if loop has been saved to prevent duplicate creation
+  const [hasBeenSaved, setHasBeenSaved] = useState(false);
+  const isNewLoop = !loopId && !hasBeenSaved;
   
   // UI state
   const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -168,7 +171,7 @@ export default function ExplorationLoopScreen() {
   const updateAndSaveLoop = useCallback(async (updates: Partial<ExplorationLoop>) => {
     if (!project || !loop) return;
     
-    console.log('Exploration Loop: Updating loop with', Object.keys(updates));
+    console.log('Exploration Loop: Updating loop with', Object.keys(updates), 'isNewLoop:', isNewLoop);
     
     const updatedLoop: ExplorationLoop = {
       ...loop,
@@ -178,12 +181,20 @@ export default function ExplorationLoopScreen() {
     
     // Update loops array in project
     let updatedLoops = project.explorationLoops || [];
-    if (isNewLoop) {
+    
+    // FIXED: Check if loop already exists in the array to prevent duplicates
+    const existingLoopIndex = updatedLoops.findIndex(l => l.id === loop.id);
+    
+    if (existingLoopIndex === -1) {
+      // Loop doesn't exist yet - add it
       updatedLoops = [...updatedLoops, updatedLoop];
-      console.log('Exploration Loop: Adding new loop to project');
+      console.log('Exploration Loop: Adding new loop to project (first save)');
+      // CRITICAL: Mark as saved to prevent duplicate creation on next update
+      setHasBeenSaved(true);
     } else {
+      // Loop already exists - update it
       updatedLoops = updatedLoops.map(l => l.id === loop.id ? updatedLoop : l);
-      console.log('Exploration Loop: Updating existing loop in project');
+      console.log('Exploration Loop: Updating existing loop in project at index', existingLoopIndex);
     }
     
     const updatedProject: Project = {
@@ -199,7 +210,8 @@ export default function ExplorationLoopScreen() {
     setProject(updatedProject);
     setLoop(updatedLoop);
     
-    console.log('Exploration Loop: Save complete. Project artifacts:', updatedProject.artifacts?.length, 'Loop artifact IDs:', {
+    console.log('Exploration Loop: Save complete. Total loops in project:', updatedLoops.length, 'Loop ID:', updatedLoop.id);
+    console.log('Exploration Loop: Project artifacts:', updatedProject.artifacts?.length, 'Loop artifact IDs:', {
       explore: updatedLoop.exploreArtifactIds?.length,
       build: updatedLoop.buildArtifactIds?.length,
       check: updatedLoop.checkArtifactIds?.length,
@@ -308,10 +320,16 @@ export default function ExplorationLoopScreen() {
         updatedDate: new Date().toISOString(),
       };
       
-      if (isNewLoop) {
+      // FIXED: Check if loop already exists to prevent duplicates
+      const existingLoopIndex = updatedLoops.findIndex(l => l.id === loop.id);
+      
+      if (existingLoopIndex === -1) {
         updatedLoops = [...updatedLoops, updatedLoop];
+        console.log('Exploration Loop: Adding new loop during artifact addition');
+        setHasBeenSaved(true);
       } else {
         updatedLoops = updatedLoops.map(l => l.id === loop.id ? updatedLoop : l);
+        console.log('Exploration Loop: Updating existing loop during artifact addition');
       }
       
       const updatedProject: Project = {
@@ -374,10 +392,16 @@ export default function ExplorationLoopScreen() {
         updatedDate: new Date().toISOString(),
       };
       
-      if (isNewLoop) {
+      // FIXED: Check if loop already exists to prevent duplicates
+      const existingLoopIndex = updatedLoops.findIndex(l => l.id === loop.id);
+      
+      if (existingLoopIndex === -1) {
         updatedLoops = [...updatedLoops, updatedLoop];
+        console.log('Exploration Loop: Adding new loop during URL artifact addition');
+        setHasBeenSaved(true);
       } else {
         updatedLoops = updatedLoops.map(l => l.id === loop.id ? updatedLoop : l);
+        console.log('Exploration Loop: Updating existing loop during URL artifact addition');
       }
       
       const updatedProject: Project = {
@@ -747,13 +771,24 @@ export default function ExplorationLoopScreen() {
       // Build updated loops array - update current loop AND add new loop
       let updatedLoops = project.explorationLoops || [];
       
-      // Update current loop
-      updatedLoops = updatedLoops.map(l => 
-        l.id === loop.id ? updatedCurrentLoop : l
-      );
+      // FIXED: Update current loop (check if it exists first)
+      const currentLoopIndex = updatedLoops.findIndex(l => l.id === loop.id);
+      if (currentLoopIndex === -1) {
+        // Current loop doesn't exist yet - add it
+        updatedLoops = [...updatedLoops, updatedCurrentLoop];
+        console.log('Exploration Loop: Adding current loop (was new)');
+        setHasBeenSaved(true);
+      } else {
+        // Current loop exists - update it
+        updatedLoops = updatedLoops.map(l => 
+          l.id === loop.id ? updatedCurrentLoop : l
+        );
+        console.log('Exploration Loop: Updating current loop');
+      }
       
-      // Add new loop
+      // Add new loop (always new, so just append)
       updatedLoops = [...updatedLoops, newLoop];
+      console.log('Exploration Loop: Adding new loop from favorited question');
       
       // Single atomic update to project
       const updatedProject: Project = {
