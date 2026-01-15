@@ -1128,6 +1128,7 @@ export default function ExplorationLoopScreen() {
           {/* 2. Exploration / Learning Question */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration / Learning Question</Text>
+            <Text style={styles.helperText}>What are you trying to learn / test or build?</Text>
             <TextInput
               style={styles.textArea}
               placeholder="What are you exploring or learning?"
@@ -1148,6 +1149,7 @@ export default function ExplorationLoopScreen() {
           {/* 3. Explore - FIXED: Always visible, no collapsing */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Explore</Text>
+            <Text style={styles.helperText}>What are the possibilities / variations?</Text>
             
             <View style={styles.listContainer}>
               {(loop.exploreItems || []).map((item, index) => (
@@ -1243,6 +1245,7 @@ export default function ExplorationLoopScreen() {
           {/* 4. Build - FIXED: Always visible, no collapsing */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Build</Text>
+            <Text style={styles.helperText}>What did you create/design?</Text>
             
             <View style={styles.listContainer}>
               {(loop.buildItems || []).map((item, index) => (
@@ -1338,6 +1341,7 @@ export default function ExplorationLoopScreen() {
           {/* 5. Check - FIXED: Always visible, no collapsing */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Check</Text>
+            <Text style={styles.helperText}>What are the key observations or learnings?</Text>
             
             <View style={styles.listContainer}>
               {(loop.checkItems || []).map((item, index) => (
@@ -1433,6 +1437,7 @@ export default function ExplorationLoopScreen() {
           {/* 6. Adapt - FIXED: Always visible, no collapsing */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Adapt</Text>
+            <Text style={styles.helperText}>What should be adjusted, questioned, or continued?</Text>
             
             <View style={styles.listContainer}>
               {(loop.adaptItems || []).map((item, index) => (
@@ -1528,6 +1533,7 @@ export default function ExplorationLoopScreen() {
           {/* 7. Exploration Decisions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Decisions</Text>
+            <Text style={styles.helperText}>What are the decisions made as a result of this loop?</Text>
             
             <TouchableOpacity 
               style={styles.addDecisionButton}
@@ -1562,9 +1568,7 @@ export default function ExplorationLoopScreen() {
           {/* 8. Next Exploration Questions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Next Exploration Questions</Text>
-            <Text style={styles.helperText}>
-              Favorite a question to create a new exploration loop in Draft status
-            </Text>
+            <Text style={styles.helperText}>What is the most logical next step?</Text>
             
             <View style={styles.listContainer}>
               {(loop.nextExplorationQuestions || []).map((question, index) => (
@@ -2229,7 +2233,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.phaseExploration,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   helperText: {
     fontSize: 14,
