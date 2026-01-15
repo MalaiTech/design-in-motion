@@ -369,8 +369,6 @@ const styles = StyleSheet.create({
   headerFilterButton: {
     padding: 8,
     marginRight: 8,
-    backgroundColor: '#FFF6D8',
-    borderRadius: 4,
   },
   scrollContent: {
     padding: 16,
