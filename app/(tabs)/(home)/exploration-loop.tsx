@@ -70,7 +70,7 @@ export default function ExplorationLoopScreen() {
   // UI state
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
-  const [artifactSection, setArtifactSection] = useState<'explore' | 'build' | 'check' | 'adapt'>('explore');
+  const [artifactSection, setArtifactSection] = useState<'explore' | 'build' | 'check' | 'adapt' | 'invoices'>('explore');
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
@@ -121,7 +121,7 @@ export default function ExplorationLoopScreen() {
         const foundLoop = found.explorationLoops?.find(l => l.id === loopId);
         if (foundLoop) {
           console.log('Exploration Loop: Found loop', foundLoop.id, 'Status:', foundLoop.status);
-          console.log('Exploration Loop: Artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length);
+          console.log('Exploration Loop: Artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length, 'Invoices:', foundLoop.invoicesArtifactIds?.length);
           setLoop(foundLoop);
           questionRef.current = foundLoop.question;
         } else {
@@ -216,6 +216,7 @@ export default function ExplorationLoopScreen() {
       build: updatedLoop.buildArtifactIds?.length,
       check: updatedLoop.checkArtifactIds?.length,
       adapt: updatedLoop.adaptArtifactIds?.length,
+      invoices: updatedLoop.invoicesArtifactIds?.length,
     });
   }, [project, loop, isNewLoop]);
 
@@ -308,7 +309,9 @@ export default function ExplorationLoopScreen() {
       const newArtifactIds = newArtifacts.map(a => a.id);
       
       // Determine which section field to update
-      const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
+      const sectionField = artifactSection === 'invoices' 
+        ? 'invoicesArtifactIds' 
+        : `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
       const currentSectionIds = (loop[sectionField] as string[]) || [];
       const updatedSectionIds = [...currentSectionIds, ...newArtifactIds];
       
@@ -381,7 +384,9 @@ export default function ExplorationLoopScreen() {
       // FIXED: Single atomic operation
       const updatedProjectArtifacts = [...(project.artifacts || []), newArtifact];
       
-      const sectionField = `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
+      const sectionField = artifactSection === 'invoices' 
+        ? 'invoicesArtifactIds' 
+        : `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
       const currentSectionIds = (loop[sectionField] as string[]) || [];
       const updatedSectionIds = [...currentSectionIds, newArtifact.id];
       
@@ -456,6 +461,7 @@ export default function ExplorationLoopScreen() {
               buildArtifactIds: (loop.buildArtifactIds || []).filter(id => id !== artifactId),
               checkArtifactIds: (loop.checkArtifactIds || []).filter(id => id !== artifactId),
               adaptArtifactIds: (loop.adaptArtifactIds || []).filter(id => id !== artifactId),
+              invoicesArtifactIds: (loop.invoicesArtifactIds || []).filter(id => id !== artifactId),
             });
             
             setShowArtifactViewer(false);
@@ -1681,6 +1687,28 @@ export default function ExplorationLoopScreen() {
                   ))}
                 </View>
               )}
+              
+              {/* NEW: Invoices or Receipts section - directly below cost entries */}
+              <View style={styles.invoicesSection}>
+                <TouchableOpacity 
+                  style={styles.addInvoicesButton}
+                  onPress={() => {
+                    console.log('Exploration Loop: User tapped Add Invoices or Receipts');
+                    setArtifactSection('invoices');
+                    setShowArtifactOverlay(true);
+                  }}
+                >
+                  <IconSymbol 
+                    ios_icon_name="plus.circle" 
+                    android_material_icon_name="add-circle" 
+                    size={20} 
+                    color={colors.phaseExploration} 
+                  />
+                  <Text style={styles.addInvoicesText}>Invoices or Receipts</Text>
+                </TouchableOpacity>
+                
+                {renderArtifactGrid(loop.invoicesArtifactIds || [])}
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -2392,6 +2420,24 @@ const styles = StyleSheet.create({
   trackingItemValue: {
     fontSize: 16,
     color: colors.text,
+    fontWeight: '600',
+  },
+  // NEW: Invoices section styles
+  invoicesSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  addInvoicesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  addInvoicesText: {
+    fontSize: 16,
+    color: colors.phaseExploration,
     fontWeight: '600',
   },
   overlayBackground: {
