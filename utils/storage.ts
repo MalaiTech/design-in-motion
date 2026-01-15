@@ -73,6 +73,7 @@ export interface ExplorationDecision {
   id: string;
   summary: string;
   timestamp: string;
+  artifactIds?: string[];
 }
 
 export interface ExplorationLoop {
@@ -100,6 +101,7 @@ export interface ExplorationLoop {
   
   // Exploration decisions
   explorationDecisions: ExplorationDecision[];
+  decisionsArtifactIds?: string[];
   
   // Next exploration questions
   nextExplorationQuestions: ExplorationQuestion[];

@@ -55,6 +55,8 @@ interface CostEntry {
   amount: number;
 }
 
+type ArtifactSection = 'explore' | 'build' | 'check' | 'adapt' | 'invoices' | 'decisions';
+
 export default function ExplorationLoopScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -72,7 +74,7 @@ export default function ExplorationLoopScreen() {
   // UI state
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
-  const [artifactSection, setArtifactSection] = useState<'explore' | 'build' | 'check' | 'adapt' | 'invoices'>('explore');
+  const [artifactSection, setArtifactSection] = useState<ArtifactSection>('explore');
   const [showArtifactViewer, setShowArtifactViewer] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [showDecisionOverlay, setShowDecisionOverlay] = useState(false);
@@ -123,7 +125,7 @@ export default function ExplorationLoopScreen() {
         const foundLoop = found.explorationLoops?.find(l => l.id === loopId);
         if (foundLoop) {
           console.log('Exploration Loop: Found loop', foundLoop.id, 'Status:', foundLoop.status);
-          console.log('Exploration Loop: Artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length, 'Invoices:', foundLoop.invoicesArtifactIds?.length);
+          console.log('Exploration Loop: Artifact counts - Explore:', foundLoop.exploreArtifactIds?.length, 'Build:', foundLoop.buildArtifactIds?.length, 'Check:', foundLoop.checkArtifactIds?.length, 'Adapt:', foundLoop.adaptArtifactIds?.length, 'Invoices:', foundLoop.invoicesArtifactIds?.length, 'Decisions:', foundLoop.decisionsArtifactIds?.length);
           setLoop(foundLoop);
           questionRef.current = foundLoop.question;
         } else {
@@ -149,6 +151,7 @@ export default function ExplorationLoopScreen() {
           adaptItems: [],
           adaptArtifactIds: [],
           explorationDecisions: [],
+          decisionsArtifactIds: [],
           nextExplorationQuestions: [],
           timeSpent: 0,
           costs: 0,
@@ -219,6 +222,7 @@ export default function ExplorationLoopScreen() {
       check: updatedLoop.checkArtifactIds?.length,
       adapt: updatedLoop.adaptArtifactIds?.length,
       invoices: updatedLoop.invoicesArtifactIds?.length,
+      decisions: updatedLoop.decisionsArtifactIds?.length,
     });
   }, [project, loop, isNewLoop]);
 
@@ -313,6 +317,8 @@ export default function ExplorationLoopScreen() {
       // Determine which section field to update
       const sectionField = artifactSection === 'invoices' 
         ? 'invoicesArtifactIds' 
+        : artifactSection === 'decisions'
+        ? 'decisionsArtifactIds'
         : `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
       const currentSectionIds = (loop[sectionField] as string[]) || [];
       const updatedSectionIds = [...currentSectionIds, ...newArtifactIds];
@@ -388,6 +394,8 @@ export default function ExplorationLoopScreen() {
       
       const sectionField = artifactSection === 'invoices' 
         ? 'invoicesArtifactIds' 
+        : artifactSection === 'decisions'
+        ? 'decisionsArtifactIds'
         : `${artifactSection}ArtifactIds` as keyof ExplorationLoop;
       const currentSectionIds = (loop[sectionField] as string[]) || [];
       const updatedSectionIds = [...currentSectionIds, newArtifact.id];
@@ -464,6 +472,7 @@ export default function ExplorationLoopScreen() {
               checkArtifactIds: (loop.checkArtifactIds || []).filter(id => id !== artifactId),
               adaptArtifactIds: (loop.adaptArtifactIds || []).filter(id => id !== artifactId),
               invoicesArtifactIds: (loop.invoicesArtifactIds || []).filter(id => id !== artifactId),
+              decisionsArtifactIds: (loop.decisionsArtifactIds || []).filter(id => id !== artifactId),
             });
             
             setShowArtifactViewer(false);
@@ -788,6 +797,7 @@ export default function ExplorationLoopScreen() {
         adaptItems: [],
         adaptArtifactIds: [],
         explorationDecisions: [],
+        decisionsArtifactIds: [],
         nextExplorationQuestions: [],
         timeSpent: 0,
         costs: 0,
@@ -868,6 +878,7 @@ export default function ExplorationLoopScreen() {
       id: Date.now().toString(),
       summary: decisionSummary.trim(),
       timestamp: new Date().toISOString(),
+      artifactIds: [],
     };
     
     await updateAndSaveLoop({ explorationDecisions: [...(loop.explorationDecisions || []), newDecision] });
@@ -998,7 +1009,7 @@ export default function ExplorationLoopScreen() {
     
     return (
       <View style={styles.artifactGrid}>
-        {artifacts.map((artifact) => (
+        {artifacts.map((artifact, index) => (
           <TouchableOpacity
             key={artifact.id}
             style={styles.artifactGridItem}
@@ -1530,7 +1541,7 @@ export default function ExplorationLoopScreen() {
             </View>
           </View>
 
-          {/* 7. Exploration Decisions */}
+          {/* 7. Exploration Decisions - NEW: With visual artifacts support */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exploration Decisions</Text>
             <Text style={styles.helperText}>What are the decisions made as a result of this loop?</Text>
@@ -1550,7 +1561,7 @@ export default function ExplorationLoopScreen() {
             
             {(loop.explorationDecisions || []).length > 0 && (
               <View style={styles.decisionsTimeline}>
-                {(loop.explorationDecisions || []).map((decision) => (
+                {(loop.explorationDecisions || []).map((decision, index) => (
                   <View key={decision.id} style={styles.decisionItem}>
                     <View style={styles.decisionDot} />
                     <View style={styles.decisionContent}>
@@ -1558,11 +1569,40 @@ export default function ExplorationLoopScreen() {
                       <Text style={styles.decisionTimestamp}>
                         {new Date(decision.timestamp).toLocaleDateString()}
                       </Text>
+                      
+                      {/* NEW: Display artifacts for this decision if any */}
+                      {decision.artifactIds && decision.artifactIds.length > 0 && (
+                        <View style={styles.decisionArtifacts}>
+                          {renderArtifactGrid(decision.artifactIds)}
+                        </View>
+                      )}
                     </View>
                   </View>
                 ))}
               </View>
             )}
+            
+            {/* NEW: Add visuals for decisions section */}
+            <View style={styles.visualsSection}>
+              <TouchableOpacity 
+                style={styles.addVisualsButton}
+                onPress={() => {
+                  console.log('Exploration Loop: User tapped Add Visuals for Decisions section');
+                  setArtifactSection('decisions');
+                  setShowArtifactOverlay(true);
+                }}
+              >
+                <IconSymbol 
+                  ios_icon_name="plus.circle" 
+                  android_material_icon_name="add-circle" 
+                  size={20} 
+                  color={colors.phaseExploration} 
+                />
+                <Text style={styles.addVisualsText}>Visuals</Text>
+              </TouchableOpacity>
+              
+              {renderArtifactGrid(loop.decisionsArtifactIds || [])}
+            </View>
           </View>
 
           {/* 8. Next Exploration Questions */}
@@ -1664,7 +1704,7 @@ export default function ExplorationLoopScreen() {
               
               {timeEntries.length > 0 && (
                 <View style={styles.trackingList}>
-                  {timeEntries.map((entry: TimeEntry) => (
+                  {timeEntries.map((entry: TimeEntry, index: number) => (
                     <View key={entry.id} style={styles.trackingItem}>
                       <View style={styles.trackingItemContent}>
                         <Text style={styles.trackingItemReason}>{entry.reason}</Text>
@@ -1705,7 +1745,7 @@ export default function ExplorationLoopScreen() {
               
               {costEntries.length > 0 && (
                 <View style={styles.trackingList}>
-                  {costEntries.map((entry: CostEntry) => (
+                  {costEntries.map((entry: CostEntry, index: number) => (
                     <View key={entry.id} style={styles.trackingItem}>
                       <View style={styles.trackingItemContent}>
                         <Text style={styles.trackingItemReason}>{entry.reason}</Text>
@@ -2407,6 +2447,9 @@ const styles = StyleSheet.create({
   decisionTimestamp: {
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  decisionArtifacts: {
+    marginTop: 8,
   },
   trackingSection: {
     backgroundColor: '#FFFFFF',
