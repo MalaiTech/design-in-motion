@@ -64,6 +64,11 @@ export default function ExplorationLoopScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
   
+  // Section collapse states
+  const [buildExpanded, setBuildExpanded] = useState(false);
+  const [checkExpanded, setCheckExpanded] = useState(false);
+  const [adaptExpanded, setAdaptExpanded] = useState(false);
+  
   // UI state
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showArtifactOverlay, setShowArtifactOverlay] = useState(false);
@@ -118,6 +123,15 @@ export default function ExplorationLoopScreen() {
           console.log('Exploration Loop: Found loop', foundLoop.id, 'Status:', foundLoop.status);
           setLoop(foundLoop);
           questionRef.current = foundLoop.question;
+          
+          // Auto-expand sections with content
+          const hasBuildContent = (foundLoop.buildItems?.length || 0) > 0 || (foundLoop.buildArtifactIds?.length || 0) > 0;
+          const hasCheckContent = (foundLoop.checkItems?.length || 0) > 0 || (foundLoop.checkArtifactIds?.length || 0) > 0;
+          const hasAdaptContent = (foundLoop.adaptItems?.length || 0) > 0 || (foundLoop.adaptArtifactIds?.length || 0) > 0;
+          
+          setBuildExpanded(hasBuildContent);
+          setCheckExpanded(hasCheckContent);
+          setAdaptExpanded(hasAdaptContent);
         } else {
           Alert.alert('Loop Not Found', 'This exploration loop no longer exists.', [
             { text: 'OK', onPress: () => router.back() }
@@ -236,6 +250,12 @@ export default function ExplorationLoopScreen() {
               const currentIds = (loop[sectionField] as string[]) || [];
               await updateAndSaveLoop({ [sectionField]: [...currentIds, newArtifact.id] });
               
+              if (artifactSection !== 'explore') {
+                if (artifactSection === 'build') setBuildExpanded(true);
+                if (artifactSection === 'check') setCheckExpanded(true);
+                if (artifactSection === 'adapt') setAdaptExpanded(true);
+              }
+              
               setShowArtifactOverlay(false);
             }
           }
@@ -297,6 +317,12 @@ export default function ExplorationLoopScreen() {
         const currentIds = (loop[sectionField] as string[]) || [];
         const newIds = newArtifacts.map(a => a.id);
         await updateAndSaveLoop({ [sectionField]: [...currentIds, ...newIds] });
+        
+        if (artifactSection !== 'explore') {
+          if (artifactSection === 'build') setBuildExpanded(true);
+          if (artifactSection === 'check') setCheckExpanded(true);
+          if (artifactSection === 'adapt') setAdaptExpanded(true);
+        }
         
         setShowArtifactOverlay(false);
       }
@@ -452,6 +478,7 @@ export default function ExplorationLoopScreen() {
     await updateAndSaveLoop({ buildItems: [...loop.buildItems, newItem] });
     newBuildTextRef.current = '';
     setBuildInputKey(prev => prev + 1);
+    setBuildExpanded(true);
   };
 
   const handleDeleteBuildItem = async (id: string) => {
@@ -495,6 +522,7 @@ export default function ExplorationLoopScreen() {
     await updateAndSaveLoop({ checkItems: [...loop.checkItems, newItem] });
     newCheckTextRef.current = '';
     setCheckInputKey(prev => prev + 1);
+    setCheckExpanded(true);
   };
 
   const handleDeleteCheckItem = async (id: string) => {
@@ -538,6 +566,7 @@ export default function ExplorationLoopScreen() {
     await updateAndSaveLoop({ adaptItems: [...loop.adaptItems, newItem] });
     newAdaptTextRef.current = '';
     setAdaptInputKey(prev => prev + 1);
+    setAdaptExpanded(true);
   };
 
   const handleDeleteAdaptItem = async (id: string) => {
@@ -802,9 +831,8 @@ export default function ExplorationLoopScreen() {
     });
   };
 
-  // FIXED: Add null check to prevent error
   const getArtifactsByIds = (ids: string[]): Artifact[] => {
-    if (!project || !project.artifacts) return [];
+    if (!project) return [];
     return project.artifacts.filter(a => ids.includes(a.id));
   };
 
@@ -822,11 +850,6 @@ export default function ExplorationLoopScreen() {
 
   // FIXED: Match Framing screen artifact grid layout
   const renderArtifactGrid = (artifactIds: string[]) => {
-    // FIXED: Early return if project or loop not loaded yet
-    if (!project || !loop) {
-      return null;
-    }
-    
     const artifacts = getArtifactsByIds(artifactIds);
     
     if (artifacts.length === 0) {
@@ -908,7 +931,6 @@ export default function ExplorationLoopScreen() {
     );
   };
 
-  // FIXED: Ensure we don't render until both project and loop are loaded
   if (!project || !loop) {
     return (
       <View style={styles.container}>
@@ -982,12 +1004,10 @@ export default function ExplorationLoopScreen() {
             />
           </View>
 
-          {/* 3. Explore - UPDATED: All content always visible */}
+          {/* 3. Explore */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Explore</Text>
             
-            {/* Notes section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Notes</Text>
             <View style={styles.listContainer}>
               {loop.exploreItems.map((item, index) => (
                 <View key={item.id} style={styles.listItem}>
@@ -1056,8 +1076,7 @@ export default function ExplorationLoopScreen() {
               </View>
             </View>
             
-            {/* Visuals section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Visuals</Text>
+            {/* FIXED: Match Framing screen visuals section */}
             <View style={styles.visualsSection}>
               <TouchableOpacity 
                 style={styles.addVisualsButton}
@@ -1072,302 +1091,338 @@ export default function ExplorationLoopScreen() {
                   size={20} 
                   color={colors.phaseExploration} 
                 />
-                <Text style={styles.addVisualsText}>Add Visual</Text>
+                <Text style={styles.addVisualsText}>Visuals</Text>
               </TouchableOpacity>
               
               {renderArtifactGrid(loop.exploreArtifactIds)}
             </View>
           </View>
 
-          {/* 4. Build - UPDATED: All content always visible */}
+          {/* 4. Build (Collapsible) */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Build</Text>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setBuildExpanded(!buildExpanded)}
+            >
+              <Text style={styles.sectionTitle}>Build</Text>
+              <IconSymbol 
+                ios_icon_name={buildExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={buildExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
             
-            {/* Notes section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Notes</Text>
-            <View style={styles.listContainer}>
-              {loop.buildItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingBuildId === item.id ? (
+            {buildExpanded && (
+              <>
+                <View style={styles.listContainer}>
+                  {loop.buildItems.map((item, index) => (
+                    <View key={item.id} style={styles.listItem}>
+                      {editingBuildId === item.id ? (
+                        <TextInput
+                          style={styles.listItemInput}
+                          value={item.text}
+                          onChangeText={(text) => handleEditBuildItem(item.id, text)}
+                          onBlur={() => setEditingBuildId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <React.Fragment key={index}>
+                          <Text style={styles.listItemText}>{item.text}</Text>
+                          <View style={styles.listItemActions}>
+                            <TouchableOpacity onPress={() => handleToggleBuildFavorite(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                                android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                                size={20} 
+                                color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEditingBuildId(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="pencil" 
+                                android_material_icon_name="edit" 
+                                size={20} 
+                                color={colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteBuildItem(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="trash" 
+                                android_material_icon_name="delete" 
+                                size={20} 
+                                color={colors.phaseFinish} 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </React.Fragment>
+                      )}
+                    </View>
+                  ))}
+                  
+                  <View style={styles.addItemRow}>
                     <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditBuildItem(item.id, text)}
-                      onBlur={() => setEditingBuildId(null)}
-                      autoFocus
+                      key={buildInputKey}
+                      style={styles.addItemInput}
+                      placeholder="Add build note..."
+                      placeholderTextColor={colors.textSecondary}
+                      defaultValue=""
+                      onChangeText={(text) => {
+                        newBuildTextRef.current = text;
+                      }}
+                      onSubmitEditing={handleAddBuildItem}
                     />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleBuildFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingBuildId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteBuildItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
+                    <TouchableOpacity onPress={handleAddBuildItem}>
+                      <IconSymbol 
+                        ios_icon_name="plus.circle.fill" 
+                        android_material_icon_name="add-circle" 
+                        size={28} 
+                        color={colors.phaseExploration} 
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  key={buildInputKey}
-                  style={styles.addItemInput}
-                  placeholder="Add build note..."
-                  placeholderTextColor={colors.textSecondary}
-                  defaultValue=""
-                  onChangeText={(text) => {
-                    newBuildTextRef.current = text;
-                  }}
-                  onSubmitEditing={handleAddBuildItem}
-                />
-                <TouchableOpacity onPress={handleAddBuildItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {/* Visuals section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Visuals</Text>
-            <View style={styles.visualsSection}>
-              <TouchableOpacity 
-                style={styles.addVisualsButton}
-                onPress={() => {
-                  setArtifactSection('build');
-                  setShowArtifactOverlay(true);
-                }}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color={colors.phaseExploration} 
-                />
-                <Text style={styles.addVisualsText}>Add Visual</Text>
-              </TouchableOpacity>
-              
-              {renderArtifactGrid(loop.buildArtifactIds)}
-            </View>
+                
+                {/* FIXED: Match Framing screen visuals section */}
+                <View style={styles.visualsSection}>
+                  <TouchableOpacity 
+                    style={styles.addVisualsButton}
+                    onPress={() => {
+                      setArtifactSection('build');
+                      setShowArtifactOverlay(true);
+                    }}
+                  >
+                    <IconSymbol 
+                      ios_icon_name="plus.circle" 
+                      android_material_icon_name="add-circle" 
+                      size={20} 
+                      color={colors.phaseExploration} 
+                    />
+                    <Text style={styles.addVisualsText}>Visuals</Text>
+                  </TouchableOpacity>
+                  
+                  {renderArtifactGrid(loop.buildArtifactIds)}
+                </View>
+              </>
+            )}
           </View>
 
-          {/* 5. Check - UPDATED: All content always visible */}
+          {/* 5. Check (Collapsible) */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Check</Text>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setCheckExpanded(!checkExpanded)}
+            >
+              <Text style={styles.sectionTitle}>Check</Text>
+              <IconSymbol 
+                ios_icon_name={checkExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={checkExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
             
-            {/* Notes section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Notes</Text>
-            <View style={styles.listContainer}>
-              {loop.checkItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingCheckId === item.id ? (
+            {checkExpanded && (
+              <>
+                <View style={styles.listContainer}>
+                  {loop.checkItems.map((item, index) => (
+                    <View key={item.id} style={styles.listItem}>
+                      {editingCheckId === item.id ? (
+                        <TextInput
+                          style={styles.listItemInput}
+                          value={item.text}
+                          onChangeText={(text) => handleEditCheckItem(item.id, text)}
+                          onBlur={() => setEditingCheckId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <React.Fragment key={index}>
+                          <Text style={styles.listItemText}>{item.text}</Text>
+                          <View style={styles.listItemActions}>
+                            <TouchableOpacity onPress={() => handleToggleCheckFavorite(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                                android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                                size={20} 
+                                color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEditingCheckId(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="pencil" 
+                                android_material_icon_name="edit" 
+                                size={20} 
+                                color={colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteCheckItem(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="trash" 
+                                android_material_icon_name="delete" 
+                                size={20} 
+                                color={colors.phaseFinish} 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </React.Fragment>
+                      )}
+                    </View>
+                  ))}
+                  
+                  <View style={styles.addItemRow}>
                     <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditCheckItem(item.id, text)}
-                      onBlur={() => setEditingCheckId(null)}
-                      autoFocus
+                      key={checkInputKey}
+                      style={styles.addItemInput}
+                      placeholder="Add check note..."
+                      placeholderTextColor={colors.textSecondary}
+                      defaultValue=""
+                      onChangeText={(text) => {
+                        newCheckTextRef.current = text;
+                      }}
+                      onSubmitEditing={handleAddCheckItem}
                     />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleCheckFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingCheckId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteCheckItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
+                    <TouchableOpacity onPress={handleAddCheckItem}>
+                      <IconSymbol 
+                        ios_icon_name="plus.circle.fill" 
+                        android_material_icon_name="add-circle" 
+                        size={28} 
+                        color={colors.phaseExploration} 
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  key={checkInputKey}
-                  style={styles.addItemInput}
-                  placeholder="Add check note..."
-                  placeholderTextColor={colors.textSecondary}
-                  defaultValue=""
-                  onChangeText={(text) => {
-                    newCheckTextRef.current = text;
-                  }}
-                  onSubmitEditing={handleAddCheckItem}
-                />
-                <TouchableOpacity onPress={handleAddCheckItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {/* Visuals section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Visuals</Text>
-            <View style={styles.visualsSection}>
-              <TouchableOpacity 
-                style={styles.addVisualsButton}
-                onPress={() => {
-                  setArtifactSection('check');
-                  setShowArtifactOverlay(true);
-                }}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color={colors.phaseExploration} 
-                />
-                <Text style={styles.addVisualsText}>Add Visual</Text>
-              </TouchableOpacity>
-              
-              {renderArtifactGrid(loop.checkArtifactIds)}
-            </View>
+                
+                {/* FIXED: Match Framing screen visuals section */}
+                <View style={styles.visualsSection}>
+                  <TouchableOpacity 
+                    style={styles.addVisualsButton}
+                    onPress={() => {
+                      setArtifactSection('check');
+                      setShowArtifactOverlay(true);
+                    }}
+                  >
+                    <IconSymbol 
+                      ios_icon_name="plus.circle" 
+                      android_material_icon_name="add-circle" 
+                      size={20} 
+                      color={colors.phaseExploration} 
+                    />
+                    <Text style={styles.addVisualsText}>Visuals</Text>
+                  </TouchableOpacity>
+                  
+                  {renderArtifactGrid(loop.checkArtifactIds)}
+                </View>
+              </>
+            )}
           </View>
 
-          {/* 6. Adapt - UPDATED: All content always visible */}
+          {/* 6. Adapt (Collapsible) */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Adapt</Text>
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setAdaptExpanded(!adaptExpanded)}
+            >
+              <Text style={styles.sectionTitle}>Adapt</Text>
+              <IconSymbol 
+                ios_icon_name={adaptExpanded ? "chevron.up" : "chevron.down"} 
+                android_material_icon_name={adaptExpanded ? "arrow-drop-up" : "arrow-drop-down"} 
+                size={24} 
+                color={colors.phaseExploration} 
+              />
+            </TouchableOpacity>
             
-            {/* Notes section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Notes</Text>
-            <View style={styles.listContainer}>
-              {loop.adaptItems.map((item, index) => (
-                <View key={item.id} style={styles.listItem}>
-                  {editingAdaptId === item.id ? (
+            {adaptExpanded && (
+              <>
+                <View style={styles.listContainer}>
+                  {loop.adaptItems.map((item, index) => (
+                    <View key={item.id} style={styles.listItem}>
+                      {editingAdaptId === item.id ? (
+                        <TextInput
+                          style={styles.listItemInput}
+                          value={item.text}
+                          onChangeText={(text) => handleEditAdaptItem(item.id, text)}
+                          onBlur={() => setEditingAdaptId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <React.Fragment key={index}>
+                          <Text style={styles.listItemText}>{item.text}</Text>
+                          <View style={styles.listItemActions}>
+                            <TouchableOpacity onPress={() => handleToggleAdaptFavorite(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
+                                android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
+                                size={20} 
+                                color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEditingAdaptId(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="pencil" 
+                                android_material_icon_name="edit" 
+                                size={20} 
+                                color={colors.textSecondary} 
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteAdaptItem(item.id)}>
+                              <IconSymbol 
+                                ios_icon_name="trash" 
+                                android_material_icon_name="delete" 
+                                size={20} 
+                                color={colors.phaseFinish} 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </React.Fragment>
+                      )}
+                    </View>
+                  ))}
+                  
+                  <View style={styles.addItemRow}>
                     <TextInput
-                      style={styles.listItemInput}
-                      value={item.text}
-                      onChangeText={(text) => handleEditAdaptItem(item.id, text)}
-                      onBlur={() => setEditingAdaptId(null)}
-                      autoFocus
+                      key={adaptInputKey}
+                      style={styles.addItemInput}
+                      placeholder="Add adapt note..."
+                      placeholderTextColor={colors.textSecondary}
+                      defaultValue=""
+                      onChangeText={(text) => {
+                        newAdaptTextRef.current = text;
+                      }}
+                      onSubmitEditing={handleAddAdaptItem}
                     />
-                  ) : (
-                    <React.Fragment key={index}>
-                      <Text style={styles.listItemText}>{item.text}</Text>
-                      <View style={styles.listItemActions}>
-                        <TouchableOpacity onPress={() => handleToggleAdaptFavorite(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name={item.isFavorite ? "star.fill" : "star"} 
-                            android_material_icon_name={item.isFavorite ? "star" : "star-border"} 
-                            size={20} 
-                            color={item.isFavorite ? "#FFD700" : colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setEditingAdaptId(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="pencil" 
-                            android_material_icon_name="edit" 
-                            size={20} 
-                            color={colors.textSecondary} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteAdaptItem(item.id)}>
-                          <IconSymbol 
-                            ios_icon_name="trash" 
-                            android_material_icon_name="delete" 
-                            size={20} 
-                            color={colors.phaseFinish} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </React.Fragment>
-                  )}
+                    <TouchableOpacity onPress={handleAddAdaptItem}>
+                      <IconSymbol 
+                        ios_icon_name="plus.circle.fill" 
+                        android_material_icon_name="add-circle" 
+                        size={28} 
+                        color={colors.phaseExploration} 
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              ))}
-              
-              <View style={styles.addItemRow}>
-                <TextInput
-                  key={adaptInputKey}
-                  style={styles.addItemInput}
-                  placeholder="Add adapt note..."
-                  placeholderTextColor={colors.textSecondary}
-                  defaultValue=""
-                  onChangeText={(text) => {
-                    newAdaptTextRef.current = text;
-                  }}
-                  onSubmitEditing={handleAddAdaptItem}
-                />
-                <TouchableOpacity onPress={handleAddAdaptItem}>
-                  <IconSymbol 
-                    ios_icon_name="plus.circle.fill" 
-                    android_material_icon_name="add-circle" 
-                    size={28} 
-                    color={colors.phaseExploration} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {/* Visuals section - ALWAYS visible */}
-            <Text style={styles.subsectionTitle}>Visuals</Text>
-            <View style={styles.visualsSection}>
-              <TouchableOpacity 
-                style={styles.addVisualsButton}
-                onPress={() => {
-                  setArtifactSection('adapt');
-                  setShowArtifactOverlay(true);
-                }}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color={colors.phaseExploration} 
-                />
-                <Text style={styles.addVisualsText}>Add Visual</Text>
-              </TouchableOpacity>
-              
-              {renderArtifactGrid(loop.adaptArtifactIds)}
-            </View>
+                
+                {/* FIXED: Match Framing screen visuals section */}
+                <View style={styles.visualsSection}>
+                  <TouchableOpacity 
+                    style={styles.addVisualsButton}
+                    onPress={() => {
+                      setArtifactSection('adapt');
+                      setShowArtifactOverlay(true);
+                    }}
+                  >
+                    <IconSymbol 
+                      ios_icon_name="plus.circle" 
+                      android_material_icon_name="add-circle" 
+                      size={20} 
+                      color={colors.phaseExploration} 
+                    />
+                    <Text style={styles.addVisualsText}>Visuals</Text>
+                  </TouchableOpacity>
+                  
+                  {renderArtifactGrid(loop.adaptArtifactIds)}
+                </View>
+              </>
+            )}
           </View>
 
           {/* 7. Exploration Decisions */}
@@ -1989,18 +2044,17 @@ const styles = StyleSheet.create({
     color: colors.phaseExploration,
     marginBottom: 12,
   },
-  subsectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 12,
-    marginBottom: 8,
-  },
   helperText: {
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 12,
     fontStyle: 'italic',
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   statusButton: {
     flexDirection: 'row',
@@ -2031,7 +2085,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.divider,
-    marginBottom: 12,
   },
   listItem: {
     flexDirection: 'row',
@@ -2069,7 +2122,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   visualsSection: {
-    marginTop: 8,
+    marginTop: 12,
   },
   addVisualsButton: {
     flexDirection: 'row',
@@ -2077,19 +2130,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: colors.divider,
     gap: 8,
-    marginBottom: 12,
   },
   addVisualsText: {
     fontSize: 16,
     color: colors.phaseExploration,
     fontWeight: '600',
   },
+  // FIXED: Match Framing screen artifact grid
   artifactGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginTop: 12,
     gap: THUMBNAIL_GAP,
   },
   artifactGridItem: {
