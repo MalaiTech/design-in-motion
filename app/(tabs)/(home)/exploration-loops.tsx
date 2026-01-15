@@ -20,7 +20,14 @@ import {
   updateProject,
   Project,
   ExplorationLoop,
+  Artifact,
 } from '@/utils/storage';
+import ExplorationLoopFilterSortModal, { 
+  LoopStatus, 
+  LoopSortOption, 
+  SortDirection 
+} from '@/components/ExplorationLoopFilterSortModal';
+import PDFThumbnail from '@/components/PDFThumbnail';
 
 export default function ExplorationLoopsScreen() {
   const router = useRouter();
@@ -29,6 +36,10 @@ export default function ExplorationLoopsScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [loops, setLoops] = useState<ExplorationLoop[]>([]);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState<LoopStatus[]>([]);
+  const [sortOption, setSortOption] = useState<LoopSortOption>('startDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const loadProject = useCallback(async () => {
     console.log('Exploration Loops: Loading project', projectId);
@@ -109,8 +120,78 @@ export default function ExplorationLoopsScreen() {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
+  const getFilteredAndSortedLoops = (): ExplorationLoop[] => {
+    let filtered = loops;
+
+    // Apply status filter
+    if (selectedStatuses.length > 0) {
+      filtered = loops.filter(loop => selectedStatuses.includes(loop.status));
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortOption === 'startDate') {
+        const aDate = a.startDate || a.updatedDate;
+        const bDate = b.startDate || b.updatedDate;
+        comparison = new Date(aDate).getTime() - new Date(bDate).getTime();
+      } else if (sortOption === 'updatedDate') {
+        comparison = new Date(a.updatedDate).getTime() - new Date(b.updatedDate).getTime();
+      } else {
+        comparison = a.status.localeCompare(b.status);
+      }
+      
+      // Apply direction
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  };
+
+  const handleFilterApply = (statuses: LoopStatus[], sort: LoopSortOption, direction: SortDirection) => {
+    console.log('Exploration Loops: Applying filter/sort', { statuses, sort, direction });
+    setSelectedStatuses(statuses);
+    setSortOption(sort);
+    setSortDirection(direction);
+  };
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getFavoriteArtifacts = (loop: ExplorationLoop): Artifact[] => {
+    if (!project) return [];
+    
+    // Get artifacts from Explore and Build segments
+    const exploreArtifactIds = loop.exploreArtifactIds || [];
+    const buildArtifactIds = loop.buildArtifactIds || [];
+    const combinedIds = [...exploreArtifactIds, ...buildArtifactIds];
+    
+    // Get artifacts that are marked as favorite
+    const favoriteArtifacts = project.artifacts.filter(
+      artifact => combinedIds.includes(artifact.id) && artifact.isFavorite && artifact.type !== 'url'
+    );
+    
+    // Return first 4
+    return favoriteArtifacts.slice(0, 4);
+  };
+
+  const getFavoriteNextQuestions = (loop: ExplorationLoop): string[] => {
+    if (!loop.nextExplorationQuestions) return [];
+    
+    return loop.nextExplorationQuestions
+      .filter(q => q.isFavorite)
+      .map(q => q.text);
+  };
+
   const renderLoopCard = (loop: ExplorationLoop) => {
-    const loopArtifacts = project?.artifacts.filter(a => loop.artifactIds.includes(a.id)) || [];
+    const favoriteArtifacts = getFavoriteArtifacts(loop);
+    const favoriteQuestions = getFavoriteNextQuestions(loop);
+    const totalHours = Math.floor(loop.timeSpent || 0);
+    const totalCosts = Math.floor(loop.costs || 0);
+    const startDate = loop.startDate || loop.updatedDate;
     
     return (
       <TouchableOpacity
@@ -137,24 +218,35 @@ export default function ExplorationLoopsScreen() {
         </View>
         
         <View style={styles.loopMeta}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(loop.status) }]}>
-            <Text style={styles.statusText}>{getStatusLabel(loop.status)}</Text>
-          </View>
-          <Text style={styles.loopDate}>
-            Updated {new Date(loop.updatedDate).toLocaleDateString()}
-          </Text>
+          <Text style={styles.metaText}>Start: {formatDate(startDate)}</Text>
+          <Text style={styles.metaSeparator}>•</Text>
+          <Text style={styles.metaText}>Updated: {formatDate(loop.updatedDate)}</Text>
+          <Text style={styles.metaSeparator}>•</Text>
+          <Text style={styles.metaText}>{getStatusLabel(loop.status)}</Text>
+        </View>
+
+        <View style={styles.loopStats}>
+          <Text style={styles.statsText}>Total Costs: €{totalCosts}</Text>
+          <Text style={styles.metaSeparator}>•</Text>
+          <Text style={styles.statsText}>Total Hours: {totalHours}h</Text>
         </View>
         
-        {loopArtifacts.length > 0 && (
+        {favoriteArtifacts.length > 0 && (
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
             style={styles.artifactStrip}
           >
-            {loopArtifacts.map((artifact) => (
+            {favoriteArtifacts.map((artifact) => (
               <View key={artifact.id} style={styles.artifactThumb}>
                 {artifact.type === 'image' ? (
                   <Image source={{ uri: artifact.uri }} style={styles.artifactImage} />
+                ) : artifact.type === 'document' ? (
+                  <PDFThumbnail
+                    uri={artifact.uri}
+                    width={80}
+                    height={80}
+                  />
                 ) : (
                   <View style={styles.artifactDoc}>
                     <IconSymbol 
@@ -168,6 +260,17 @@ export default function ExplorationLoopsScreen() {
               </View>
             ))}
           </ScrollView>
+        )}
+
+        {favoriteQuestions.length > 0 && (
+          <View style={styles.nextQuestionsSection}>
+            <Text style={styles.nextQuestionsLabel}>Next Exploration:</Text>
+            {favoriteQuestions.map((question, index) => (
+              <Text key={index} style={styles.nextQuestionText}>
+                {question}
+              </Text>
+            ))}
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -183,8 +286,28 @@ export default function ExplorationLoopsScreen() {
     );
   }
 
+  const filteredLoops = getFilteredAndSortedLoops();
+
   return (
     <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.headerFilterButton}
+              onPress={() => setFilterModalVisible(true)}
+            >
+              <IconSymbol
+                ios_icon_name="line.3.horizontal.decrease.circle"
+                android_material_icon_name="filter-list"
+                size={24}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -193,49 +316,45 @@ export default function ExplorationLoopsScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {loops.length === 0 ? (
+          {filteredLoops.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateTitle}>No exploration loops yet</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Start a loop to explore an open question.
+              <Text style={styles.emptyStateTitle}>
+                {loops.length === 0 ? 'No exploration loops yet' : 'No loops match your filters'}
               </Text>
-              <TouchableOpacity 
-                style={styles.primaryButton}
-                onPress={handleCreateLoop}
-              >
-                <IconSymbol 
-                  ios_icon_name="plus.circle.fill" 
-                  android_material_icon_name="add-circle" 
-                  size={20} 
-                  color="#FFFFFF" 
-                />
-                <Text style={styles.primaryButtonText}>New Exploration</Text>
-              </TouchableOpacity>
+              <Text style={styles.emptyStateSubtext}>
+                {loops.length === 0 
+                  ? 'Start a loop to explore an open question.'
+                  : 'Try adjusting your filter settings.'}
+              </Text>
             </View>
           ) : (
             <React.Fragment>
-              {loops.map(loop => renderLoopCard(loop))}
+              {filteredLoops.map(loop => renderLoopCard(loop))}
             </React.Fragment>
           )}
         </ScrollView>
         
-        {loops.length > 0 && (
-          <View style={styles.floatingButtonContainer}>
-            <TouchableOpacity 
-              style={styles.floatingButton}
-              onPress={handleCreateLoop}
-            >
-              <IconSymbol 
-                ios_icon_name="plus" 
-                android_material_icon_name="add" 
-                size={24} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.floatingButtonText}>New Exploration</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <TouchableOpacity 
+          style={styles.fab}
+          onPress={handleCreateLoop}
+        >
+          <IconSymbol 
+            ios_icon_name="plus" 
+            android_material_icon_name="add" 
+            size={24} 
+            color="#FFFFFF" 
+          />
+        </TouchableOpacity>
       </KeyboardAvoidingView>
+
+      <ExplorationLoopFilterSortModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        selectedStatuses={selectedStatuses}
+        sortOption={sortOption}
+        sortDirection={sortDirection}
+        onApply={handleFilterApply}
+      />
     </View>
   );
 }
@@ -244,6 +363,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surfaceExploration,
+  },
+  headerFilterButton: {
+    padding: 8,
+    marginRight: 8,
   },
   scrollContent: {
     padding: 16,
@@ -269,25 +392,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptyStateSubtext: {
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.phaseExploration,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    gap: 8,
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   loopCard: {
     backgroundColor: '#FFFFFF',
@@ -312,32 +423,38 @@ const styles = StyleSheet.create({
   loopMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  metaSeparator: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginHorizontal: 8,
+  },
+  loopStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
-    gap: 12,
   },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-  },
-  loopDate: {
-    fontSize: 14,
+  statsText: {
+    fontSize: 11,
     color: colors.textSecondary,
   },
   artifactStrip: {
     flexDirection: 'row',
     marginTop: 8,
+    marginBottom: 12,
   },
   artifactThumb: {
-    width: 60,
-    height: 60,
+    width: 80,
+    height: 80,
     backgroundColor: colors.divider,
-    marginRight: 8,
+    marginRight: 12,
+    overflow: 'hidden',
   },
   artifactImage: {
     width: '100%',
@@ -350,23 +467,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
   },
-  floatingButtonContainer: {
+  nextQuestionsSection: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  nextQuestionsLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  nextQuestionText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+    lineHeight: 16,
+  },
+  fab: {
     position: 'absolute',
-    bottom: 24,
-    left: 16,
+    bottom: 100,
     right: 16,
-  },
-  floatingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 0,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
-    backgroundColor: colors.phaseExploration,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  floatingButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    alignItems: 'center',
   },
 });

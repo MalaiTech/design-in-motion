@@ -80,6 +80,7 @@ export interface ExplorationLoop {
   id: string;
   question: string;
   status: 'draft' | 'active' | 'paused' | 'completed';
+  startDate: string;
   updatedDate: string;
   artifactIds: string[];
   
