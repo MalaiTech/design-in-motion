@@ -240,6 +240,9 @@ export default function ExplorationLoopScreen() {
     
     console.log('Exploration Loop: User tapped Add Artifact -', type, 'for section', artifactSection);
     
+    // FIXED: Close the artifact overlay immediately before launching picker
+    setShowArtifactOverlay(false);
+    
     try {
       if (type === 'url') {
         // Show in-app modal instead of Alert.prompt
@@ -330,7 +333,6 @@ export default function ExplorationLoopScreen() {
         setDecisionArtifactIds(prev => [...prev, ...newArtifactIds]);
         
         console.log('Exploration Loop: Added artifacts to decision overlay. Total:', decisionArtifactIds.length + newArtifactIds.length);
-        setShowArtifactOverlay(false);
         return;
       }
       
@@ -388,8 +390,6 @@ export default function ExplorationLoopScreen() {
         projectArtifacts: updatedProject.artifacts.length,
         sectionArtifactIds: updatedSectionIds.length,
       });
-      
-      setShowArtifactOverlay(false);
     } catch (error) {
       console.error('Exploration Loop: Error adding artifact:', error);
       Alert.alert('Error', 'Failed to add artifact.');
@@ -432,7 +432,6 @@ export default function ExplorationLoopScreen() {
         console.log('Exploration Loop: Added URL artifact to decision overlay');
         setUrlInput('');
         setShowUrlInputModal(false);
-        setShowArtifactOverlay(false);
         return;
       }
       
@@ -482,7 +481,6 @@ export default function ExplorationLoopScreen() {
       
       setUrlInput('');
       setShowUrlInputModal(false);
-      setShowArtifactOverlay(false);
     } catch (error) {
       console.error('Exploration Loop: Error adding URL artifact:', error);
       Alert.alert('Error', 'Failed to add URL.');
