@@ -802,8 +802,9 @@ export default function ExplorationLoopScreen() {
     });
   };
 
+  // FIXED: Add null check to prevent error
   const getArtifactsByIds = (ids: string[]): Artifact[] => {
-    if (!project) return [];
+    if (!project || !project.artifacts) return [];
     return project.artifacts.filter(a => ids.includes(a.id));
   };
 
@@ -821,6 +822,11 @@ export default function ExplorationLoopScreen() {
 
   // FIXED: Match Framing screen artifact grid layout
   const renderArtifactGrid = (artifactIds: string[]) => {
+    // FIXED: Early return if project or loop not loaded yet
+    if (!project || !loop) {
+      return null;
+    }
+    
     const artifacts = getArtifactsByIds(artifactIds);
     
     if (artifacts.length === 0) {
@@ -902,6 +908,7 @@ export default function ExplorationLoopScreen() {
     );
   };
 
+  // FIXED: Ensure we don't render until both project and loop are loaded
   if (!project || !loop) {
     return (
       <View style={styles.container}>
