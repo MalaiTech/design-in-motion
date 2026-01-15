@@ -819,17 +819,9 @@ export default function ExplorationLoopScreen() {
     return entries.reduce((sum: number, entry: CostEntry) => sum + entry.amount, 0);
   };
 
-  // FIXED: Match Framing screen artifact grid layout
+  // FIXED: Match Framing screen artifact grid layout - ALWAYS render grid container
   const renderArtifactGrid = (artifactIds: string[]) => {
-    if (!artifactIds || artifactIds.length === 0) {
-      return null;
-    }
-    
     const artifacts = getArtifactsByIds(artifactIds);
-    
-    if (artifacts.length === 0) {
-      return null;
-    }
     
     return (
       <View style={styles.artifactGrid}>
