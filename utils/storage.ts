@@ -142,6 +142,7 @@ export interface Project {
   designSpaceItems?: DesignSpaceItem[];
   explorationQuestions?: ExplorationQuestion[];
   framingDecisions?: FramingDecision[];
+  framingArtifactIds?: string[]; // FIXED: Track which artifacts belong to Framing
   
   // Exploration Loops
   explorationLoops?: ExplorationLoop[];

@@ -145,8 +145,14 @@ export default function FramingScreen() {
                 name: 'URL Artifact',
               };
               
+              // FIXED: Add to both project.artifacts AND framingArtifactIds
               const updatedArtifacts = [...project.artifacts, newArtifact];
-              await updateAndSaveProject({ artifacts: updatedArtifacts });
+              const updatedFramingIds = [...(project.framingArtifactIds || []), newArtifact.id];
+              
+              await updateAndSaveProject({ 
+                artifacts: updatedArtifacts,
+                framingArtifactIds: updatedFramingIds,
+              });
               setShowArtifactOverlay(false);
             }
           }
@@ -195,8 +201,17 @@ export default function FramingScreen() {
           name: asset.name || 'Untitled',
         }));
         
+        // FIXED: Add to both project.artifacts AND framingArtifactIds
         const updatedArtifacts = [...project.artifacts, ...newArtifacts];
-        await updateAndSaveProject({ artifacts: updatedArtifacts });
+        const newArtifactIds = newArtifacts.map(a => a.id);
+        const updatedFramingIds = [...(project.framingArtifactIds || []), ...newArtifactIds];
+        
+        console.log('Framing: Adding', newArtifacts.length, 'artifacts. Total framing artifacts:', updatedFramingIds.length);
+        
+        await updateAndSaveProject({ 
+          artifacts: updatedArtifacts,
+          framingArtifactIds: updatedFramingIds,
+        });
         setShowArtifactOverlay(false);
       }
     } catch (error) {
@@ -218,8 +233,14 @@ export default function FramingScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            // FIXED: Remove from both project.artifacts AND framingArtifactIds
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
-            await updateAndSaveProject({ artifacts: updatedArtifacts });
+            const updatedFramingIds = (project.framingArtifactIds || []).filter(id => id !== artifactId);
+            
+            await updateAndSaveProject({ 
+              artifacts: updatedArtifacts,
+              framingArtifactIds: updatedFramingIds,
+            });
             setShowArtifactViewer(false);
           }
         }
@@ -654,9 +675,14 @@ export default function FramingScreen() {
             </TouchableOpacity>
           </View>
           
-          {project.artifacts.length > 0 && (
-            <View style={styles.artifactGrid}>
-              {project.artifacts.map((artifact) => (
+          {/* FIXED: Only show artifacts that belong to Framing */}
+          {(() => {
+            const framingArtifactIds = project.framingArtifactIds || [];
+            const framingArtifacts = project.artifacts.filter(a => framingArtifactIds.includes(a.id));
+            console.log('Framing: Displaying', framingArtifacts.length, 'artifacts out of', project.artifacts.length, 'total');
+            return framingArtifacts.length > 0 && (
+              <View style={styles.artifactGrid}>
+                {framingArtifacts.map((artifact) => (
                 <TouchableOpacity
                   key={artifact.id}
                   style={styles.artifactGridItem}
@@ -721,7 +747,8 @@ export default function FramingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          )}
+            );
+          })()}
         </View>
 
         {/* 4. Level of Certainty */}
