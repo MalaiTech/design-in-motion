@@ -247,45 +247,41 @@ export default function ProjectOverviewScreen() {
   };
 
   // FIXED: Get artifacts to display in Project Overview
-  // Only show: 1) Initial artifact from project creation, 2) Favorite artifacts from Framing
+  // Logic: Show ONLY initial artifact if no framing favorites exist
+  //        Show ONLY framing favorites if they exist (hide initial artifact)
   const getDisplayArtifacts = (): Artifact[] => {
     if (!project || !project.artifacts || project.artifacts.length === 0) {
       console.log('Project Overview: No artifacts in project');
       return [];
     }
 
-    const displayArtifacts: Artifact[] = [];
     const framingArtifactIds = project.framingArtifactIds || [];
     
     console.log('Project Overview: Total artifacts:', project.artifacts.length);
     console.log('Project Overview: Framing artifact IDs:', framingArtifactIds.length);
     
-    // 1. Add the initial artifact (first artifact added during project creation)
-    // The initial artifact is the first one that is NOT in framingArtifactIds
-    const initialArtifact = project.artifacts.find(artifact => !framingArtifactIds.includes(artifact.id));
-    if (initialArtifact) {
-      displayArtifacts.push(initialArtifact);
-      console.log('Project Overview: Found initial artifact:', initialArtifact.id);
-    }
-    
-    // 2. Add ONLY favorite artifacts from Framing
+    // 1. Check if there are any favorite artifacts from Framing
     const framingFavoriteArtifacts = project.artifacts.filter(artifact => 
       framingArtifactIds.includes(artifact.id) && artifact.isFavorite === true
     );
     
     console.log('Project Overview: Framing favorite artifacts:', framingFavoriteArtifacts.length);
     
-    // Add framing favorites (avoid duplicates if initial artifact is also a framing favorite)
-    framingFavoriteArtifacts.forEach(artifact => {
-      if (!displayArtifacts.find(a => a.id === artifact.id)) {
-        displayArtifacts.push(artifact);
-      }
-    });
+    // 2. If there are framing favorites, show ONLY those (hide initial artifact)
+    if (framingFavoriteArtifacts.length > 0) {
+      console.log('Project Overview: Displaying ONLY', framingFavoriteArtifacts.length, 'framing favorite artifacts');
+      return framingFavoriteArtifacts;
+    }
     
-    console.log('Project Overview: Displaying', displayArtifacts.length, 'artifacts total');
-    console.log('Project Overview: Artifact breakdown - Initial:', initialArtifact ? 1 : 0, ', Framing favorites:', framingFavoriteArtifacts.length);
+    // 3. Otherwise, show ONLY the initial artifact (first artifact NOT in framingArtifactIds)
+    const initialArtifact = project.artifacts.find(artifact => !framingArtifactIds.includes(artifact.id));
+    if (initialArtifact) {
+      console.log('Project Overview: Displaying ONLY initial artifact:', initialArtifact.id);
+      return [initialArtifact];
+    }
     
-    return displayArtifacts;
+    console.log('Project Overview: No artifacts to display');
+    return [];
   };
 
   if (!project) {
@@ -300,7 +296,7 @@ export default function ProjectOverviewScreen() {
 
   const phases: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
   
-  // Get artifacts to display (initial + framing favorites only)
+  // Get artifacts to display (initial OR framing favorites only)
   const displayArtifacts = getDisplayArtifacts();
 
   // Determine background color based on color scheme
@@ -360,10 +356,15 @@ export default function ProjectOverviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* FIXED: Visuals (Artifacts) - Only initial artifact + framing favorites */}
+          {/* FIXED: Visuals (Artifacts) - Only initial artifact OR framing favorites */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Visuals</Text>
-            <Text style={styles.helperText}>Initial project visual and favorite visuals from Framing</Text>
+            <Text style={styles.helperText}>
+              {displayArtifacts.length > 0 && project.framingArtifactIds && 
+               project.artifacts.some(a => project.framingArtifactIds!.includes(a.id) && a.isFavorite)
+                ? 'Favorite visuals from Framing'
+                : 'Initial project visual'}
+            </Text>
             
             {displayArtifacts.length > 0 ? (
               <View style={styles.artifactGrid}>
