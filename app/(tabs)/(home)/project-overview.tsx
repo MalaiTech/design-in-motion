@@ -443,7 +443,8 @@ export default function ProjectOverviewScreen() {
               <TouchableOpacity 
                 style={styles.toolItem}
                 onPress={() => {
-                  console.log('Project Overview: Export tapped (not yet implemented)');
+                  console.log('Project Overview: Navigating to Export');
+                  router.push(`/(tabs)/(home)/export?id=${project.id}`);
                 }}
               >
                 <View style={styles.toolItemLeft}>
