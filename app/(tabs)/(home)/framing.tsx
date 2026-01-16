@@ -126,7 +126,7 @@ export default function FramingScreen() {
     await updateProject(updatedProject);
   }, [project]);
 
-  // FIXED: Artifact management - now stores artifact IDs in framingArtifactIds to separate from exploration loop artifacts
+  // Artifact management - UPDATED to support multiple photo selection and PDF-only documents
   const handleAddArtifact = async (type: 'camera' | 'photo' | 'document' | 'url') => {
     if (!project) return;
     
@@ -146,13 +146,7 @@ export default function FramingScreen() {
               };
               
               const updatedArtifacts = [...project.artifacts, newArtifact];
-              // FIXED: Add artifact ID to framingArtifactIds
-              const updatedFramingIds = [...(project.framingArtifactIds || []), newArtifact.id];
-              console.log('Framing: Added URL artifact to framingArtifactIds:', updatedFramingIds.length);
-              await updateAndSaveProject({ 
-                artifacts: updatedArtifacts,
-                framingArtifactIds: updatedFramingIds,
-              });
+              await updateAndSaveProject({ artifacts: updatedArtifacts });
               setShowArtifactOverlay(false);
             }
           }
@@ -202,14 +196,7 @@ export default function FramingScreen() {
         }));
         
         const updatedArtifacts = [...project.artifacts, ...newArtifacts];
-        // FIXED: Add artifact IDs to framingArtifactIds
-        const newArtifactIds = newArtifacts.map(a => a.id);
-        const updatedFramingIds = [...(project.framingArtifactIds || []), ...newArtifactIds];
-        console.log('Framing: Added', newArtifacts.length, 'artifacts to framingArtifactIds. Total:', updatedFramingIds.length);
-        await updateAndSaveProject({ 
-          artifacts: updatedArtifacts,
-          framingArtifactIds: updatedFramingIds,
-        });
+        await updateAndSaveProject({ artifacts: updatedArtifacts });
         setShowArtifactOverlay(false);
       }
     } catch (error) {
@@ -232,13 +219,7 @@ export default function FramingScreen() {
           style: 'destructive',
           onPress: async () => {
             const updatedArtifacts = project.artifacts.filter(a => a.id !== artifactId);
-            // FIXED: Also remove from framingArtifactIds
-            const updatedFramingIds = (project.framingArtifactIds || []).filter(id => id !== artifactId);
-            console.log('Framing: Removed artifact from framingArtifactIds. Remaining:', updatedFramingIds.length);
-            await updateAndSaveProject({ 
-              artifacts: updatedArtifacts,
-              framingArtifactIds: updatedFramingIds,
-            });
+            await updateAndSaveProject({ artifacts: updatedArtifacts });
             setShowArtifactViewer(false);
           }
         }
@@ -656,7 +637,7 @@ export default function FramingScreen() {
           />
         </View>
 
-        {/* 3. Artifacts (Visuals) - FIXED: Only show artifacts in framingArtifactIds */}
+        {/* 3. Artifacts (Visuals) - UPDATED with 4-column grid */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <TouchableOpacity 
@@ -673,15 +654,9 @@ export default function FramingScreen() {
             </TouchableOpacity>
           </View>
           
-          {(() => {
-            // FIXED: Filter artifacts to only show those in framingArtifactIds
-            const framingArtifacts = project.artifacts.filter(a => 
-              (project.framingArtifactIds || []).includes(a.id)
-            );
-            console.log('Framing: Displaying', framingArtifacts.length, 'artifacts from framingArtifactIds');
-            return framingArtifacts.length > 0 && (
-              <View style={styles.artifactGrid}>
-                {framingArtifacts.map((artifact) => (
+          {project.artifacts.length > 0 && (
+            <View style={styles.artifactGrid}>
+              {project.artifacts.map((artifact) => (
                 <TouchableOpacity
                   key={artifact.id}
                   style={styles.artifactGridItem}
@@ -746,8 +721,7 @@ export default function FramingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            );
-          })()}
+          )}
         </View>
 
         {/* 4. Level of Certainty */}
