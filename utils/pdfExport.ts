@@ -289,7 +289,7 @@ const generateExecutiveOverview = (project: Project): string => {
   
   // Key Decisions (Project level and Framing)
   let decisionsSection = '';
-  const allDecisions: Array<{text: string, timestamp: string, type: string}> = [];
+  const allDecisions: {text: string, timestamp: string, type: string}[] = [];
   
   if (project.decisions && project.decisions.length > 0) {
     project.decisions.forEach(d => {
@@ -545,7 +545,7 @@ const generateTimelineReport = (project: Project): string => {
   const coverPage = generateCoverPage(project, 'Timeline');
   
   // Build timeline events
-  const timelineEvents: Array<{timestamp: string, type: string, content: string, artifacts?: Artifact[]}> = [];
+  const timelineEvents: {timestamp: string, type: string, content: string, artifacts?: Artifact[]}[] = [];
   
   // Project created
   timelineEvents.push({
