@@ -154,6 +154,7 @@ const getBaseHTML = (title: string, content: string): string => {
     .favorite-marker {
       color: #F2C94C;
       font-weight: bold;
+      margin-right: 4px;
     }
     
     .decision-box {
@@ -225,6 +226,29 @@ const getBaseHTML = (title: string, content: string): string => {
       color: #555555;
       line-height: 2;
     }
+    
+    .artifact-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 24px 0;
+    }
+    
+    .artifact-item {
+      text-align: center;
+    }
+    
+    .artifact-thumbnail {
+      width: 100%;
+      height: 120px;
+      background: #F5F5F5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+      font-size: 9pt;
+      color: #555555;
+    }
   </style>
 </head>
 <body>
@@ -242,8 +266,8 @@ const generateCoverPage = (project: Project, formatTitle: string): string => {
       <p class="cover-subtitle">${formatTitle}</p>
       <div class="cover-meta">
         <p><strong>Phase:</strong> ${project.phase}</p>
-        <p><strong>Export Date:</strong> ${formatDate(new Date().toISOString())}</p>
         <p><strong>Project Started:</strong> ${formatDate(project.startDate)}</p>
+        <p><strong>Export Date:</strong> ${formatDate(new Date().toISOString())}</p>
       </div>
     </div>
   `;
@@ -253,41 +277,58 @@ const generateCoverPage = (project: Project, formatTitle: string): string => {
 const generateExecutiveOverview = (project: Project): string => {
   const coverPage = generateCoverPage(project, 'Executive Overview');
   
-  // Project Snapshot
-  let snapshotSection = '';
-  if (project.title || project.phase || project.startDate) {
-    snapshotSection = `
-      <div class="page">
-        <h2>Project Snapshot</h2>
-        <div class="divider"></div>
-        <p><strong>Project Name:</strong> ${project.title}</p>
-        <p><strong>Current Phase:</strong> <span class="phase-badge" style="background: ${getPhaseSurface(project.phase)}; color: ${getPhaseColor(project.phase)};">${project.phase}</span></p>
-        <p><strong>Started:</strong> ${formatDate(project.startDate)}</p>
-        <p><strong>Last Updated:</strong> ${formatDate(project.updatedDate)}</p>
-      </div>
+  // 2nd Page: Project Summary
+  let summarySection = '';
+  
+  // Calculate exploration loop summaries
+  let loopSummaries = '';
+  if (project.explorationLoops && project.explorationLoops.length > 0) {
+    loopSummaries = `
+      <h3>Exploration Loops Status</h3>
+      ${project.explorationLoops.map(loop => {
+        const loopHours = loop.timeSpent || 0;
+        const loopCosts = loop.costs || 0;
+        return `
+          <div style="margin-bottom: 16px;">
+            <p><strong>${loop.question}</strong></p>
+            <p class="meta">Status: ${loop.status} • Hours: ${loopHours.toFixed(1)} • Costs: $${loopCosts.toFixed(2)}</p>
+          </div>
+        `;
+      }).join('')}
     `;
   }
   
-  // Purpose & Intent
-  let purposeSection = '';
-  if (project.opportunityOrigin || project.purpose) {
-    purposeSection = `
-      <div class="page">
-        <h2>Purpose & Intent</h2>
-        <div class="divider"></div>
-        ${project.opportunityOrigin ? `
-          <h3>Opportunity Origin</h3>
-          <p>${project.opportunityOrigin}</p>
-        ` : ''}
-        ${project.purpose ? `
-          <h3>Purpose</h3>
-          <p>${project.purpose}</p>
-        ` : ''}
-      </div>
-    `;
-  }
+  const totalHours = project.hours || 0;
+  const totalCosts = project.costs || 0;
   
-  // Key Decisions (Project level and Framing)
+  summarySection = `
+    <div class="page">
+      <h2>Project Summary</h2>
+      <div class="divider"></div>
+      <p><strong>Project Name:</strong> ${project.title}</p>
+      ${project.purpose ? `<p><strong>Project Purpose:</strong> ${project.purpose}</p>` : ''}
+      
+      ${loopSummaries}
+      
+      <h3>Total Exploration Costs and Hours</h3>
+      <table class="cost-table">
+        <tr>
+          <th>Metric</th>
+          <th>Total</th>
+        </tr>
+        <tr>
+          <td>Total Hours</td>
+          <td>${totalHours.toFixed(1)} hours</td>
+        </tr>
+        <tr>
+          <td>Total Costs</td>
+          <td>$${totalCosts.toFixed(2)}</td>
+        </tr>
+      </table>
+    </div>
+  `;
+  
+  // 3rd Page: Key Decisions (Project level and Framing, chronological)
   let decisionsSection = '';
   const allDecisions: {text: string, timestamp: string, type: string}[] = [];
   
@@ -329,50 +370,7 @@ const generateExecutiveOverview = (project: Project): string => {
     `;
   }
   
-  // Costs & Hours Summary
-  let costsSection = '';
-  const totalHours = project.hours || 0;
-  const totalCosts = project.costs || 0;
-  
-  if (totalHours > 0 || totalCosts > 0) {
-    costsSection = `
-      <div class="page">
-        <h2>Costs & Hours Summary</h2>
-        <div class="divider"></div>
-        <table class="cost-table">
-          <tr>
-            <th>Metric</th>
-            <th>Total</th>
-          </tr>
-          <tr>
-            <td>Total Hours</td>
-            <td>${totalHours.toFixed(1)} hours</td>
-          </tr>
-          <tr>
-            <td>Total Costs</td>
-            <td>$${totalCosts.toFixed(2)}</td>
-          </tr>
-        </table>
-      </div>
-    `;
-  }
-  
-  // Current Status
-  const statusSection = `
-    <div class="page">
-      <h2>Current Status</h2>
-      <div class="divider"></div>
-      <p><strong>Phase:</strong> ${project.phase}</p>
-      <p><strong>Last Updated:</strong> ${formatDate(project.updatedDate)}</p>
-      ${project.explorationLoops && project.explorationLoops.length > 0 ? `
-        <p><strong>Exploration Loops:</strong> ${project.explorationLoops.length} loop(s)</p>
-        <p><strong>Active Loops:</strong> ${project.explorationLoops.filter(l => l.status === 'active').length}</p>
-        <p><strong>Completed Loops:</strong> ${project.explorationLoops.filter(l => l.status === 'completed').length}</p>
-      ` : ''}
-    </div>
-  `;
-  
-  const content = coverPage + snapshotSection + purposeSection + decisionsSection + costsSection + statusSection;
+  const content = coverPage + summarySection + decisionsSection;
   return getBaseHTML(`${project.title} - Executive Overview`, content);
 };
 
@@ -380,30 +378,40 @@ const generateExecutiveOverview = (project: Project): string => {
 const generateDesignProcessReport = (project: Project): string => {
   const coverPage = generateCoverPage(project, 'Design Process Report');
   
-  // Key Artifacts (favorites only)
+  // 2nd Page: Key Artifacts (favorites only, max 3 per row in grid)
   let artifactsSection = '';
-  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite);
+  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite && a.type !== 'url');
   if (favoriteArtifacts.length > 0) {
     artifactsSection = `
       <div class="page">
         <h2>Key Artifacts</h2>
         <div class="divider"></div>
-        ${favoriteArtifacts.map(a => `
-          <div class="list-item">
-            <span class="favorite-marker">★</span> ${a.name || a.uri}
-            ${a.caption ? `<p class="meta">${a.caption}</p>` : ''}
-          </div>
-        `).join('')}
+        <div class="artifact-grid">
+          ${favoriteArtifacts.map(a => `
+            <div class="artifact-item">
+              <div class="artifact-thumbnail">
+                <span class="favorite-marker">★</span> ${a.name || 'Artifact'}
+              </div>
+              ${a.caption ? `<p class="meta">${a.caption}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
       </div>
     `;
   }
   
-  // Design Context (full framing)
+  // 3rd Page: Design Framing (All segments incl. First Exploration Questions and Framing decisions)
   let framingSection = '';
-  if (project.opportunityOrigin || project.purpose || (project.certaintyItems && project.certaintyItems.length > 0) || (project.designSpaceItems && project.designSpaceItems.length > 0)) {
+  const hasFramingContent = project.opportunityOrigin || project.purpose || 
+    (project.certaintyItems && project.certaintyItems.length > 0) || 
+    (project.designSpaceItems && project.designSpaceItems.length > 0) ||
+    (project.explorationQuestions && project.explorationQuestions.length > 0) ||
+    (project.framingDecisions && project.framingDecisions.length > 0);
+  
+  if (hasFramingContent) {
     framingSection = `
       <div class="page">
-        <h2>Design Context</h2>
+        <h2>Design Framing</h2>
         <div class="divider"></div>
         
         ${project.opportunityOrigin ? `
@@ -444,11 +452,30 @@ const generateDesignProcessReport = (project: Project): string => {
             <div class="list-item">${d.text}</div>
           `).join('')}
         ` : ''}
+        
+        ${project.explorationQuestions && project.explorationQuestions.length > 0 ? `
+          <h3>First Exploration Questions</h3>
+          ${project.explorationQuestions.map(q => `
+            <div class="list-item">
+              ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
+            </div>
+          `).join('')}
+        ` : ''}
+        
+        ${project.framingDecisions && project.framingDecisions.length > 0 ? `
+          <h3>Framing Decisions</h3>
+          ${project.framingDecisions.map(d => `
+            <div class="decision-box">
+              <p class="meta">${formatDate(d.timestamp)}</p>
+              <p>${d.summary}</p>
+            </div>
+          `).join('')}
+        ` : ''}
       </div>
     `;
   }
   
-  // Exploration Lanes (each loop grouped, detailed)
+  // Next Pages: Exploration Lanes (each loop grouped, Add Next exploration Questions, Add Star icon for favorites)
   let explorationSection = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     explorationSection = project.explorationLoops.map(loop => {
@@ -506,6 +533,15 @@ const generateDesignProcessReport = (project: Project): string => {
             `).join('')}
           ` : ''}
           
+          ${loop.nextExplorationQuestions && loop.nextExplorationQuestions.length > 0 ? `
+            <h3>Next Exploration Questions</h3>
+            ${loop.nextExplorationQuestions.map(q => `
+              <div class="list-item">
+                ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
+              </div>
+            `).join('')}
+          ` : ''}
+          
           ${loopArtifacts.length > 0 ? `
             <h3>Key Artifacts</h3>
             ${loopArtifacts.map(a => `
@@ -519,24 +555,7 @@ const generateDesignProcessReport = (project: Project): string => {
     }).join('');
   }
   
-  // Timeline Overview (condensed)
-  let timelineSection = '';
-  if (project.phaseHistory && project.phaseHistory.length > 0) {
-    timelineSection = `
-      <div class="page">
-        <h2>Timeline Overview</h2>
-        <div class="divider"></div>
-        ${project.phaseHistory.map(event => `
-          <div class="timeline-event">
-            <p class="meta">${formatDate(event.timestamp)}</p>
-            <p>Phase changed to <strong>${event.phase}</strong></p>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }
-  
-  const content = coverPage + artifactsSection + framingSection + explorationSection + timelineSection;
+  const content = coverPage + artifactsSection + framingSection + explorationSection;
   return getBaseHTML(`${project.title} - Design Process Report`, content);
 };
 
@@ -651,8 +670,19 @@ const generateCostsReport = (project: Project): string => {
   const totalHours = project.hours || 0;
   const totalCosts = project.costs || 0;
   
+  // Calculate per-loop totals
+  let loopTotals: {loopId: string, question: string, hours: number, costs: number}[] = [];
+  if (project.explorationLoops && project.explorationLoops.length > 0) {
+    loopTotals = project.explorationLoops.map(loop => ({
+      loopId: loop.id,
+      question: loop.question,
+      hours: loop.timeSpent || 0,
+      costs: loop.costs || 0
+    }));
+  }
+  
   // If no data, only show cover and overview
-  if (totalHours === 0 && totalCosts === 0) {
+  if (totalHours === 0 && totalCosts === 0 && loopTotals.every(l => l.hours === 0 && l.costs === 0)) {
     const content = coverPage + `
       <div class="page">
         <h2>Cost & Time Overview</h2>
@@ -663,11 +693,13 @@ const generateCostsReport = (project: Project): string => {
     return getBaseHTML(`${project.title} - Costs & Hours Report`, content);
   }
   
-  // Overview
+  // 2nd Page: Total Cost & Total Time Overview (Overall + Per Loop)
   const overviewSection = `
     <div class="page">
       <h2>Cost & Time Overview</h2>
       <div class="divider"></div>
+      
+      <h3>Overall Project Totals</h3>
       <table class="cost-table">
         <tr>
           <th>Metric</th>
@@ -682,10 +714,28 @@ const generateCostsReport = (project: Project): string => {
           <td>$${totalCosts.toFixed(2)}</td>
         </tr>
       </table>
+      
+      ${loopTotals.length > 0 ? `
+        <h3>Per Exploration Loop</h3>
+        <table class="cost-table">
+          <tr>
+            <th>Loop</th>
+            <th>Hours</th>
+            <th>Costs</th>
+          </tr>
+          ${loopTotals.map(loop => `
+            <tr>
+              <td>${loop.question}</td>
+              <td>${loop.hours.toFixed(1)} hours</td>
+              <td>$${loop.costs.toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </table>
+      ` : ''}
     </div>
   `;
   
-  // Breakdown by Exploration Loop
+  // Next Pages: Breakdown by Exploration Loop with individual entries
   let loopBreakdown = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     loopBreakdown = project.explorationLoops.map(loop => {
