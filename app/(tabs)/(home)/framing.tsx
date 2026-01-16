@@ -422,19 +422,25 @@ export default function FramingScreen() {
     
     // If marking as favorite, create a new Draft Exploration Loop
     if (!question.isFavorite) {
+      const currentDate = new Date().toISOString();
+      
       const newLoop: ExplorationLoop = {
         id: Date.now().toString(),
         question: question.text,
-        status: 'draft', // FIXED: Changed from 'paused' to 'draft'
-        updatedDate: new Date().toISOString(),
+        status: 'draft',
+        startDate: currentDate, // FIXED: Add startDate when creating new loop
+        updatedDate: currentDate,
         artifactIds: [],
         exploreItems: [],
         exploreArtifactIds: [],
         buildItems: [],
         buildArtifactIds: [],
         checkItems: [],
+        checkArtifactIds: [],
         adaptItems: [],
+        adaptArtifactIds: [],
         explorationDecisions: [],
+        decisionsArtifactIds: [],
         nextExplorationQuestions: [],
         timeSpent: 0,
         costs: 0,
@@ -452,6 +458,8 @@ export default function FramingScreen() {
         explorationQuestions: updatedQuestions,
         explorationLoops: updatedLoops,
       });
+      
+      console.log('Framing: Created new exploration loop with startDate:', currentDate);
       
       // Show alert to inform user
       Alert.alert(
