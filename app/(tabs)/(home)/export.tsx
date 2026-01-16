@@ -8,15 +8,15 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { getProjects, Project } from '@/utils/storage';
+import { exportProjectToPDF, ExportFormat } from '@/utils/pdfExport';
 import * as Sharing from 'expo-sharing';
-
-type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
 
 interface FormatOption {
   id: ExportFormat;
@@ -64,6 +64,7 @@ export default function ExportScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('executive');
+  const [isExporting, setIsExporting] = useState(false);
 
   const loadProject = useCallback(async () => {
     console.log('Export: Loading project', projectId);
@@ -93,18 +94,40 @@ export default function ExportScreen() {
       selectedFormat,
     });
 
-    // TODO: Backend Integration - Generate PDF based on selected format
-    // For now, show a placeholder alert
-    Alert.alert(
-      'Export PDF',
-      `Exporting "${project.title}" as ${EXPORT_FORMATS.find(f => f.id === selectedFormat)?.title}.\n\nPDF generation will be implemented in the next phase.`,
-      [{ text: 'OK' }]
-    );
+    setIsExporting(true);
 
-    // Future implementation will:
-    // 1. Generate PDF based on selectedFormat
-    // 2. Save to temporary location
-    // 3. Open iOS Share Sheet with Sharing.shareAsync()
+    try {
+      // Generate PDF
+      const filePath = await exportProjectToPDF(project, selectedFormat);
+      
+      console.log('Export: PDF generated, opening share sheet', filePath);
+      
+      // Share the PDF using iOS Share Sheet
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(filePath, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Export ${project.title}`,
+          UTI: 'com.adobe.pdf',
+        });
+        console.log('Export: Share sheet completed');
+      } else {
+        Alert.alert(
+          'Export Complete',
+          `PDF saved to: ${filePath}`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Export: Error exporting PDF', error);
+      Alert.alert(
+        'Export Failed',
+        'There was an error generating the PDF. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (!project) {
@@ -118,6 +141,7 @@ export default function ExportScreen() {
           }}
         />
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading project...</Text>
         </View>
       </View>
@@ -163,6 +187,7 @@ export default function ExportScreen() {
                   setSelectedFormat(format.id);
                 }}
                 activeOpacity={0.7}
+                disabled={isExporting}
               >
                 <View style={styles.formatRadio}>
                   {selectedFormat === format.id ? (
@@ -198,17 +223,27 @@ export default function ExportScreen() {
         {/* Export Button */}
         <View style={styles.actionSection}>
           <TouchableOpacity
-            style={styles.exportButton}
+            style={[styles.exportButton, isExporting && styles.exportButtonDisabled]}
             onPress={handleExportPDF}
             activeOpacity={0.8}
+            disabled={isExporting}
           >
-            <IconSymbol
-              ios_icon_name="arrow.down.doc"
-              android_material_icon_name="download"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.exportButtonText}>Export PDF</Text>
+            {isExporting ? (
+              <>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.exportButtonText}>Generating PDF...</Text>
+              </>
+            ) : (
+              <>
+                <IconSymbol
+                  ios_icon_name="arrow.down.doc"
+                  android_material_icon_name="download"
+                  size={20}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.exportButtonText}>Export PDF</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -233,6 +268,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 16,
   },
   loadingText: {
     fontSize: 16,
@@ -333,6 +369,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingVertical: 18,
     gap: 8,
+  },
+  exportButtonDisabled: {
+    opacity: 0.6,
   },
   exportButtonText: {
     fontSize: 16,
