@@ -140,6 +140,17 @@ export default function HomeLayout() {
             headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
+        <Stack.Screen
+          name="export"
+          options={{
+            headerShown: true,
+            title: 'Export',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
+          }}
+        />
       </Stack>
       
       {isInProject && projectId && (
