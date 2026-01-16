@@ -20,6 +20,7 @@ import {
   ExplorationLoop,
   FramingDecision,
   ExplorationDecision,
+  ExplorationQuestion,
 } from '@/utils/storage';
 
 interface TimelineEvent {
@@ -38,6 +39,7 @@ export default function TimelineScreen() {
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
 
   const loadProject = useCallback(async () => {
+    console.log('Timeline: Loading project', projectId);
     const projects = await getProjects();
     const found = projects.find(p => p.id === projectId);
     if (found) {
@@ -57,6 +59,7 @@ export default function TimelineScreen() {
   );
 
   const generateTimeline = (proj: Project) => {
+    console.log('Timeline: Generating timeline for project', proj.title);
     const events: TimelineEvent[] = [];
 
     // 1. Project created event
@@ -70,7 +73,6 @@ export default function TimelineScreen() {
     });
 
     // 2. Phase changes (we don't have history, so we only show current phase if it's not Framing)
-    // In a real app, you'd track phase change history
     if (proj.phase !== 'Framing') {
       events.push({
         id: `phase_change_${proj.id}_${proj.phase}`,
@@ -84,13 +86,17 @@ export default function TimelineScreen() {
 
     // 3. Framing event (if framing data exists)
     if (proj.opportunityOrigin || proj.purpose || (proj.framingDecisions && proj.framingDecisions.length > 0)) {
+      // Get favorite exploration questions (First Explorations)
+      const favoriteQuestions = (proj.explorationQuestions || []).filter(q => q.isFavorite);
+      
       events.push({
         id: `framing_${proj.id}`,
         type: 'framing',
-        timestamp: proj.startDate, // Framing typically happens at the start
+        timestamp: proj.startDate,
         data: {
           purpose: proj.purpose,
           framingDecisions: proj.framingDecisions || [],
+          firstExplorations: favoriteQuestions,
           artifacts: proj.artifacts.filter(a => a.caption === 'favorite'),
         },
       });
@@ -99,16 +105,19 @@ export default function TimelineScreen() {
     // 4. Exploration loops
     if (proj.explorationLoops && proj.explorationLoops.length > 0) {
       proj.explorationLoops.forEach((loop) => {
+        // Get favorite next exploration questions
+        const favoriteNextQuestions = (loop.nextExplorationQuestions || []).filter(q => q.isFavorite);
+        
         events.push({
           id: `exploration_loop_${loop.id}`,
           type: 'exploration_loop',
-          timestamp: loop.updatedDate,
+          timestamp: loop.startDate, // Use startDate instead of updatedDate
           data: {
             loopId: loop.id,
             question: loop.question,
             status: loop.status,
-            buildItems: loop.buildItems || [],
             explorationDecisions: loop.explorationDecisions || [],
+            nextExplorations: favoriteNextQuestions,
             artifacts: proj.artifacts.filter(a => 
               loop.exploreArtifactIds?.includes(a.id) || 
               loop.buildArtifactIds?.includes(a.id)
@@ -135,42 +144,33 @@ export default function TimelineScreen() {
     // Sort chronologically (oldest first)
     events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
+    console.log('Timeline: Generated', events.length, 'events');
     setTimelineEvents(events);
   };
 
   const handleDeleteEvent = async (eventId: string, eventType: string) => {
     if (!project) return;
 
+    // Only allow deletion of phase_change events
+    if (eventType !== 'phase_change') {
+      console.log('Timeline: Attempted to delete non-phase-change event', eventType);
+      return;
+    }
+
+    console.log('Timeline: User tapped delete phase change event');
     Alert.alert(
-      'Delete Timeline Event',
-      'Are you sure you want to delete this event?',
+      'Delete Phase Change',
+      'Are you sure you want to delete this phase change event?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            console.log('Timeline: Deleting phase change event', eventId);
+            // For phase changes, we would need to track history to properly delete
+            // For now, we'll just reload the timeline
             let updatedProject = { ...project };
-
-            // Handle deletion based on event type
-            if (eventType === 'exploration_loop') {
-              const loopId = eventId.replace('exploration_loop_', '');
-              updatedProject.explorationLoops = (project.explorationLoops || []).filter(
-                loop => loop.id !== loopId
-              );
-            } else if (eventType === 'decision') {
-              const decisionId = eventId.replace('decision_', '');
-              const decisions = ((project as any).decisions || []).filter(
-                (d: any) => d.id !== decisionId
-              );
-              (updatedProject as any).decisions = decisions;
-            } else if (eventType === 'framing') {
-              // Clear framing data
-              updatedProject.opportunityOrigin = '';
-              updatedProject.purpose = '';
-              updatedProject.framingDecisions = [];
-            }
-
             updatedProject.updatedDate = new Date().toISOString();
             await updateProject(updatedProject);
             setProject(updatedProject);
@@ -182,6 +182,7 @@ export default function TimelineScreen() {
   };
 
   const handleEventTap = (event: TimelineEvent) => {
+    console.log('Timeline: User tapped event', event.type);
     if (event.type === 'framing') {
       router.push(`/(tabs)/(home)/framing?id=${projectId}`);
     } else if (event.type === 'exploration_loop') {
@@ -221,10 +222,26 @@ export default function TimelineScreen() {
             </View>
             <View style={styles.eventContent}>
               <View style={styles.eventHeader}>
-                <Text style={styles.eventType}>Phase Change</Text>
-                <Text style={styles.eventDate}>
-                  {new Date(event.timestamp).toLocaleDateString()}
-                </Text>
+                <Text style={styles.eventType}>Project Phase Change</Text>
+                <View style={styles.eventActions}>
+                  <Text style={styles.eventDate}>
+                    {new Date(event.timestamp).toLocaleDateString()}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDeleteEvent(event.id, event.type);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <IconSymbol 
+                      ios_icon_name="trash" 
+                      android_material_icon_name="delete" 
+                      size={18} 
+                      color={colors.textSecondary} 
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={styles.eventDescription}>
                 Phase changed to {event.data.phase}
@@ -249,30 +266,13 @@ export default function TimelineScreen() {
                 <Text style={[styles.eventType, { color: colors.phaseFraming }]}>
                   Framing
                 </Text>
-                <View style={styles.eventActions}>
-                  <Text style={styles.eventDate}>
-                    {new Date(event.timestamp).toLocaleDateString()}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDeleteEvent(event.id, event.type);
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <IconSymbol 
-                      ios_icon_name="trash" 
-                      android_material_icon_name="delete" 
-                      size={18} 
-                      color={colors.textSecondary} 
-                    />
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.eventDate}>
+                  {new Date(event.timestamp).toLocaleDateString()}
+                </Text>
               </View>
 
               {event.data.purpose && (
                 <View style={styles.cardSection}>
-                  <Text style={styles.cardSectionTitle}>Purpose</Text>
                   <Text style={styles.cardSectionText} numberOfLines={3}>
                     {event.data.purpose}
                   </Text>
@@ -311,13 +311,24 @@ export default function TimelineScreen() {
 
               {event.data.framingDecisions && event.data.framingDecisions.length > 0 && (
                 <View style={styles.cardSection}>
-                  <Text style={styles.cardSectionTitle}>Decisions</Text>
+                  <Text style={styles.cardSectionTitle}>DECISIONS</Text>
                   {event.data.framingDecisions.map((decision: FramingDecision) => (
                     <View key={decision.id} style={styles.decisionItem}>
                       <Text style={styles.decisionText}>{decision.summary}</Text>
                       <Text style={styles.decisionDate}>
                         {new Date(decision.timestamp).toLocaleDateString()}
                       </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {event.data.firstExplorations && event.data.firstExplorations.length > 0 && (
+                <View style={styles.cardSection}>
+                  <Text style={styles.cardSectionTitle}>FIRST EXPLORATIONS</Text>
+                  {event.data.firstExplorations.map((question: ExplorationQuestion) => (
+                    <View key={question.id} style={styles.decisionItem}>
+                      <Text style={styles.decisionText}>{question.text}</Text>
                     </View>
                   ))}
                 </View>
@@ -342,47 +353,19 @@ export default function TimelineScreen() {
                 <Text style={[styles.eventType, { color: colors.phaseExploration }]}>
                   Exploration Loop
                 </Text>
-                <View style={styles.eventActions}>
-                  <Text style={styles.eventDate}>
-                    {new Date(event.timestamp).toLocaleDateString()}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDeleteEvent(event.id, event.type);
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <IconSymbol 
-                      ios_icon_name="trash" 
-                      android_material_icon_name="delete" 
-                      size={18} 
-                      color={colors.textSecondary} 
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.cardSection}>
-                <Text style={styles.cardSectionTitle}>Status</Text>
-                <Text style={styles.cardSectionText}>
-                  {event.data.status.charAt(0).toUpperCase() + event.data.status.slice(1)}
+                <Text style={styles.eventDate}>
+                  {new Date(event.timestamp).toLocaleDateString()}
                 </Text>
               </View>
 
               {event.data.question && (
                 <View style={styles.cardSection}>
-                  <Text style={styles.cardSectionTitle}>Exploration Question</Text>
-                  <Text style={styles.cardSectionText}>{event.data.question}</Text>
-                </View>
-              )}
-
-              {event.data.buildItems && event.data.buildItems.length > 0 && (
-                <View style={styles.cardSection}>
-                  <Text style={styles.cardSectionTitle}>Build</Text>
-                  <Text style={styles.cardSectionText} numberOfLines={2}>
-                    {event.data.buildItems.map((item: any) => item.text).join(', ')}
-                  </Text>
+                  <View style={styles.questionRow}>
+                    <Text style={styles.cardSectionText}>{event.data.question}</Text>
+                    <Text style={styles.statusBadge}>
+                      {event.data.status.charAt(0).toUpperCase() + event.data.status.slice(1)}
+                    </Text>
+                  </View>
                 </View>
               )}
 
@@ -418,13 +401,24 @@ export default function TimelineScreen() {
 
               {event.data.explorationDecisions && event.data.explorationDecisions.length > 0 && (
                 <View style={styles.cardSection}>
-                  <Text style={styles.cardSectionTitle}>Decisions</Text>
+                  <Text style={styles.cardSectionTitle}>DECISIONS</Text>
                   {event.data.explorationDecisions.map((decision: ExplorationDecision) => (
                     <View key={decision.id} style={styles.decisionItem}>
                       <Text style={styles.decisionText}>{decision.summary}</Text>
                       <Text style={styles.decisionDate}>
                         {new Date(decision.timestamp).toLocaleDateString()}
                       </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {event.data.nextExplorations && event.data.nextExplorations.length > 0 && (
+                <View style={styles.cardSection}>
+                  <Text style={styles.cardSectionTitle}>NEXT EXPLORATIONS</Text>
+                  {event.data.nextExplorations.map((question: ExplorationQuestion) => (
+                    <View key={question.id} style={styles.decisionItem}>
+                      <Text style={styles.decisionText}>{question.text}</Text>
                     </View>
                   ))}
                 </View>
@@ -445,25 +439,9 @@ export default function TimelineScreen() {
                 <Text style={[styles.eventType, styles.eventTypeDecision]}>
                   Project Decision
                 </Text>
-                <View style={styles.eventActions}>
-                  <Text style={styles.eventDate}>
-                    {new Date(event.timestamp).toLocaleDateString()}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDeleteEvent(event.id, event.type);
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <IconSymbol 
-                      ios_icon_name="trash" 
-                      android_material_icon_name="delete" 
-                      size={18} 
-                      color={colors.textSecondary} 
-                    />
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.eventDate}>
+                  {new Date(event.timestamp).toLocaleDateString()}
+                </Text>
               </View>
               <Text style={styles.eventDescription}>{event.data.summary}</Text>
             </View>
@@ -611,12 +589,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   cardSectionText: {
     fontSize: 14,
     color: colors.text,
     lineHeight: 20,
+    flex: 1,
+  },
+  questionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  statusBadge: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.background,
+    borderRadius: 4,
   },
   cardArtifactStrip: {
     flexDirection: 'row',
@@ -640,15 +633,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   decisionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginTop: 8,
     paddingLeft: 12,
     borderLeftWidth: 2,
     borderLeftColor: colors.divider,
+    gap: 12,
   },
   decisionText: {
     fontSize: 14,
     color: colors.text,
-    marginBottom: 2,
+    flex: 1,
   },
   decisionDate: {
     fontSize: 12,
