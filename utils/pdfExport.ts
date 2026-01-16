@@ -1,7 +1,7 @@
 
-import RNHTMLtoPDF from 'react-native-html-to-pdf';
-import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent } from './storage';
+import * as Print from 'expo-print';
 import { colors } from '@/styles/commonStyles';
+import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent } from './storage';
 
 export type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
 
@@ -270,7 +270,7 @@ const generateExecutiveOverview = (project: Project): string => {
   
   // Purpose & Intent
   let purposeSection = '';
-  if (project.purpose || project.opportunityOrigin) {
+  if (project.opportunityOrigin || project.purpose) {
     purposeSection = `
       <div class="page">
         <h2>Purpose & Intent</h2>
@@ -728,7 +728,7 @@ const generateCostsReport = (project: Project): string => {
   return getBaseHTML(`${project.title} - Costs & Hours Report`, content);
 };
 
-// Main export function
+// Main export function using expo-print
 export const exportProjectToPDF = async (
   project: Project,
   format: ExportFormat
@@ -763,15 +763,12 @@ export const exportProjectToPDF = async (
   fileName = fileName.replace(/[^a-z0-9_\-]/gi, '_');
   
   try {
-    const options = {
+    const { uri } = await Print.printToFileAsync({
       html: htmlContent,
-      fileName: fileName,
-      directory: 'Documents',
-    };
+    });
     
-    const file = await RNHTMLtoPDF.convert(options);
-    console.log('PDF Export: PDF generated successfully', file.filePath);
-    return file.filePath;
+    console.log('PDF Export: PDF generated successfully', uri);
+    return uri;
   } catch (error) {
     console.error('PDF Export: Error generating PDF', error);
     throw error;
