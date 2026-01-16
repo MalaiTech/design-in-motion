@@ -123,13 +123,13 @@ export default function ProjectOverviewScreen() {
 
   const { totalCosts, totalHours } = calculateTotals();
 
-  // UPDATED: Handle opening artifacts (URLs, PDFs, images)
+  // Handle opening artifacts (URLs, PDFs, images)
   const handleOpenArtifact = async (artifact: Artifact) => {
     console.log('Project Overview: Attempting to open artifact', artifact.type, artifact.uri);
     
     try {
       if (artifact.type === 'url') {
-        // FIXED: For web URLs, use Linking.openURL to open in browser (same as Framing)
+        // For web URLs, use Linking.openURL to open in browser
         let url = artifact.uri.trim();
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
           url = 'https://' + url;
@@ -246,6 +246,48 @@ export default function ProjectOverviewScreen() {
     );
   };
 
+  // FIXED: Get artifacts to display in Project Overview
+  // Only show: 1) Initial artifact from project creation, 2) Favorite artifacts from Framing
+  const getDisplayArtifacts = (): Artifact[] => {
+    if (!project || !project.artifacts || project.artifacts.length === 0) {
+      console.log('Project Overview: No artifacts in project');
+      return [];
+    }
+
+    const displayArtifacts: Artifact[] = [];
+    const framingArtifactIds = project.framingArtifactIds || [];
+    
+    console.log('Project Overview: Total artifacts:', project.artifacts.length);
+    console.log('Project Overview: Framing artifact IDs:', framingArtifactIds.length);
+    
+    // 1. Add the initial artifact (first artifact added during project creation)
+    // The initial artifact is the first one that is NOT in framingArtifactIds
+    const initialArtifact = project.artifacts.find(artifact => !framingArtifactIds.includes(artifact.id));
+    if (initialArtifact) {
+      displayArtifacts.push(initialArtifact);
+      console.log('Project Overview: Found initial artifact:', initialArtifact.id);
+    }
+    
+    // 2. Add ONLY favorite artifacts from Framing
+    const framingFavoriteArtifacts = project.artifacts.filter(artifact => 
+      framingArtifactIds.includes(artifact.id) && artifact.isFavorite === true
+    );
+    
+    console.log('Project Overview: Framing favorite artifacts:', framingFavoriteArtifacts.length);
+    
+    // Add framing favorites (avoid duplicates if initial artifact is also a framing favorite)
+    framingFavoriteArtifacts.forEach(artifact => {
+      if (!displayArtifacts.find(a => a.id === artifact.id)) {
+        displayArtifacts.push(artifact);
+      }
+    });
+    
+    console.log('Project Overview: Displaying', displayArtifacts.length, 'artifacts total');
+    console.log('Project Overview: Artifact breakdown - Initial:', initialArtifact ? 1 : 0, ', Framing favorites:', framingFavoriteArtifacts.length);
+    
+    return displayArtifacts;
+  };
+
   if (!project) {
     return (
       <View style={styles.container}>
@@ -258,9 +300,8 @@ export default function ProjectOverviewScreen() {
 
   const phases: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
   
-  // Filter artifacts: show favorites if any exist, otherwise show all
-  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite);
-  const displayArtifacts = favoriteArtifacts.length > 0 ? favoriteArtifacts : project.artifacts;
+  // Get artifacts to display (initial + framing favorites only)
+  const displayArtifacts = getDisplayArtifacts();
 
   // Determine background color based on color scheme
   const isDark = colorScheme === 'dark';
@@ -319,9 +360,10 @@ export default function ProjectOverviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* UPDATED: Visuals (Artifacts) - Read-only, no add/delete/favorite options */}
+          {/* FIXED: Visuals (Artifacts) - Only initial artifact + framing favorites */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Visuals</Text>
+            <Text style={styles.helperText}>Initial project visual and favorite visuals from Framing</Text>
             
             {displayArtifacts.length > 0 ? (
               <View style={styles.artifactGrid}>
@@ -359,7 +401,8 @@ export default function ProjectOverviewScreen() {
               </View>
             ) : (
               <View style={styles.emptyVisuals}>
-                <Text style={styles.emptyVisualsText}>No visuals added yet</Text>
+                <Text style={styles.emptyVisualsText}>No visuals to display</Text>
+                <Text style={styles.emptyVisualsSubtext}>Add visuals in Framing and mark them as favorites</Text>
               </View>
             )}
           </View>
@@ -466,7 +509,7 @@ export default function ProjectOverviewScreen() {
             </View>
           </View>
 
-          {/* UPDATED: Project Decisions & Changes - with helper text */}
+          {/* Project Decisions & Changes - with helper text */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View>
@@ -823,6 +866,12 @@ const styles = StyleSheet.create({
   emptyVisualsText: {
     fontSize: 14,
     color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  emptyVisualsSubtext: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   toolsList: {
     backgroundColor: '#FFFFFF',
