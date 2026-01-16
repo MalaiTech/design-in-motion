@@ -26,6 +26,7 @@ import {
   ProjectPhase,
   Artifact,
   Decision,
+  PhaseChangeEvent,
 } from '@/utils/storage';
 import * as Sharing from 'expo-sharing';
 
@@ -84,11 +85,23 @@ export default function ProjectOverviewScreen() {
   const handlePhaseChange = async (newPhase: ProjectPhase) => {
     if (!project) return;
     
-    console.log('Project Overview: Changing phase to', newPhase);
+    console.log('Project Overview: Changing phase from', project.phase, 'to', newPhase);
+    
+    // Initialize phase history if it doesn't exist
+    const phaseHistory = project.phaseHistory || [];
+    
+    // Add new phase change event to history
+    const newPhaseEvent: PhaseChangeEvent = {
+      id: `phase_${Date.now()}`,
+      phase: newPhase,
+      timestamp: new Date().toISOString(),
+    };
+    
     const updatedProject = {
       ...project,
       phase: newPhase,
       updatedDate: new Date().toISOString(),
+      phaseHistory: [...phaseHistory, newPhaseEvent],
     };
     
     await updateProject(updatedProject);

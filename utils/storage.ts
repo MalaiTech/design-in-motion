@@ -76,6 +76,12 @@ export interface ExplorationDecision {
   artifactIds?: string[];
 }
 
+export interface PhaseChangeEvent {
+  id: string;
+  phase: ProjectPhase;
+  timestamp: string;
+}
+
 export interface ExplorationLoop {
   id: string;
   question: string;
@@ -125,6 +131,9 @@ export interface Project {
   startDate: string;
   artifacts: Artifact[];
   decisions?: Decision[];
+  
+  // Phase history tracking
+  phaseHistory?: PhaseChangeEvent[];
   
   // Framing fields
   opportunityOrigin?: string;

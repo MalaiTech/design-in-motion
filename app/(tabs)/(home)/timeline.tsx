@@ -21,6 +21,7 @@ import {
   FramingDecision,
   ExplorationDecision,
   ExplorationQuestion,
+  PhaseChangeEvent,
 } from '@/utils/storage';
 
 interface TimelineEvent {
@@ -72,15 +73,17 @@ export default function TimelineScreen() {
       },
     });
 
-    // 2. Phase changes (we don't have history, so we only show current phase if it's not Framing)
-    if (proj.phase !== 'Framing') {
-      events.push({
-        id: `phase_change_${proj.id}_${proj.phase}`,
-        type: 'phase_change',
-        timestamp: proj.updatedDate,
-        data: {
-          phase: proj.phase,
-        },
+    // 2. Phase changes from history (each phase change is a separate event)
+    if (proj.phaseHistory && proj.phaseHistory.length > 0) {
+      proj.phaseHistory.forEach((phaseEvent: PhaseChangeEvent) => {
+        events.push({
+          id: phaseEvent.id,
+          type: 'phase_change',
+          timestamp: phaseEvent.timestamp,
+          data: {
+            phase: phaseEvent.phase,
+          },
+        });
       });
     }
 
@@ -157,7 +160,7 @@ export default function TimelineScreen() {
       return;
     }
 
-    console.log('Timeline: User tapped delete phase change event');
+    console.log('Timeline: User tapped delete phase change event', eventId);
     Alert.alert(
       'Delete Phase Change',
       'Are you sure you want to delete this phase change event?',
@@ -168,10 +171,18 @@ export default function TimelineScreen() {
           style: 'destructive',
           onPress: async () => {
             console.log('Timeline: Deleting phase change event', eventId);
-            // For phase changes, we would need to track history to properly delete
-            // For now, we'll just reload the timeline
-            let updatedProject = { ...project };
-            updatedProject.updatedDate = new Date().toISOString();
+            
+            // Remove the phase change event from history
+            const updatedPhaseHistory = (project.phaseHistory || []).filter(
+              (phaseEvent: PhaseChangeEvent) => phaseEvent.id !== eventId
+            );
+            
+            const updatedProject = {
+              ...project,
+              phaseHistory: updatedPhaseHistory,
+              updatedDate: new Date().toISOString(),
+            };
+            
             await updateProject(updatedProject);
             setProject(updatedProject);
             generateTimeline(updatedProject);
