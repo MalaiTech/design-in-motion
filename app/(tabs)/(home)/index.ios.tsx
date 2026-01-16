@@ -26,7 +26,7 @@ export default function HomeScreen() {
 
   const loadProjects = useCallback(async () => {
     const data = await getProjects();
-    console.log('Loaded projects:', data.length);
+    console.log('Home Screen (iOS): Loaded projects:', data.length);
     setProjects(data);
   }, []);
 
@@ -83,27 +83,46 @@ export default function HomeScreen() {
     return sorted;
   };
 
+  // FIXED: Get artifacts to display - matches project-overview.tsx logic
+  // Logic: Show ONLY initial artifact if no framing favorites exist
+  //        Show ONLY framing favorites if they exist (hide initial artifact)
   const getDisplayArtifacts = (project: Project) => {
     if (!project.artifacts || project.artifacts.length === 0) {
+      console.log('Home Screen (iOS): No artifacts in project', project.title);
       return [];
     }
 
-    // Get favorite artifacts (excluding URLs)
-    // Check both isFavorite property and caption === 'favorite' for backwards compatibility
-    const favorites = project.artifacts.filter(
-      artifact => (artifact.isFavorite || artifact.caption === 'favorite') && artifact.type !== 'url'
+    const framingArtifactIds = project.framingArtifactIds || [];
+    
+    console.log('Home Screen (iOS): Project', project.title, '- Total artifacts:', project.artifacts.length, 'Framing IDs:', framingArtifactIds.length);
+    
+    // 1. Check if there are any favorite artifacts from Framing (excluding URLs for display)
+    const framingFavoriteArtifacts = project.artifacts.filter(artifact => 
+      framingArtifactIds.includes(artifact.id) && 
+      artifact.isFavorite === true &&
+      artifact.type !== 'url'
     );
-
-    // If there are favorites, show only those
-    if (favorites.length > 0) {
-      console.log('Showing', favorites.length, 'favorite artifacts for project:', project.title);
-      return favorites;
+    
+    console.log('Home Screen (iOS): Framing favorite artifacts (non-URL):', framingFavoriteArtifacts.length);
+    
+    // 2. If there are framing favorites, show ONLY those (hide initial artifact)
+    if (framingFavoriteArtifacts.length > 0) {
+      console.log('Home Screen (iOS): Displaying ONLY', framingFavoriteArtifacts.length, 'framing favorite artifacts');
+      return framingFavoriteArtifacts;
     }
-
-    // Otherwise, show all artifacts except URLs
-    const allNonUrl = project.artifacts.filter(artifact => artifact.type !== 'url');
-    console.log('Showing', allNonUrl.length, 'non-URL artifacts for project:', project.title);
-    return allNonUrl;
+    
+    // 3. Otherwise, show ONLY the initial artifact (first artifact NOT in framingArtifactIds, excluding URLs)
+    const initialArtifact = project.artifacts.find(
+      artifact => !framingArtifactIds.includes(artifact.id) && artifact.type !== 'url'
+    );
+    
+    if (initialArtifact) {
+      console.log('Home Screen (iOS): Displaying ONLY initial artifact:', initialArtifact.id);
+      return [initialArtifact];
+    }
+    
+    console.log('Home Screen (iOS): No artifacts to display');
+    return [];
   };
 
   const handleFilterApply = (statuses: ProjectPhase[], sort: SortOption, direction: SortDirection) => {
@@ -119,6 +138,7 @@ export default function HomeScreen() {
 
   const handleEditProject = (projectId: string, event: any) => {
     event.stopPropagation();
+    console.log('Home Screen (iOS): Navigating to edit project', projectId);
     router.push(`/(tabs)/(home)/edit-project?id=${projectId}`);
   };
 
@@ -143,7 +163,10 @@ export default function HomeScreen() {
           <Text style={styles.emptySubtext}>Start a project to begin exploring.</Text>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={() => router.push('/(tabs)/(home)/create-project')}
+            onPress={() => {
+              console.log('Home Screen (iOS): Navigating to create project');
+              router.push('/(tabs)/(home)/create-project');
+            }}
           >
             <Text style={styles.primaryButtonText}>Start Project</Text>
           </TouchableOpacity>
@@ -166,7 +189,10 @@ export default function HomeScreen() {
         </View>
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => setFilterModalVisible(true)}
+          onPress={() => {
+            console.log('Home Screen (iOS): Opening filter modal');
+            setFilterModalVisible(true);
+          }}
         >
           <IconSymbol
             ios_icon_name="line.3.horizontal.decrease.circle"
@@ -185,7 +211,10 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={project.id}
               style={[styles.projectCard, { backgroundColor: getPhaseSurface(project.phase) }]}
-              onPress={() => router.push(`/(tabs)/(home)/project-overview?id=${project.id}`)}
+              onPress={() => {
+                console.log('Home Screen (iOS): Opening project overview for', project.title);
+                router.push(`/(tabs)/(home)/project-overview?id=${project.id}`);
+              }}
             >
               <View style={styles.projectHeader}>
                 <Text style={styles.projectTitle}>{project.title}</Text>
@@ -247,7 +276,10 @@ export default function HomeScreen() {
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => router.push('/(tabs)/(home)/create-project')}
+        onPress={() => {
+          console.log('Home Screen (iOS): Navigating to create project (FAB)');
+          router.push('/(tabs)/(home)/create-project');
+        }}
       >
         <IconSymbol ios_icon_name="plus" android_material_icon_name="add" color="#FFFFFF" size={24} />
       </TouchableOpacity>
