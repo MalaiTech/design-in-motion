@@ -1,9 +1,39 @@
 
 import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system/legacy';
 import { colors } from '@/styles/commonStyles';
 import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent, TimeEntry, CostEntry, calculateProjectTotals } from './storage';
 
 export type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
+
+// Helper to convert local image URI to base64 data URI
+const convertImageToBase64 = async (uri: string): Promise<string | null> => {
+  try {
+    console.log('PDF Export: Converting image to base64:', uri);
+    
+    // Read the file as base64
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    // Determine MIME type from file extension
+    let mimeType = 'image/jpeg';
+    if (uri.toLowerCase().endsWith('.png')) {
+      mimeType = 'image/png';
+    } else if (uri.toLowerCase().endsWith('.gif')) {
+      mimeType = 'image/gif';
+    } else if (uri.toLowerCase().endsWith('.webp')) {
+      mimeType = 'image/webp';
+    }
+    
+    const dataUri = `data:${mimeType};base64,${base64}`;
+    console.log('PDF Export: Successfully converted image to base64 data URI');
+    return dataUri;
+  } catch (error) {
+    console.error('PDF Export: Error converting image to base64:', error);
+    return null;
+  }
+};
 
 // Helper to format dates
 const formatDate = (dateString: string): string => {
@@ -254,6 +284,14 @@ const getBaseHTML = (title: string, content: string): string => {
       text-align: center;
     }
     
+    .artifact-image {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      background: #F5F5F5;
+      display: block;
+    }
+    
     .artifact-thumbnail {
       width: 100%;
       height: 120px;
@@ -412,29 +450,46 @@ const generateExecutiveOverview = (project: Project): string => {
 };
 
 // Generate Design Process Report
-const generateDesignProcessReport = (project: Project): string => {
+const generateDesignProcessReport = async (project: Project): Promise<string> => {
+  console.log('PDF Export: Generating Design Process Report');
   const coverPage = generateCoverPage(project, 'Design Process Report');
   
-  // 2nd Page: Key Artifacts (favorites only, max 3 per row in grid)
+  // 2nd Page: Key Artifacts (favorites only, images in 3-column grid)
   let artifactsSection = '';
-  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite && a.type !== 'url');
+  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite && a.type === 'image');
+  
+  console.log('PDF Export: Found', favoriteArtifacts.length, 'favorite image artifacts');
+  
   if (favoriteArtifacts.length > 0) {
-    artifactsSection = `
-      <div class="page">
-        <h2>Key Artifacts</h2>
-        <div class="divider"></div>
-        <div class="artifact-grid">
-          ${favoriteArtifacts.map(a => `
-            <div class="artifact-item">
-              <div class="artifact-thumbnail">
-                <span class="favorite-marker">★</span> ${a.name || 'Artifact'}
+    // Convert all images to base64 in parallel
+    const artifactPromises = favoriteArtifacts.map(async (artifact) => {
+      const base64Uri = await convertImageToBase64(artifact.uri);
+      return { artifact, base64Uri };
+    });
+    
+    const artifactResults = await Promise.all(artifactPromises);
+    
+    // Filter out failed conversions
+    const validArtifacts = artifactResults.filter(result => result.base64Uri !== null);
+    
+    console.log('PDF Export: Successfully converted', validArtifacts.length, 'images to base64');
+    
+    if (validArtifacts.length > 0) {
+      artifactsSection = `
+        <div class="page">
+          <h2>Key Artifacts</h2>
+          <div class="divider"></div>
+          <div class="artifact-grid">
+            ${validArtifacts.map(({ artifact, base64Uri }) => `
+              <div class="artifact-item">
+                <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
+                ${artifact.caption ? `<p class="meta">${artifact.caption}</p>` : ''}
               </div>
-              ${a.caption ? `<p class="meta">${a.caption}</p>` : ''}
-            </div>
-          `).join('')}
+            `).join('')}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
   }
   
   // 3rd Page: Design Framing (All segments incl. First Exploration Questions and Framing decisions)
@@ -515,81 +570,103 @@ const generateDesignProcessReport = (project: Project): string => {
   // Next Pages: Exploration Lanes (each loop grouped, Add Next exploration Questions, Add Star icon for favorites)
   let explorationSection = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
-    explorationSection = project.explorationLoops.map(loop => {
-      const loopArtifacts = project.artifacts.filter(a => loop.artifactIds.includes(a.id) && a.isFavorite);
-      
-      return `
-        <div class="page">
-          <h2>Exploration Loop: ${loop.question}</h2>
-          <div class="divider"></div>
-          <p class="meta">Status: ${loop.status} • Started: ${formatDate(loop.startDate)}</p>
+    const loopSections = await Promise.all(
+      project.explorationLoops.map(async (loop) => {
+        const loopArtifacts = project.artifacts.filter(a => loop.artifactIds.includes(a.id) && a.isFavorite && a.type === 'image');
+        
+        // Convert loop artifacts to base64
+        let loopArtifactsHTML = '';
+        if (loopArtifacts.length > 0) {
+          const loopArtifactPromises = loopArtifacts.map(async (artifact) => {
+            const base64Uri = await convertImageToBase64(artifact.uri);
+            return { artifact, base64Uri };
+          });
           
-          ${loop.exploreItems && loop.exploreItems.length > 0 ? `
-            <h3>Explore</h3>
-            ${loop.exploreItems.map(item => `
-              <div class="list-item">
-                ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-              </div>
-            `).join('')}
-          ` : ''}
+          const loopArtifactResults = await Promise.all(loopArtifactPromises);
+          const validLoopArtifacts = loopArtifactResults.filter(result => result.base64Uri !== null);
           
-          ${loop.buildItems && loop.buildItems.length > 0 ? `
-            <h3>Build</h3>
-            ${loop.buildItems.map(item => `
-              <div class="list-item">
-                ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+          if (validLoopArtifacts.length > 0) {
+            loopArtifactsHTML = `
+              <h3>Key Artifacts</h3>
+              <div class="artifact-grid">
+                ${validLoopArtifacts.map(({ artifact, base64Uri }) => `
+                  <div class="artifact-item">
+                    <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
+                  </div>
+                `).join('')}
               </div>
-            `).join('')}
-          ` : ''}
-          
-          ${loop.checkItems && loop.checkItems.length > 0 ? `
-            <h3>Check</h3>
-            ${loop.checkItems.map(item => `
-              <div class="list-item">
-                ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-              </div>
-            `).join('')}
-          ` : ''}
-          
-          ${loop.adaptItems && loop.adaptItems.length > 0 ? `
-            <h3>Adapt</h3>
-            ${loop.adaptItems.map(item => `
-              <div class="list-item">
-                ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-              </div>
-            `).join('')}
-          ` : ''}
-          
-          ${loop.explorationDecisions && loop.explorationDecisions.length > 0 ? `
-            <h3>Decisions</h3>
-            ${loop.explorationDecisions.map(d => `
-              <div class="decision-box">
-                <p class="meta">${formatDate(d.timestamp)}</p>
-                <p>${d.summary}</p>
-              </div>
-            `).join('')}
-          ` : ''}
-          
-          ${loop.nextExplorationQuestions && loop.nextExplorationQuestions.length > 0 ? `
-            <h3>Next Exploration Questions</h3>
-            ${loop.nextExplorationQuestions.map(q => `
-              <div class="list-item">
-                ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
-              </div>
-            `).join('')}
-          ` : ''}
-          
-          ${loopArtifacts.length > 0 ? `
-            <h3>Key Artifacts</h3>
-            ${loopArtifacts.map(a => `
-              <div class="list-item">
-                <span class="favorite-marker">★</span> ${a.name || a.uri}
-              </div>
-            `).join('')}
-          ` : ''}
-        </div>
-      `;
-    }).join('');
+            `;
+          }
+        }
+        
+        return `
+          <div class="page">
+            <h2>Exploration Loop: ${loop.question}</h2>
+            <div class="divider"></div>
+            <p class="meta">Status: ${loop.status} • Started: ${formatDate(loop.startDate)}</p>
+            
+            ${loop.exploreItems && loop.exploreItems.length > 0 ? `
+              <h3>Explore</h3>
+              ${loop.exploreItems.map(item => `
+                <div class="list-item">
+                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                </div>
+              `).join('')}
+            ` : ''}
+            
+            ${loop.buildItems && loop.buildItems.length > 0 ? `
+              <h3>Build</h3>
+              ${loop.buildItems.map(item => `
+                <div class="list-item">
+                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                </div>
+              `).join('')}
+            ` : ''}
+            
+            ${loop.checkItems && loop.checkItems.length > 0 ? `
+              <h3>Check</h3>
+              ${loop.checkItems.map(item => `
+                <div class="list-item">
+                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                </div>
+              `).join('')}
+            ` : ''}
+            
+            ${loop.adaptItems && loop.adaptItems.length > 0 ? `
+              <h3>Adapt</h3>
+              ${loop.adaptItems.map(item => `
+                <div class="list-item">
+                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                </div>
+              `).join('')}
+            ` : ''}
+            
+            ${loop.explorationDecisions && loop.explorationDecisions.length > 0 ? `
+              <h3>Decisions</h3>
+              ${loop.explorationDecisions.map(d => `
+                <div class="decision-box">
+                  <p class="meta">${formatDate(d.timestamp)}</p>
+                  <p>${d.summary}</p>
+                </div>
+              `).join('')}
+            ` : ''}
+            
+            ${loop.nextExplorationQuestions && loop.nextExplorationQuestions.length > 0 ? `
+              <h3>Next Exploration Questions</h3>
+              ${loop.nextExplorationQuestions.map(q => `
+                <div class="list-item">
+                  ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
+                </div>
+              `).join('')}
+            ` : ''}
+            
+            ${loopArtifactsHTML}
+          </div>
+        `;
+      })
+    );
+    
+    explorationSection = loopSections.join('');
   }
   
   const content = coverPage + artifactsSection + framingSection + explorationSection;
@@ -846,7 +923,8 @@ export const exportProjectToPDF = async (
       fileName = `${project.title}_Executive_Overview`;
       break;
     case 'process':
-      htmlContent = generateDesignProcessReport(project);
+      // Design Process Report needs async image conversion
+      htmlContent = await generateDesignProcessReport(project);
       fileName = `${project.title}_Design_Process`;
       break;
     case 'timeline':

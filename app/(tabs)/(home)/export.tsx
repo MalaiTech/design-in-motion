@@ -1,5 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { colors } from '@/styles/commonStyles';
 import {
   View,
   Text,
@@ -9,12 +11,10 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
-import { colors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
 import { getProjects, Project } from '@/utils/storage';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Sharing from 'expo-sharing';
+import { IconSymbol } from '@/components/IconSymbol';
 
 type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
 
@@ -30,27 +30,27 @@ const EXPORT_FORMATS: FormatOption[] = [
   {
     id: 'executive',
     title: 'Executive Overview',
-    description: 'High-level summary with key decisions and outcomes',
+    description: 'High-level summary with key decisions and totals',
     iosIcon: 'doc.text',
     androidIcon: 'description',
   },
   {
     id: 'process',
-    title: 'Design Process',
-    description: 'Complete framing and exploration documentation',
-    iosIcon: 'arrow.triangle.2.circlepath',
-    androidIcon: 'refresh',
+    title: 'Design Process Report',
+    description: 'Complete design journey with framing and exploration loops',
+    iosIcon: 'doc.richtext',
+    androidIcon: 'article',
   },
   {
     id: 'timeline',
     title: 'Timeline',
-    description: 'Chronological view of project evolution',
+    description: 'Chronological view of all project events',
     iosIcon: 'calendar',
-    androidIcon: 'calendar-today',
+    androidIcon: 'event',
   },
   {
     id: 'costs',
-    title: 'Hours & Costs',
+    title: 'Costs & Hours Report',
     description: 'Detailed breakdown of time and expenses',
     iosIcon: 'dollarsign.circle',
     androidIcon: 'attach-money',
@@ -63,7 +63,6 @@ export default function ExportScreen() {
   const projectId = params.id as string;
 
   const [project, setProject] = useState<Project | null>(null);
-  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('executive');
 
   const loadProject = useCallback(async () => {
     console.log('Export: Loading project', projectId);
@@ -84,41 +83,28 @@ export default function ExportScreen() {
     }, [loadProject])
   );
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = async (format: ExportFormat) => {
     if (!project) return;
 
-    console.log('Export: User tapped Export PDF button', {
-      projectId: project.id,
-      projectTitle: project.title,
-      selectedFormat,
-    });
-
-    // TODO: Backend Integration - Generate PDF based on selected format
-    // For now, show a placeholder alert
+    console.log('Export: PDF export requested', format);
     Alert.alert(
-      'Export PDF',
-      `Exporting "${project.title}" as ${EXPORT_FORMATS.find(f => f.id === selectedFormat)?.title}.\n\nPDF generation will be implemented in the next phase.`,
+      'Export Not Available',
+      'PDF export is only available on iOS. Please use an iOS device to export your project.',
       [{ text: 'OK' }]
     );
-
-    // Future implementation will:
-    // 1. Generate PDF based on selectedFormat
-    // 2. Save to temporary location
-    // 3. Open iOS Share Sheet with Sharing.shareAsync()
   };
 
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen
+        <Stack.Screen 
           options={{
             title: 'Export',
-            headerShown: true,
             headerBackTitle: 'Back',
           }}
         />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading project...</Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Loading project...</Text>
         </View>
       </View>
     );
@@ -126,90 +112,63 @@ export default function ExportScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
+      <Stack.Screen 
         options={{
           title: 'Export',
-          headerShown: true,
           headerBackTitle: 'Back',
         }}
       />
       
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        style={styles.scrollView}
-      >
-        {/* Project Context */}
-        <View style={styles.headerSection}>
-          <Text style={styles.projectTitle}>{project.title}</Text>
-          <Text style={styles.projectContext}>
-            {project.phase} • Started {new Date(project.startDate).toLocaleDateString()}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Export Project</Text>
+          <Text style={styles.subtitle}>{project.title}</Text>
+          <Text style={styles.description}>
+            Choose a format to export your project as a PDF document
           </Text>
         </View>
 
-        {/* Export Format Selector */}
-        <View style={styles.formatsSection}>
-          <Text style={styles.sectionTitle}>Select Export Format</Text>
-          
-          <View style={styles.formatsList}>
-            {EXPORT_FORMATS.map((format) => (
-              <TouchableOpacity
-                key={format.id}
-                style={[
-                  styles.formatOption,
-                  selectedFormat === format.id && styles.formatOptionSelected,
-                ]}
-                onPress={() => {
-                  console.log('Export: User selected format', format.id);
-                  setSelectedFormat(format.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.formatRadio}>
-                  {selectedFormat === format.id ? (
-                    <View style={styles.formatRadioSelected} />
-                  ) : null}
-                </View>
-                
-                <View style={styles.formatIcon}>
-                  <IconSymbol
-                    ios_icon_name={format.iosIcon}
-                    android_material_icon_name={format.androidIcon}
-                    size={24}
-                    color={selectedFormat === format.id ? colors.primary : colors.textSecondary}
-                  />
-                </View>
-                
-                <View style={styles.formatContent}>
-                  <Text style={[
-                    styles.formatTitle,
-                    selectedFormat === format.id && styles.formatTitleSelected,
-                  ]}>
-                    {format.title}
-                  </Text>
-                  <Text style={styles.formatDescription}>
-                    {format.description}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={styles.formatList}>
+          {EXPORT_FORMATS.map((format) => (
+            <TouchableOpacity
+              key={format.id}
+              style={styles.formatCard}
+              onPress={() => handleExportPDF(format.id)}
+            >
+              <View style={styles.formatIcon}>
+                <IconSymbol 
+                  ios_icon_name={format.iosIcon} 
+                  android_material_icon_name={format.androidIcon} 
+                  size={32} 
+                  color={colors.primary} 
+                />
+              </View>
+              
+              <View style={styles.formatContent}>
+                <Text style={styles.formatTitle}>{format.title}</Text>
+                <Text style={styles.formatDescription}>{format.description}</Text>
+              </View>
+
+              <IconSymbol 
+                ios_icon_name="chevron.right" 
+                android_material_icon_name="chevron-right" 
+                size={24} 
+                color={colors.textSecondary} 
+              />
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Export Button */}
-        <View style={styles.actionSection}>
-          <TouchableOpacity
-            style={styles.exportButton}
-            onPress={handleExportPDF}
-            activeOpacity={0.8}
-          >
-            <IconSymbol
-              ios_icon_name="arrow.down.doc"
-              android_material_icon_name="download"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.exportButtonText}>Export PDF</Text>
-          </TouchableOpacity>
+        <View style={styles.notice}>
+          <IconSymbol 
+            ios_icon_name="info.circle" 
+            android_material_icon_name="info" 
+            size={24} 
+            color={colors.textSecondary} 
+          />
+          <Text style={styles.noticeText}>
+            PDF export is currently only available on iOS devices.
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -221,88 +180,57 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollView: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
+    padding: 16,
+    paddingBottom: 120,
   },
-  loadingContainer: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
+  emptyText: {
     fontSize: 16,
     color: colors.textSecondary,
   },
-  
-  // Header Section
-  headerSection: {
-    marginBottom: 32,
+  header: {
+    marginBottom: 24,
   },
-  projectTitle: {
+  title: {
     fontSize: 28,
     fontWeight: '700',
     color: colors.text,
     marginBottom: 8,
   },
-  projectContext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  
-  // Formats Section
-  formatsSection: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
+  subtitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
+    color: colors.textSecondary,
     marginBottom: 16,
   },
-  formatsList: {
-    gap: 12,
+  description: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
-  formatOption: {
+  formatList: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  formatCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     padding: 16,
-    borderWidth: 2,
-    borderColor: colors.divider,
     gap: 16,
-  },
-  formatOptionSelected: {
-    borderColor: colors.primary,
-    backgroundColor: '#F0F7FA',
-  },
-  formatRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.textSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  formatRadioSelected: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.divider,
   },
   formatIcon: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
+    backgroundColor: colors.surfaceFraming,
   },
   formatContent: {
     flex: 1,
@@ -313,30 +241,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 4,
   },
-  formatTitleSelected: {
-    color: colors.primary,
-  },
   formatDescription: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 18,
   },
-  
-  // Action Section
-  actionSection: {
-    marginTop: 8,
-  },
-  exportButton: {
+  notice: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: 18,
-    gap: 8,
+    backgroundColor: colors.surfaceFraming,
+    padding: 16,
+    gap: 12,
   },
-  exportButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  noticeText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
