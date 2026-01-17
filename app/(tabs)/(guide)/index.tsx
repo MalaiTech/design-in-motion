@@ -7,13 +7,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 interface NavigationCard {
   id: string;
@@ -63,14 +60,12 @@ export default function GuideHomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Conceptual Image Block - Full image visible on all devices */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
-            style={styles.conceptImage}
-            resizeMode="contain"
-          />
-        </View>
+        {/* Conceptual Image Block - Scales with screen width, full image visible */}
+        <Image
+          source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
+          style={styles.conceptImage}
+          resizeMode="contain"
+        />
 
         {/* Intent Block */}
         <View style={styles.intentBlock}>
@@ -136,14 +131,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  imageContainer: {
-    width: '100%',
-    height: 280,
-    backgroundColor: colors.divider,
-  },
   conceptImage: {
     width: '100%',
-    height: '100%',
+    aspectRatio: 16 / 9,
   },
   intentBlock: {
     paddingHorizontal: 24,
