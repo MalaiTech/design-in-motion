@@ -20,7 +20,8 @@ interface NavigationCard {
   title: string;
   subtitle: string;
   route: string;
-  icon: string;
+  iosIcon: string;
+  androidIcon: string;
 }
 
 const navigationCards: NavigationCard[] = [
@@ -29,26 +30,31 @@ const navigationCards: NavigationCard[] = [
     title: 'Method',
     subtitle: 'How Design in Motion works',
     route: '/(tabs)/(guide)/method',
-    icon: 'lightbulb',
+    iosIcon: 'point.bottomleft.forward.to.arrow.triangle.uturn.scurvepath',
+    androidIcon: 'timeline',
   },
   {
     id: 'phases',
     title: 'Phases',
     subtitle: 'What to focus on at each stage',
     route: '/(tabs)/(guide)/phases',
-    icon: 'timeline',
+    iosIcon: 'circle.grid.cross.left.filled',
+    androidIcon: 'grid-on',
   },
   {
     id: 'tools',
     title: 'Tools',
     subtitle: 'Practical supports inside the app',
     route: '/(tabs)/(guide)/tools',
-    icon: 'build',
+    iosIcon: 'slider.horizontal.2.arrow.trianglehead.counterclockwise',
+    androidIcon: 'tune',
   },
 ];
 
 export default function GuideHomeScreen() {
   const router = useRouter();
+
+  console.log('Guide Home Screen rendered');
 
   return (
     <View style={styles.container}>
@@ -57,7 +63,7 @@ export default function GuideHomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Conceptual Image Block */}
+        {/* Conceptual Image Block - Full width without fixed aspect ratio */}
         <View style={styles.imageContainer}>
           <Image
             source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
@@ -82,14 +88,17 @@ export default function GuideHomeScreen() {
             <React.Fragment key={card.id}>
               <TouchableOpacity
                 style={styles.card}
-                onPress={() => router.push(card.route as any)}
+                onPress={() => {
+                  console.log(`User tapped ${card.title} navigation card`);
+                  router.push(card.route as any);
+                }}
                 activeOpacity={0.7}
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardHeader}>
                     <IconSymbol
-                      ios_icon_name={card.icon}
-                      android_material_icon_name={card.icon}
+                      ios_icon_name={card.iosIcon}
+                      android_material_icon_name={card.androidIcon}
                       size={28}
                       color={colors.text}
                     />
@@ -129,7 +138,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    height: 280,
     backgroundColor: colors.divider,
   },
   conceptImage: {
