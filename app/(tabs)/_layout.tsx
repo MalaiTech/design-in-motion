@@ -4,13 +4,19 @@ import { Stack } from 'expo-router';
 import FloatingTabBar, { TabBarItem } from '@/components/FloatingTabBar';
 
 export default function TabLayout() {
-  // Single tab configuration - Home only
+  // Two tabs configuration - Projects and Guide
   const tabs: TabBarItem[] = [
     {
       name: '(home)',
       route: '/(tabs)/(home)/',
       icon: 'home',
       label: 'Projects',
+    },
+    {
+      name: '(guide)',
+      route: '/(tabs)/(guide)/',
+      icon: 'menu-book',
+      label: 'Guide',
     },
   ];
 
@@ -23,6 +29,7 @@ export default function TabLayout() {
         }}
       >
         <Stack.Screen key="home" name="(home)" />
+        <Stack.Screen key="guide" name="(guide)" />
       </Stack>
       <FloatingTabBar tabs={tabs} />
     </>

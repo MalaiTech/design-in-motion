@@ -18,6 +18,12 @@ export default function TabLayout() {
         icon: 'home',
         label: 'Projects',
       },
+      {
+        name: '(guide)',
+        route: '/(tabs)/(guide)/',
+        icon: 'menu-book',
+        label: 'Guide',
+      },
     ];
 
     return (
@@ -29,6 +35,7 @@ export default function TabLayout() {
           }}
         >
           <Stack.Screen key="home" name="(home)" />
+          <Stack.Screen key="guide" name="(guide)" />
         </Stack>
         <FloatingTabBar tabs={tabs} />
       </>
@@ -41,6 +48,10 @@ export default function TabLayout() {
       <NativeTabs.Trigger key="home" name="(home)">
         <Icon sf="house.fill" />
         <Label>Projects</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger key="guide" name="(guide)">
+        <Icon sf="book.closed.fill" />
+        <Label>Guide</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

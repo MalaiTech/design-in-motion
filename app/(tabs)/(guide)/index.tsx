@@ -1,0 +1,199 @@
+
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Dimensions,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { colors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+
+const { width: screenWidth } = Dimensions.get('window');
+
+interface NavigationCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  route: string;
+  icon: string;
+}
+
+const navigationCards: NavigationCard[] = [
+  {
+    id: 'method',
+    title: 'Method',
+    subtitle: 'How Design in Motion works',
+    route: '/(tabs)/(guide)/method',
+    icon: 'lightbulb',
+  },
+  {
+    id: 'phases',
+    title: 'Phases',
+    subtitle: 'What to focus on at each stage',
+    route: '/(tabs)/(guide)/phases',
+    icon: 'timeline',
+  },
+  {
+    id: 'tools',
+    title: 'Tools',
+    subtitle: 'Practical supports inside the app',
+    route: '/(tabs)/(guide)/tools',
+    icon: 'build',
+  },
+];
+
+export default function GuideHomeScreen() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Conceptual Image Block */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
+            style={styles.conceptImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Intent Block */}
+        <View style={styles.intentBlock}>
+          <Text style={styles.headline}>Design in Motion</Text>
+          <Text style={styles.intentText}>
+            This app supports structured exploration, learning before decisions, and making thinking visible over time. 
+            It helps you navigate the creative process with clarity, documenting your journey from initial framing through 
+            exploration loops to final delivery.
+          </Text>
+        </View>
+
+        {/* Primary Navigation Cards */}
+        <View style={styles.cardsContainer}>
+          {navigationCards.map((card, index) => (
+            <React.Fragment key={card.id}>
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => router.push(card.route as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.cardHeader}>
+                    <IconSymbol
+                      ios_icon_name={card.icon}
+                      android_material_icon_name={card.icon}
+                      size={28}
+                      color={colors.text}
+                    />
+                    <Text style={styles.cardTitle}>{card.title}</Text>
+                  </View>
+                  <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+              {index < navigationCards.length - 1 && <View style={styles.divider} />}
+            </React.Fragment>
+          ))}
+        </View>
+
+        {/* Bottom spacing for tab bar */}
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  imageContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: colors.divider,
+  },
+  conceptImage: {
+    width: '100%',
+    height: '100%',
+  },
+  intentBlock: {
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+  },
+  headline: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
+  intentText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.textSecondary,
+    letterSpacing: 0.2,
+  },
+  cardsContainer: {
+    marginHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  cardContent: {
+    flex: 1,
+    gap: 8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    letterSpacing: -0.2,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginLeft: 40,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.divider,
+    marginLeft: 60,
+  },
+  bottomSpacer: {
+    height: 40,
+  },
+});
