@@ -63,12 +63,12 @@ export default function GuideHomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Conceptual Image Block - Full width without fixed aspect ratio */}
+        {/* Conceptual Image Block - Full image visible on all devices */}
         <View style={styles.imageContainer}>
           <Image
             source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
             style={styles.conceptImage}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         </View>
 
