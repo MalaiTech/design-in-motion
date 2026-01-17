@@ -60,12 +60,14 @@ export default function GuideHomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Conceptual Image Block - Scales with screen width, full image visible */}
-        <Image
-          source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
-          style={styles.conceptImage}
-          resizeMode="contain"
-        />
+        {/* Conceptual Image Block - Scales with screen width, maintains aspect ratio */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
+            style={styles.conceptImage}
+            resizeMode="contain"
+          />
+        </View>
 
         {/* Intent Block */}
         <View style={styles.intentBlock}>
@@ -131,9 +133,15 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
+  imageContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   conceptImage: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    height: undefined,
+    aspectRatio: 1920 / 1080, // Adjust this ratio to match your actual image dimensions
   },
   intentBlock: {
     paddingHorizontal: 24,
