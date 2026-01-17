@@ -53,7 +53,7 @@ const EXPORT_FORMATS: FormatOption[] = [
     title: 'Costs & Hours Report',
     description: 'Detailed breakdown of time and expenses',
     iosIcon: 'dollarsign.circle',
-    androidIcon: 'attach-money',
+    androidIcon: 'attach_money',
   },
 ];
 
@@ -151,7 +151,7 @@ export default function ExportScreen() {
 
               <IconSymbol 
                 ios_icon_name="chevron.right" 
-                android_material_icon_name="chevron-right" 
+                android_material_icon_name="chevron_right" 
                 size={24} 
                 color={colors.textSecondary} 
               />

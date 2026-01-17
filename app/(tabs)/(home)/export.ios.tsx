@@ -1,10 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { exportProjectToPDF, ExportFormat } from '@/utils/pdfExport';
 import { getProjects, Project } from '@/utils/storage';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Sharing from 'expo-sharing';
+import React, { useState, useCallback } from 'react';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import {
   View,
   Text,
@@ -15,8 +17,6 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import * as Sharing from 'expo-sharing';
-import { IconSymbol } from '@/components/IconSymbol';
 
 interface FormatOption {
   id: ExportFormat;
@@ -53,9 +53,103 @@ const EXPORT_FORMATS: FormatOption[] = [
     title: 'Costs & Hours Report',
     description: 'Detailed breakdown of time and expenses',
     iosIcon: 'dollarsign.circle',
-    androidIcon: 'attach-money',
+    androidIcon: 'attach_money',
   },
 ];
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 120,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  header: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  formatList: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  formatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  formatIcon: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceFraming,
+  },
+  formatContent: {
+    flex: 1,
+  },
+  formatTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  formatDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+});
 
 export default function ExportScreen() {
   const router = useRouter();
@@ -64,7 +158,6 @@ export default function ExportScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
 
   const loadProject = useCallback(async () => {
     console.log('Export: Loading project', projectId);
@@ -90,30 +183,31 @@ export default function ExportScreen() {
 
     console.log('Export: Starting PDF export', format);
     setIsExporting(true);
-    setExportingFormat(format);
 
     try {
       const pdfUri = await exportProjectToPDF(project, format);
-      console.log('Export: PDF generated at', pdfUri);
+      console.log('Export: PDF generated successfully', pdfUri);
 
-      // Share the PDF
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
+      setIsExporting(false);
+
+      if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(pdfUri, {
           mimeType: 'application/pdf',
-          dialogTitle: 'Export Project',
+          dialogTitle: `Export ${project.title}`,
           UTI: 'com.adobe.pdf',
         });
         console.log('Export: PDF shared successfully');
       } else {
-        Alert.alert('Export Complete', 'PDF has been generated but sharing is not available on this device.');
+        Alert.alert('Success', 'PDF exported successfully!');
       }
     } catch (error) {
-      console.error('Export: Error generating PDF:', error);
-      Alert.alert('Export Failed', 'There was an error generating the PDF. Please try again.');
-    } finally {
+      console.error('Export: Error exporting PDF', error);
       setIsExporting(false);
-      setExportingFormat(null);
+      Alert.alert(
+        'Export Failed',
+        'There was an error exporting your project. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -155,10 +249,7 @@ export default function ExportScreen() {
           {EXPORT_FORMATS.map((format) => (
             <TouchableOpacity
               key={format.id}
-              style={[
-                styles.formatCard,
-                isExporting && exportingFormat === format.id && styles.formatCardExporting
-              ]}
+              style={styles.formatCard}
               onPress={() => handleExportPDF(format.id)}
               disabled={isExporting}
             >
@@ -176,117 +267,25 @@ export default function ExportScreen() {
                 <Text style={styles.formatDescription}>{format.description}</Text>
               </View>
 
-              {isExporting && exportingFormat === format.id ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <IconSymbol 
-                  ios_icon_name="chevron.right" 
-                  android_material_icon_name="chevron-right" 
-                  size={24} 
-                  color={colors.textSecondary} 
-                />
-              )}
+              <IconSymbol 
+                ios_icon_name="chevron.right" 
+                android_material_icon_name="chevron_right" 
+                size={24} 
+                color={colors.textSecondary} 
+              />
             </TouchableOpacity>
           ))}
         </View>
-
-        {isExporting && (
-          <View style={styles.exportingBanner}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.exportingText}>
-              Generating PDF... This may take a moment for reports with many images.
-            </Text>
-          </View>
-        )}
       </ScrollView>
+
+      {isExporting && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Generating PDF...</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 120,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: colors.textSecondary,
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  formatList: {
-    gap: 12,
-  },
-  formatCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: colors.divider,
-  },
-  formatCardExporting: {
-    opacity: 0.6,
-  },
-  formatIcon: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceFraming,
-  },
-  formatContent: {
-    flex: 1,
-  },
-  formatTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  formatDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  exportingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceFraming,
-    padding: 16,
-    marginTop: 24,
-    gap: 12,
-  },
-  exportingText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-  },
-});
