@@ -454,45 +454,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
   console.log('PDF Export: Generating Design Process Report');
   const coverPage = generateCoverPage(project, 'Design Process Report');
   
-  // 2nd Page: Key Artifacts (favorites only, images in 3-column grid)
-  let artifactsSection = '';
-  const favoriteArtifacts = project.artifacts.filter(a => a.isFavorite && a.type === 'image');
-  
-  console.log('PDF Export: Found', favoriteArtifacts.length, 'favorite image artifacts');
-  
-  if (favoriteArtifacts.length > 0) {
-    // Convert all images to base64 in parallel
-    const artifactPromises = favoriteArtifacts.map(async (artifact) => {
-      const base64Uri = await convertImageToBase64(artifact.uri);
-      return { artifact, base64Uri };
-    });
-    
-    const artifactResults = await Promise.all(artifactPromises);
-    
-    // Filter out failed conversions
-    const validArtifacts = artifactResults.filter(result => result.base64Uri !== null);
-    
-    console.log('PDF Export: Successfully converted', validArtifacts.length, 'images to base64');
-    
-    if (validArtifacts.length > 0) {
-      artifactsSection = `
-        <div class="page">
-          <h2>Key Artifacts</h2>
-          <div class="divider"></div>
-          <div class="artifact-grid">
-            ${validArtifacts.map(({ artifact, base64Uri }) => `
-              <div class="artifact-item">
-                <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
-                ${artifact.caption ? `<p class="meta">${artifact.caption}</p>` : ''}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-  }
-  
-  // 3rd Page: Design Framing (All segments incl. First Exploration Questions and Framing decisions)
+  // 2nd Page: Design Framing (with inline artifacts)
   let framingSection = '';
   const hasFramingContent = project.opportunityOrigin || project.purpose || 
     (project.certaintyItems && project.certaintyItems.length > 0) || 
@@ -501,6 +463,42 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
     (project.framingDecisions && project.framingDecisions.length > 0);
   
   if (hasFramingContent) {
+    // Get favorite artifacts for Framing phase
+    const framingArtifacts = project.artifacts.filter(a => 
+      a.isFavorite && 
+      a.type === 'image' && 
+      (a.phase === 'framing' || !a.explorationLoopId)
+    );
+    
+    console.log('PDF Export: Found', framingArtifacts.length, 'favorite framing artifacts');
+    
+    // Convert framing artifacts to base64
+    let framingArtifactsHTML = '';
+    if (framingArtifacts.length > 0) {
+      const framingArtifactPromises = framingArtifacts.map(async (artifact) => {
+        const base64Uri = await convertImageToBase64(artifact.uri);
+        return { artifact, base64Uri };
+      });
+      
+      const framingArtifactResults = await Promise.all(framingArtifactPromises);
+      const validFramingArtifacts = framingArtifactResults.filter(result => result.base64Uri !== null);
+      
+      console.log('PDF Export: Successfully converted', validFramingArtifacts.length, 'framing images to base64');
+      
+      if (validFramingArtifacts.length > 0) {
+        framingArtifactsHTML = `
+          <h3>Key Artifacts</h3>
+          <div class="artifact-grid">
+            ${validFramingArtifacts.map(({ artifact, base64Uri }) => `
+              <div class="artifact-item">
+                <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+    
     framingSection = `
       <div class="page">
         <h2>Design Framing</h2>
@@ -563,16 +561,24 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
             </div>
           `).join('')}
         ` : ''}
+        
+        ${framingArtifactsHTML}
       </div>
     `;
   }
   
-  // Next Pages: Exploration Lanes (each loop grouped, Add Next exploration Questions, Add Star icon for favorites)
+  // Next Pages: Exploration Loops (each loop with inline artifacts)
   let explorationSection = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     const loopSections = await Promise.all(
       project.explorationLoops.map(async (loop) => {
-        const loopArtifacts = project.artifacts.filter(a => loop.artifactIds.includes(a.id) && a.isFavorite && a.type === 'image');
+        const loopArtifacts = project.artifacts.filter(a => 
+          loop.artifactIds.includes(a.id) && 
+          a.isFavorite && 
+          a.type === 'image'
+        );
+        
+        console.log('PDF Export: Loop', loop.question, '- Found', loopArtifacts.length, 'favorite artifacts');
         
         // Convert loop artifacts to base64
         let loopArtifactsHTML = '';
@@ -584,6 +590,8 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
           
           const loopArtifactResults = await Promise.all(loopArtifactPromises);
           const validLoopArtifacts = loopArtifactResults.filter(result => result.base64Uri !== null);
+          
+          console.log('PDF Export: Successfully converted', validLoopArtifacts.length, 'loop images to base64');
           
           if (validLoopArtifacts.length > 0) {
             loopArtifactsHTML = `
@@ -669,7 +677,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
     explorationSection = loopSections.join('');
   }
   
-  const content = coverPage + artifactsSection + framingSection + explorationSection;
+  const content = coverPage + framingSection + explorationSection;
   return getBaseHTML(`${project.title} - Design Process Report`, content);
 };
 
