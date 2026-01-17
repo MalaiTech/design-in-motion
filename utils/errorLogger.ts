@@ -1,4 +1,3 @@
-
 // Global error logging for runtime errors
 // Captures console.log/warn/error and sends to Natively server for AI debugging
 
@@ -69,17 +68,11 @@ const getLogServerUrl = (): string | null => {
     }
   } catch (e) {
     // Silently fail
-    console.log('[Natively] Error getting log server URL:', e);
   }
 
   urlChecked = true;
   return cachedLogServerUrl;
 };
-
-// Store original console methods globally so they're accessible everywhere
-const originalConsoleLog = console.log;
-const originalConsoleWarn = console.warn;
-const originalConsoleError = console.error;
 
 // Track if we've logged fetch errors to avoid spam
 let fetchErrorLogged = false;
@@ -108,13 +101,14 @@ const flushLogs = async () => {
         // Log fetch errors only once to avoid spam
         if (!fetchErrorLogged) {
           fetchErrorLogged = true;
-          // Use original console.log to avoid recursion
-          originalConsoleLog('[Natively] Fetch error (will not repeat):', e.message || e);
+          // Use a different method to avoid recursion - write directly without going through our intercept
+          if (typeof window !== 'undefined' && window.console) {
+            (window.console as any).__proto__.log.call(console, '[Natively] Fetch error (will not repeat):', e.message || e);
+          }
         }
       });
     } catch (e) {
       // Silently ignore sync errors
-      console.log('[Natively] Error in flushLogs:', e);
     }
   }
 };
@@ -170,7 +164,6 @@ const sendErrorToParent = (level: string, message: string, data: any) => {
     }
   } catch (error) {
     // Silently fail
-    console.log('[Natively] Error sending to parent:', error);
   }
 };
 
@@ -261,13 +254,18 @@ const stringifyArgs = (args: any[]): string => {
     if (arg === undefined) return 'undefined';
     try {
       return JSON.stringify(arg);
-    } catch (e) {
+    } catch {
       return String(arg);
     }
   }).join(' ');
 };
 
 export const setupErrorLogging = () => {
+  // Store original console methods BEFORE any modifications
+  const originalConsoleLog = console.log;
+  const originalConsoleWarn = console.warn;
+  const originalConsoleError = console.error;
+
   // Log initialization info using original console (not intercepted)
   const logServerUrl = getLogServerUrl();
   originalConsoleLog('[Natively] Setting up error logging...');

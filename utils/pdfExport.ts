@@ -463,11 +463,12 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
     (project.framingDecisions && project.framingDecisions.length > 0);
   
   if (hasFramingContent) {
-    // Get favorite artifacts for Framing phase
+    // Get favorite artifacts for Framing phase using framingArtifactIds
+    const framingArtifactIds = project.framingArtifactIds || [];
     const framingArtifacts = project.artifacts.filter(a => 
       a.isFavorite && 
       a.type === 'image' && 
-      (a.phase === 'framing' || !a.explorationLoopId)
+      framingArtifactIds.includes(a.id)
     );
     
     console.log('PDF Export: Found', framingArtifacts.length, 'favorite framing artifacts');
