@@ -168,6 +168,7 @@ const getBaseHTML = (title: string, content: string): string => {
       width: 100%;
       border-collapse: collapse;
       margin: 16px 0;
+      table-layout: fixed;
     }
     
     .cost-table th,
@@ -184,6 +185,17 @@ const getBaseHTML = (title: string, content: string): string => {
     
     .cost-table tr:last-child td {
       border-bottom: none;
+    }
+    
+    .cost-table th:first-child,
+    .cost-table td:first-child {
+      width: 70%;
+    }
+    
+    .cost-table th:last-child,
+    .cost-table td:last-child {
+      width: 30%;
+      text-align: right;
     }
     
     .timeline-event {
