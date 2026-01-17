@@ -1,7 +1,7 @@
 
 import * as Print from 'expo-print';
 import { colors } from '@/styles/commonStyles';
-import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent } from './storage';
+import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent, TimeEntry, CostEntry, calculateProjectTotals } from './storage';
 
 export type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
 
@@ -182,6 +182,10 @@ const getBaseHTML = (title: string, content: string): string => {
       background: #F5F5F5;
     }
     
+    .cost-table tr:last-child td {
+      border-bottom: none;
+    }
+    
     .timeline-event {
       margin-bottom: 24px;
       padding-left: 24px;
@@ -249,6 +253,27 @@ const getBaseHTML = (title: string, content: string): string => {
       font-size: 9pt;
       color: #555555;
     }
+    
+    .entry-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #EEEEEE;
+    }
+    
+    .entry-item:last-child {
+      border-bottom: none;
+    }
+    
+    .entry-description {
+      font-size: 11pt;
+      color: #111111;
+      margin-bottom: 4px;
+    }
+    
+    .entry-value {
+      font-size: 10pt;
+      color: #555555;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -277,6 +302,9 @@ const generateCoverPage = (project: Project, formatTitle: string): string => {
 const generateExecutiveOverview = (project: Project): string => {
   const coverPage = generateCoverPage(project, 'Executive Overview');
   
+  // Calculate project totals
+  const { totalHours, totalCosts } = calculateProjectTotals(project);
+  
   // 2nd Page: Project Summary
   let summarySection = '';
   
@@ -297,9 +325,6 @@ const generateExecutiveOverview = (project: Project): string => {
       }).join('')}
     `;
   }
-  
-  const totalHours = project.hours || 0;
-  const totalCosts = project.costs || 0;
   
   summarySection = `
     <div class="page">
@@ -667,8 +692,8 @@ const generateTimelineReport = (project: Project): string => {
 const generateCostsReport = (project: Project): string => {
   const coverPage = generateCoverPage(project, 'Costs & Hours Report');
   
-  const totalHours = project.hours || 0;
-  const totalCosts = project.costs || 0;
+  // Calculate project totals
+  const { totalHours, totalCosts } = calculateProjectTotals(project);
   
   // Calculate per-loop totals
   let loopTotals: {loopId: string, question: string, hours: number, costs: number}[] = [];
@@ -741,6 +766,8 @@ const generateCostsReport = (project: Project): string => {
     loopBreakdown = project.explorationLoops.map(loop => {
       const loopHours = loop.timeSpent || 0;
       const loopCosts = loop.costs || 0;
+      const timeEntries = loop.timeEntries || [];
+      const costEntries = loop.costEntries || [];
       
       if (loopHours === 0 && loopCosts === 0) {
         return ''; // Skip loops with no data
@@ -759,16 +786,38 @@ const generateCostsReport = (project: Project): string => {
               <th>Amount</th>
             </tr>
             <tr>
-              <td>Hours</td>
+              <td>Total Hours</td>
               <td>${loopHours.toFixed(1)} hours</td>
             </tr>
             <tr>
-              <td>Costs</td>
+              <td>Total Costs</td>
               <td>$${loopCosts.toFixed(2)}</td>
             </tr>
           </table>
           
-          <p class="meta" style="margin-top: 16px;">This report shows factual recorded data only. No projections or assumptions are included.</p>
+          ${timeEntries.length > 0 ? `
+            <h3>Time Entries</h3>
+            <div style="margin-top: 16px;">
+              ${timeEntries.map((entry: TimeEntry) => `
+                <div class="entry-item">
+                  <div class="entry-description">${entry.reason}</div>
+                  <div class="entry-value">${entry.hours.toFixed(1)} hours</div>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+          
+          ${costEntries.length > 0 ? `
+            <h3>Cost Entries</h3>
+            <div style="margin-top: 16px;">
+              ${costEntries.map((entry: CostEntry) => `
+                <div class="entry-item">
+                  <div class="entry-description">${entry.reason}</div>
+                  <div class="entry-value">$${entry.amount.toFixed(2)}</div>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');

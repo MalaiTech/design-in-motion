@@ -82,6 +82,18 @@ export interface PhaseChangeEvent {
   timestamp: string;
 }
 
+export interface TimeEntry {
+  id: string;
+  reason: string;
+  hours: number;
+}
+
+export interface CostEntry {
+  id: string;
+  reason: string;
+  amount: number;
+}
+
 export interface ExplorationLoop {
   id: string;
   question: string;
@@ -113,9 +125,13 @@ export interface ExplorationLoop {
   // Next exploration questions
   nextExplorationQuestions: ExplorationQuestion[];
   
-  // Time and costs
+  // Time and costs - aggregated totals
   timeSpent: number;
   costs: number;
+  
+  // Time and costs - individual entries with descriptions
+  timeEntries?: TimeEntry[];
+  costEntries?: CostEntry[];
   
   // Invoices and receipts
   invoicesArtifactIds: string[];
@@ -150,10 +166,37 @@ export interface Project {
 
 const PROJECTS_KEY = '@design_in_motion_projects';
 
+// Helper function to calculate project-level totals from exploration loops
+export const calculateProjectTotals = (project: Project): { totalHours: number; totalCosts: number } => {
+  let totalHours = 0;
+  let totalCosts = 0;
+  
+  if (project.explorationLoops && project.explorationLoops.length > 0) {
+    project.explorationLoops.forEach(loop => {
+      totalHours += loop.timeSpent || 0;
+      totalCosts += loop.costs || 0;
+    });
+  }
+  
+  return { totalHours, totalCosts };
+};
+
 export const getProjects = async (): Promise<Project[]> => {
   try {
     const data = await AsyncStorage.getItem(PROJECTS_KEY);
-    return data ? JSON.parse(data) : [];
+    const projects = data ? JSON.parse(data) : [];
+    
+    // Calculate and update project-level totals for all projects
+    const updatedProjects = projects.map((project: Project) => {
+      const { totalHours, totalCosts } = calculateProjectTotals(project);
+      return {
+        ...project,
+        hours: totalHours,
+        costs: totalCosts,
+      };
+    });
+    
+    return updatedProjects;
   } catch (error) {
     console.error('Error loading projects:', error);
     return [];
@@ -163,7 +206,16 @@ export const getProjects = async (): Promise<Project[]> => {
 export const saveProject = async (project: Project): Promise<void> => {
   try {
     const projects = await getProjects();
-    projects.push(project);
+    
+    // Calculate project-level totals before saving
+    const { totalHours, totalCosts } = calculateProjectTotals(project);
+    const projectWithTotals = {
+      ...project,
+      hours: totalHours,
+      costs: totalCosts,
+    };
+    
+    projects.push(projectWithTotals);
     await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
   } catch (error) {
     console.error('Error saving project:', error);
@@ -176,7 +228,15 @@ export const updateProject = async (updatedProject: Project): Promise<void> => {
     const projects = await getProjects();
     const index = projects.findIndex(p => p.id === updatedProject.id);
     if (index !== -1) {
-      projects[index] = updatedProject;
+      // Calculate project-level totals before saving
+      const { totalHours, totalCosts } = calculateProjectTotals(updatedProject);
+      const projectWithTotals = {
+        ...updatedProject,
+        hours: totalHours,
+        costs: totalCosts,
+      };
+      
+      projects[index] = projectWithTotals;
       await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     }
   } catch (error) {
