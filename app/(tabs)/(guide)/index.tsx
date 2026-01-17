@@ -145,7 +145,8 @@ const styles = StyleSheet.create({
   },
   intentBlock: {
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
   headline: {
     fontSize: 32,
