@@ -760,17 +760,16 @@ const generateCostsReport = (project: Project): string => {
     </div>
   `;
   
-  // Next Pages: Breakdown by Exploration Loop with individual entries
+  // Next Pages: Breakdown by Exploration Loop with individual entries in table format
   let loopBreakdown = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     loopBreakdown = project.explorationLoops.map(loop => {
-      const loopHours = loop.timeSpent || 0;
-      const loopCosts = loop.costs || 0;
       const timeEntries = loop.timeEntries || [];
       const costEntries = loop.costEntries || [];
       
-      if (loopHours === 0 && loopCosts === 0) {
-        return ''; // Skip loops with no data
+      // Skip loops with no entries
+      if (timeEntries.length === 0 && costEntries.length === 0) {
+        return '';
       }
       
       return `
@@ -779,44 +778,36 @@ const generateCostsReport = (project: Project): string => {
           <div class="divider"></div>
           <p class="meta">Status: ${loop.status} • Started: ${formatDate(loop.startDate)}</p>
           
-          <h3>Summary</h3>
-          <table class="cost-table">
-            <tr>
-              <th>Metric</th>
-              <th>Amount</th>
-            </tr>
-            <tr>
-              <td>Total Hours</td>
-              <td>${loopHours.toFixed(1)} hours</td>
-            </tr>
-            <tr>
-              <td>Total Costs</td>
-              <td>$${loopCosts.toFixed(2)}</td>
-            </tr>
-          </table>
-          
           ${timeEntries.length > 0 ? `
             <h3>Time Entries</h3>
-            <div style="margin-top: 16px;">
+            <table class="cost-table">
+              <tr>
+                <th>Description</th>
+                <th>Hours</th>
+              </tr>
               ${timeEntries.map((entry: TimeEntry) => `
-                <div class="entry-item">
-                  <div class="entry-description">${entry.reason}</div>
-                  <div class="entry-value">${entry.hours.toFixed(1)} hours</div>
-                </div>
+                <tr>
+                  <td>${entry.reason}</td>
+                  <td>${entry.hours.toFixed(1)} hours</td>
+                </tr>
               `).join('')}
-            </div>
+            </table>
           ` : ''}
           
           ${costEntries.length > 0 ? `
             <h3>Cost Entries</h3>
-            <div style="margin-top: 16px;">
+            <table class="cost-table">
+              <tr>
+                <th>Description</th>
+                <th>Amount</th>
+              </tr>
               ${costEntries.map((entry: CostEntry) => `
-                <div class="entry-item">
-                  <div class="entry-description">${entry.reason}</div>
-                  <div class="entry-value">$${entry.amount.toFixed(2)}</div>
-                </div>
+                <tr>
+                  <td>${entry.reason}</td>
+                  <td>$${entry.amount.toFixed(2)}</td>
+                </tr>
               `).join('')}
-            </div>
+            </table>
           ` : ''}
         </div>
       `;
