@@ -277,7 +277,7 @@ const getBaseHTML = (title: string, content: string): string => {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 16px;
-      margin: 24px 0;
+      margin: 16px 0 24px 0;
     }
     
     .artifact-item {
@@ -449,12 +449,52 @@ const generateExecutiveOverview = (project: Project): string => {
   return getBaseHTML(`${project.title} - Executive Overview`, content);
 };
 
+// Helper function to render artifacts inline
+const renderArtifactsInline = async (artifactIds: string[], allArtifacts: Artifact[]): Promise<string> => {
+  const artifacts = allArtifacts.filter(a => 
+    a.isFavorite && 
+    a.type === 'image' && 
+    artifactIds.includes(a.id)
+  );
+  
+  if (artifacts.length === 0) {
+    return '';
+  }
+  
+  console.log('PDF Export: Rendering', artifacts.length, 'inline artifacts');
+  
+  // Convert artifacts to base64
+  const artifactPromises = artifacts.map(async (artifact) => {
+    const base64Uri = await convertImageToBase64(artifact.uri);
+    return { artifact, base64Uri };
+  });
+  
+  const artifactResults = await Promise.all(artifactPromises);
+  const validArtifacts = artifactResults.filter(result => result.base64Uri !== null);
+  
+  console.log('PDF Export: Successfully converted', validArtifacts.length, 'images to base64');
+  
+  if (validArtifacts.length === 0) {
+    return '';
+  }
+  
+  return `
+    <div class="artifact-grid">
+      ${validArtifacts.map(({ artifact, base64Uri }) => `
+        <div class="artifact-item">
+          <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
+        </div>
+      `).join('')}
+    </div>
+  `;
+};
+
 // Generate Design Process Report
 const generateDesignProcessReport = async (project: Project): Promise<string> => {
   console.log('PDF Export: Generating Design Process Report');
   const coverPage = generateCoverPage(project, 'Design Process Report');
   
-  // 2nd Page: Design Framing (with inline artifacts)
+  // 2nd Page: Design Framing (with inline artifacts directly below Purpose)
   let framingSection = '';
   const hasFramingContent = project.opportunityOrigin || project.purpose || 
     (project.certaintyItems && project.certaintyItems.length > 0) || 
@@ -465,40 +505,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
   if (hasFramingContent) {
     // Get favorite artifacts for Framing phase using framingArtifactIds
     const framingArtifactIds = project.framingArtifactIds || [];
-    const framingArtifacts = project.artifacts.filter(a => 
-      a.isFavorite && 
-      a.type === 'image' && 
-      framingArtifactIds.includes(a.id)
-    );
-    
-    console.log('PDF Export: Found', framingArtifacts.length, 'favorite framing artifacts');
-    
-    // Convert framing artifacts to base64
-    let framingArtifactsHTML = '';
-    if (framingArtifacts.length > 0) {
-      const framingArtifactPromises = framingArtifacts.map(async (artifact) => {
-        const base64Uri = await convertImageToBase64(artifact.uri);
-        return { artifact, base64Uri };
-      });
-      
-      const framingArtifactResults = await Promise.all(framingArtifactPromises);
-      const validFramingArtifacts = framingArtifactResults.filter(result => result.base64Uri !== null);
-      
-      console.log('PDF Export: Successfully converted', validFramingArtifacts.length, 'framing images to base64');
-      
-      if (validFramingArtifacts.length > 0) {
-        framingArtifactsHTML = `
-          <h3>Key Artifacts</h3>
-          <div class="artifact-grid">
-            ${validFramingArtifacts.map(({ artifact, base64Uri }) => `
-              <div class="artifact-item">
-                <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
-              </div>
-            `).join('')}
-          </div>
-        `;
-      }
-    }
+    const framingArtifactsHTML = await renderArtifactsInline(framingArtifactIds, project.artifacts);
     
     framingSection = `
       <div class="page">
@@ -513,7 +520,8 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
         ${project.purpose ? `
           <h3>Purpose</h3>
           <p>${project.purpose}</p>
-        ` : ''}
+          ${framingArtifactsHTML}
+        ` : framingArtifactsHTML}
         
         ${project.certaintyItems && project.certaintyItems.length > 0 ? `
           <h3>Certainty Mapping</h3>
@@ -562,60 +570,23 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
             </div>
           `).join('')}
         ` : ''}
-        
-        ${framingArtifactsHTML}
       </div>
     `;
   }
   
-  // Next Pages: Exploration Loops (each loop with inline artifacts)
+  // Next Pages: Exploration Loops (with inline artifacts below each segment)
   let explorationSection = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     const loopSections = await Promise.all(
       project.explorationLoops.map(async (loop) => {
-        // FIXED: Collect artifacts from ALL segment-specific arrays
-        const loopArtifacts = project.artifacts.filter(a => {
-          if (!a.isFavorite || a.type !== 'image') return false;
-          
-          // Check if artifact ID exists in any of the segment arrays
-          return (
-            (loop.exploreArtifactIds && loop.exploreArtifactIds.includes(a.id)) ||
-            (loop.buildArtifactIds && loop.buildArtifactIds.includes(a.id)) ||
-            (loop.checkArtifactIds && loop.checkArtifactIds.includes(a.id)) ||
-            (loop.adaptArtifactIds && loop.adaptArtifactIds.includes(a.id)) ||
-            (loop.decisionsArtifactIds && loop.decisionsArtifactIds.includes(a.id)) ||
-            (loop.invoicesArtifactIds && loop.invoicesArtifactIds.includes(a.id))
-          );
-        });
+        console.log('PDF Export: Processing loop:', loop.question);
         
-        console.log('PDF Export: Loop', loop.question, '- Found', loopArtifacts.length, 'favorite artifacts from all segments');
-        
-        // Convert loop artifacts to base64
-        let loopArtifactsHTML = '';
-        if (loopArtifacts.length > 0) {
-          const loopArtifactPromises = loopArtifacts.map(async (artifact) => {
-            const base64Uri = await convertImageToBase64(artifact.uri);
-            return { artifact, base64Uri };
-          });
-          
-          const loopArtifactResults = await Promise.all(loopArtifactPromises);
-          const validLoopArtifacts = loopArtifactResults.filter(result => result.base64Uri !== null);
-          
-          console.log('PDF Export: Successfully converted', validLoopArtifacts.length, 'loop images to base64');
-          
-          if (validLoopArtifacts.length > 0) {
-            loopArtifactsHTML = `
-              <h3>Key Artifacts</h3>
-              <div class="artifact-grid">
-                ${validLoopArtifacts.map(({ artifact, base64Uri }) => `
-                  <div class="artifact-item">
-                    <img src="${base64Uri}" class="artifact-image" alt="${artifact.name || 'Artifact'}" />
-                  </div>
-                `).join('')}
-              </div>
-            `;
-          }
-        }
+        // Render artifacts for each segment
+        const exploreArtifactsHTML = await renderArtifactsInline(loop.exploreArtifactIds || [], project.artifacts);
+        const buildArtifactsHTML = await renderArtifactsInline(loop.buildArtifactIds || [], project.artifacts);
+        const checkArtifactsHTML = await renderArtifactsInline(loop.checkArtifactIds || [], project.artifacts);
+        const adaptArtifactsHTML = await renderArtifactsInline(loop.adaptArtifactIds || [], project.artifacts);
+        const decisionsArtifactsHTML = await renderArtifactsInline(loop.decisionsArtifactIds || [], project.artifacts);
         
         return `
           <div class="page">
@@ -630,6 +601,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
                   ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
                 </div>
               `).join('')}
+              ${exploreArtifactsHTML}
             ` : ''}
             
             ${loop.buildItems && loop.buildItems.length > 0 ? `
@@ -639,6 +611,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
                   ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
                 </div>
               `).join('')}
+              ${buildArtifactsHTML}
             ` : ''}
             
             ${loop.checkItems && loop.checkItems.length > 0 ? `
@@ -648,6 +621,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
                   ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
                 </div>
               `).join('')}
+              ${checkArtifactsHTML}
             ` : ''}
             
             ${loop.adaptItems && loop.adaptItems.length > 0 ? `
@@ -657,6 +631,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
                   ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
                 </div>
               `).join('')}
+              ${adaptArtifactsHTML}
             ` : ''}
             
             ${loop.explorationDecisions && loop.explorationDecisions.length > 0 ? `
@@ -667,6 +642,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
                   <p>${d.summary}</p>
                 </div>
               `).join('')}
+              ${decisionsArtifactsHTML}
             ` : ''}
             
             ${loop.nextExplorationQuestions && loop.nextExplorationQuestions.length > 0 ? `
@@ -677,8 +653,6 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
                 </div>
               `).join('')}
             ` : ''}
-            
-            ${loopArtifactsHTML}
           </div>
         `;
       })
@@ -732,7 +706,7 @@ const generateTimelineReport = (project: Project): string => {
   // Exploration loops
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     project.explorationLoops.forEach(loop => {
-      // FIXED: Collect artifacts from all segment arrays for timeline
+      // Collect artifacts from all segment arrays for timeline
       const loopArtifacts = project.artifacts.filter(a => {
         if (!a.isFavorite) return false;
         return (
