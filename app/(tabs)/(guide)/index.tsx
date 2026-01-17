@@ -137,15 +137,17 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 0, // Explicitly set to 0 to remove any extra space below image
   },
   conceptImage: {
     width: '100%',
     height: undefined,
     aspectRatio: 1920 / 1080, // Adjust this ratio to match your actual image dimensions
+    marginBottom: 0, // Explicitly set to 0 to remove any extra space below image
   },
   intentBlock: {
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 4, // Reduced from 16 to 4 (75% reduction - more than 50%)
     paddingBottom: 32,
   },
   headline: {
