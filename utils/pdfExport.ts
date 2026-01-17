@@ -573,13 +573,22 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     const loopSections = await Promise.all(
       project.explorationLoops.map(async (loop) => {
-        const loopArtifacts = project.artifacts.filter(a => 
-          loop.artifactIds.includes(a.id) && 
-          a.isFavorite && 
-          a.type === 'image'
-        );
+        // FIXED: Collect artifacts from ALL segment-specific arrays
+        const loopArtifacts = project.artifacts.filter(a => {
+          if (!a.isFavorite || a.type !== 'image') return false;
+          
+          // Check if artifact ID exists in any of the segment arrays
+          return (
+            (loop.exploreArtifactIds && loop.exploreArtifactIds.includes(a.id)) ||
+            (loop.buildArtifactIds && loop.buildArtifactIds.includes(a.id)) ||
+            (loop.checkArtifactIds && loop.checkArtifactIds.includes(a.id)) ||
+            (loop.adaptArtifactIds && loop.adaptArtifactIds.includes(a.id)) ||
+            (loop.decisionsArtifactIds && loop.decisionsArtifactIds.includes(a.id)) ||
+            (loop.invoicesArtifactIds && loop.invoicesArtifactIds.includes(a.id))
+          );
+        });
         
-        console.log('PDF Export: Loop', loop.question, '- Found', loopArtifacts.length, 'favorite artifacts');
+        console.log('PDF Export: Loop', loop.question, '- Found', loopArtifacts.length, 'favorite artifacts from all segments');
         
         // Convert loop artifacts to base64
         let loopArtifactsHTML = '';
@@ -723,7 +732,19 @@ const generateTimelineReport = (project: Project): string => {
   // Exploration loops
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     project.explorationLoops.forEach(loop => {
-      const loopArtifacts = project.artifacts.filter(a => loop.artifactIds.includes(a.id) && a.isFavorite);
+      // FIXED: Collect artifacts from all segment arrays for timeline
+      const loopArtifacts = project.artifacts.filter(a => {
+        if (!a.isFavorite) return false;
+        return (
+          (loop.exploreArtifactIds && loop.exploreArtifactIds.includes(a.id)) ||
+          (loop.buildArtifactIds && loop.buildArtifactIds.includes(a.id)) ||
+          (loop.checkArtifactIds && loop.checkArtifactIds.includes(a.id)) ||
+          (loop.adaptArtifactIds && loop.adaptArtifactIds.includes(a.id)) ||
+          (loop.decisionsArtifactIds && loop.decisionsArtifactIds.includes(a.id)) ||
+          (loop.invoicesArtifactIds && loop.invoicesArtifactIds.includes(a.id))
+        );
+      });
+      
       timelineEvents.push({
         timestamp: loop.startDate,
         type: 'Exploration Loop',
