@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { Stack } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 
 interface Phase {
@@ -58,17 +57,6 @@ const phases: Phase[] = [
 export default function PhasesScreen() {
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: 'Phases',
-          headerStyle: {
-            backgroundColor: colors.background,
-          },
-          headerTintColor: colors.text,
-          headerShadowVisible: false,
-        }}
-      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}

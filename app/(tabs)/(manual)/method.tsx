@@ -5,28 +5,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
 } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
 
 export default function MethodScreen() {
-  const router = useRouter();
-
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: 'Method',
-          headerStyle: {
-            backgroundColor: colors.background,
-          },
-          headerTintColor: colors.text,
-          headerShadowVisible: false,
-        }}
-      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}

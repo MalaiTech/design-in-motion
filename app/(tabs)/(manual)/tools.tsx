@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import React, { useState, useRef, useEffect } from 'react';
 import { colors } from '@/styles/commonStyles';
-import { Stack } from 'expo-router';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -257,17 +256,6 @@ export default function ToolsScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: 'Tools',
-          headerStyle: {
-            backgroundColor: colors.background,
-          },
-          headerTintColor: colors.text,
-          headerShadowVisible: false,
-        }}
-      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
