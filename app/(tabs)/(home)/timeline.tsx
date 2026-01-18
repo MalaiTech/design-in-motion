@@ -39,6 +39,17 @@ export default function TimelineScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
 
+  const getPhaseSurfaceColor = (phase: string): string => {
+    switch (phase) {
+      case 'Framing': return '#EAF0FF';
+      case 'Exploration': return '#FFF6D8';
+      case 'Pilot': return '#EEF2F5';
+      case 'Delivery': return '#E6E6E6';
+      case 'Finish': return '#FDECEC';
+      default: return colors.background;
+    }
+  };
+
   const loadProject = useCallback(async () => {
     console.log('Timeline: Loading project', projectId);
     const projects = await getProjects();
@@ -474,8 +485,10 @@ export default function TimelineScreen() {
     );
   }
 
+  const screenBackgroundColor = getPhaseSurfaceColor(project.phase);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: screenBackgroundColor }]}>
       {timelineEvents.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateTitle}>No activity yet</Text>
@@ -487,6 +500,7 @@ export default function TimelineScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          style={{ backgroundColor: screenBackgroundColor }}
         >
           {timelineEvents.map((event, index) => renderEvent(event, index))}
         </ScrollView>

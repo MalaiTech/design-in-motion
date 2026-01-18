@@ -286,9 +286,10 @@ export default function ExplorationLoopsScreen() {
   }
 
   const filteredLoops = getFilteredAndSortedLoops();
+  const explorationBackgroundColor = '#FFF6D8';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: explorationBackgroundColor }]}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -314,6 +315,7 @@ export default function ExplorationLoopsScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          style={{ backgroundColor: explorationBackgroundColor }}
         >
           {filteredLoops.length === 0 ? (
             <View style={styles.emptyState}>

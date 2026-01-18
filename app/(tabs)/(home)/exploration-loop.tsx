@@ -1170,9 +1170,10 @@ export default function ExplorationLoopScreen() {
 
   const timeEntries = (loop as any).timeEntries || [];
   const costEntries = (loop as any).costEntries || [];
+  const explorationBackgroundColor = '#FFF6D8';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: explorationBackgroundColor }]}>
       <Stack.Screen 
         options={{ 
           title: 'Exploration:',
@@ -1187,6 +1188,7 @@ export default function ExplorationLoopScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          style={{ backgroundColor: explorationBackgroundColor }}
         >
           {/* 1. Status */}
           <View style={styles.section}>

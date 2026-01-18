@@ -82,6 +82,17 @@ export default function ProjectOverviewScreen() {
     }
   };
 
+  const getPhaseSurfaceColor = (phase: ProjectPhase): string => {
+    switch (phase) {
+      case 'Framing': return '#EAF0FF';
+      case 'Exploration': return '#FFF6D8';
+      case 'Pilot': return '#EEF2F5';
+      case 'Delivery': return '#E6E6E6';
+      case 'Finish': return '#FDECEC';
+      default: return colors.background;
+    }
+  };
+
   const handlePhaseChange = async (newPhase: ProjectPhase) => {
     if (!project) return;
     
@@ -299,9 +310,8 @@ export default function ProjectOverviewScreen() {
   // Get artifacts to display (initial OR framing favorites only)
   const displayArtifacts = getDisplayArtifacts();
 
-  // Determine background color based on color scheme
-  const isDark = colorScheme === 'dark';
-  const screenBackgroundColor = colors.background; // #FAFAF7 in light mode
+  // Determine background color based on project phase
+  const screenBackgroundColor = getPhaseSurfaceColor(project.phase);
 
   return (
     <View style={[styles.container, { backgroundColor: screenBackgroundColor }]}>

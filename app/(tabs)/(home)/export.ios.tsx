@@ -159,6 +159,17 @@ export default function ExportScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  const getPhaseSurfaceColor = (phase: string): string => {
+    switch (phase) {
+      case 'Framing': return '#EAF0FF';
+      case 'Exploration': return '#FFF6D8';
+      case 'Pilot': return '#EEF2F5';
+      case 'Delivery': return '#E6E6E6';
+      case 'Finish': return '#FDECEC';
+      default: return colors.background;
+    }
+  };
+
   const loadProject = useCallback(async () => {
     console.log('Export: Loading project', projectId);
     const projects = await getProjects();
@@ -227,8 +238,10 @@ export default function ExportScreen() {
     );
   }
 
+  const screenBackgroundColor = getPhaseSurfaceColor(project.phase);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: screenBackgroundColor }]}>
       <Stack.Screen 
         options={{
           title: 'Export',
@@ -236,7 +249,10 @@ export default function ExportScreen() {
         }}
       />
       
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        style={{ backgroundColor: screenBackgroundColor }}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Export Project</Text>
           <Text style={styles.subtitle}>{project.title}</Text>
