@@ -5,6 +5,10 @@ import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
 import { Stack } from 'expo-router';
 import FloatingTabBar, { TabBarItem } from '@/components/FloatingTabBar';
 
+export const unstable_settings = {
+  initialRouteName: '(home)',
+};
+
 export default function TabLayout() {
   // Check if device is iPad
   const isIPad = Platform.OS === 'ios' && Platform.isPad;
@@ -33,6 +37,7 @@ export default function TabLayout() {
             headerShown: false,
             animation: 'none',
           }}
+          initialRouteName="(home)"
         >
           <Stack.Screen key="home" name="(home)" />
           <Stack.Screen key="guide" name="(guide)" />
@@ -44,7 +49,7 @@ export default function TabLayout() {
 
   // On iPhone, use native tabs
   return (
-    <NativeTabs>
+    <NativeTabs initialRouteName="(home)">
       <NativeTabs.Trigger key="home" name="(home)">
         <Icon sf="house.fill" />
         <Label>Projects</Label>
