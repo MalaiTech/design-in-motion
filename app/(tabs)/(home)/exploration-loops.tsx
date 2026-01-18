@@ -289,6 +289,26 @@ export default function ExplorationLoopsScreen() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerStyle: {
+            backgroundColor: '#FFF6D8',
+          },
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.headerFilterButton}
+              onPress={() => setFilterModalVisible(true)}
+            >
+              <IconSymbol
+                ios_icon_name="line.3.horizontal.decrease.circle"
+                android_material_icon_name="filter-list"
+                size={24}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+          ),
+        }}
+      />
       
       <KeyboardAvoidingView 
         style={{ flex: 1 }}

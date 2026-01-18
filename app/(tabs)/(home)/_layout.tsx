@@ -52,23 +52,15 @@ export default function HomeLayout() {
     },
   ];
 
-  // Simplified header configuration for project-specific screens
-  const projectScreenOptions = {
-    headerShown: true,
-    headerBackTitleVisible: false, // Hide back button text, show only chevron
-    headerStyle: {
-      backgroundColor: 'transparent', // Transparent header background
-    },
-    headerTransparent: true, // Make header transparent
-    headerBlurEffect: undefined, // No blur effect
-    headerTitleStyle: {
-      color: '#111111', // Black text for title
-      fontSize: 17,
-      fontWeight: '600' as const,
-    },
-    headerTintColor: '#111111', // Black color for back button chevron and icons
-    headerShadowVisible: false, // No shadow
-    headerTitleAlign: 'center' as const, // Center the title
+  // Common header style for specified screens
+  const headerStyle = {
+    backgroundColor: colors.background, // #FAFAF7
+  };
+
+  const headerTitleStyle = {
+    color: '#111111', // Black text for title
+    fontSize: 17,
+    fontWeight: '600' as const,
   };
 
   return (
@@ -87,9 +79,7 @@ export default function HomeLayout() {
             headerShown: true,
             title: 'Start a Project',
             presentation: 'modal',
-            headerStyle: {
-              backgroundColor: colors.background,
-            },
+            headerStyle,
           }}
         />
         <Stack.Screen
@@ -98,51 +88,73 @@ export default function HomeLayout() {
             headerShown: true,
             title: 'Edit Project',
             presentation: 'modal',
-            headerStyle: {
-              backgroundColor: colors.background,
-            },
+            headerStyle,
           }}
         />
         <Stack.Screen
           name="project-overview"
           options={{
-            ...projectScreenOptions,
+            headerShown: true,
             title: 'Project Overview',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
           name="framing"
           options={{
-            ...projectScreenOptions,
+            headerShown: true,
             title: 'Framing',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
           name="exploration-loops"
           options={{
-            ...projectScreenOptions,
+            headerShown: true,
             title: 'Exploration Loops',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
           name="exploration-loop"
           options={{
-            ...projectScreenOptions,
+            headerShown: true,
             title: 'Exploration Loop',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
           name="timeline"
           options={{
-            ...projectScreenOptions,
+            headerShown: true,
             title: 'Timeline',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
         <Stack.Screen
           name="export"
           options={{
-            ...projectScreenOptions,
+            headerShown: true,
             title: 'Export',
+            headerBackTitle: '', // Remove back button text, show only chevron
+            headerStyle,
+            headerTitleStyle,
+            headerTintColor: '#111111', // Black color for back button chevron
           }}
         />
       </Stack>

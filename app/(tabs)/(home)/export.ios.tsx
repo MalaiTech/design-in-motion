@@ -214,6 +214,12 @@ export default function ExportScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
+        <Stack.Screen 
+          options={{
+            title: 'Export',
+            headerBackTitle: 'Back',
+          }}
+        />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -223,6 +229,13 @@ export default function ExportScreen() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen 
+        options={{
+          title: 'Export',
+          headerBackTitle: 'Back',
+        }}
+      />
+      
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Export Project</Text>
