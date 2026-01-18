@@ -22,36 +22,36 @@ const phases: Phase[] = [
     name: 'Framing',
     color: '#1E4DD8',
     surface: '#EAF0FF',
-    focus: 'Define the opportunity',
-    description: 'Establish what you know, what you need to learn, and what questions will guide your exploration.',
+    focus: 'Understanding before solving.',
+    description: 'Framing is about clarifying intent, context, and uncertainty. Use exploration loops to test assumptions, gather understanding what you do not know, and refine the questions that matter most.\n\nAt this stage, exploration is lightweight and reflective. You are learning what to explore, not what to build.',
   },
   {
     name: 'Exploration',
     color: '#F2C94C',
     surface: '#FFF6D8',
-    focus: 'Test and learn',
-    description: 'Run structured loops to explore possibilities, build prototypes, check assumptions, and adapt based on findings.',
+    focus: 'Learning through deliberate inquiry',
+    description: 'Exploration is where loops become central. Each loop is a focused cycle of questioning, experimenting, and reflecting to continue learn and develop the project.\n\nUse loops to explore multiple directions without committing. The goal is not progress, but insight.',
   },
   {
     name: 'Pilot',
     color: '#555555',
     surface: '#EEF2F5',
-    focus: 'Validate at scale',
-    description: 'Test your solution in real conditions to confirm it works before full commitment.',
+    focus: 'Testing your designs under realistic conditions',
+    description: 'In Pilot, exploration loops become more constrained. You use them to validate whether a direction holds up when exposed to real-world constraints.\n\nThe work shifts from 'what could be' to 'does this still make sense' when tested.',
   },
   {
     name: 'Delivery',
     color: '#555555',
     surface: '#E6E6E6',
-    focus: 'Prepare for launch',
-    description: 'Finalize all elements and prepare for implementation or handoff.',
+    focus: 'Commitment to prepare for launch',
+    description: 'Delivery turns validated learning into real outcomes. Exploration loops may still occur, but they are smaller and more targeted to finalize all elements and prepare for implementation and handoff.\n\nAt this stage, loops help refine decisions and final deliverables rather than question direction. Learning supports execution, instead of delaying it.',
   },
   {
     name: 'Finish',
     color: '#D32F2F',
     surface: '#FDECEC',
     focus: 'Complete and reflect',
-    description: 'Close the project, document outcomes, and capture learnings for future work.',
+    description: 'We consolidate what was learned across all phases. Exploration loops are no longer forward-looking, but reflective.\n\nUse this phase to capture insights, document decisions, and make learning transferable to future projects.',
   },
 ];
 
@@ -78,8 +78,7 @@ export default function PhasesScreen() {
           <Text style={styles.sectionTitle}>What to Focus on at Each Stage</Text>
           
           <Text style={styles.introText}>
-            Each phase has a distinct purpose and set of activities. Move through them sequentially, 
-            but feel free to return to earlier phases if new insights emerge.
+            Design in Motion is not a linear process. While projects move through phases, exploration loops remain the core engine throughout. Each phase gives you a different focus.{'\n\n'}Exploration loops help you learn, test assumptions, and reflect at every stage — from early framing to final delivery.
           </Text>
 
           <View style={styles.phasesContainer}>
