@@ -1,7 +1,10 @@
+
 # Ignore generated files
 _expo/
 dist/
 web-build/
+.expo/
+.expo-shared/
 
 # Ignore node modules
 node_modules/
@@ -9,3 +12,16 @@ node_modules/
 # Ignore build artifacts
 *.bundle.js
 *.bundle.js.map
+
+# Ignore backend (has its own linting)
+backend/
+
+# Ignore babel plugins (custom tooling)
+babel-plugins/
+
+# Ignore assets
+assets/
+
+# Ignore config files that don't need linting
+metro.config.js
+babel.config.js
