@@ -597,13 +597,6 @@ export default function FramingScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{
-          headerStyle: {
-            backgroundColor: colors.surfaceFraming,
-          },
-        }}
-      />
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}

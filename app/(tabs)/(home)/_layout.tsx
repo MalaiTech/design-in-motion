@@ -52,10 +52,10 @@ export default function HomeLayout() {
     },
   ];
 
-  // UPDATED: Simplified header configuration for project-specific screens
+  // Simplified header configuration for project-specific screens
   const projectScreenOptions = {
     headerShown: true,
-    headerBackTitle: '', // Remove back button text, show only chevron
+    headerBackTitleVisible: false, // Hide back button text, show only chevron
     headerStyle: {
       backgroundColor: 'transparent', // Transparent header background
     },
