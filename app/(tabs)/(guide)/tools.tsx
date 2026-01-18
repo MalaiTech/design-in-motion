@@ -72,19 +72,14 @@ const toolCategories: ToolCategory[] = [
     title: 'Decision & Reflection Tools',
     tools: [
       {
-        name: 'Decisions Log',
-        description: 'Document key choices with context and rationale',
-        details: 'The Decisions Log captures why you made specific choices:\n\n• What was decided\n• Why it was decided\n• What alternatives were considered\n• Supporting artifacts\n\nDecisions are not just outcomes—they are learning moments. Documenting them helps you understand your process, communicate with stakeholders, and reflect on what worked.',
+        name: 'Decisions',
+        description: 'What was decided and why?',
+        details: 'Decisions record conscious choices made at a specific moment.\n\nThey are traceable commitments, not final conclusions.\n\nRecording decisions prevents repeated debates.',
       },
       {
         name: 'Timeline',
-        description: 'Visual history of your project evolution',
-        details: 'The Timeline shows your project journey:\n\n• Phase changes and transitions\n• Exploration loops and their outcomes\n• Key decisions and when they were made\n• Artifacts created along the way\n\nThe timeline helps you see patterns, understand pacing, and communicate progress. It is a narrative tool that shows how learning accumulated over time.',
-      },
-      {
-        name: 'Time & Cost Tracking',
-        description: 'Track hours and expenses within each loop',
-        details: 'Time and Cost Tracking helps you understand resource investment:\n\n• Log hours spent on each loop\n• Record costs and expenses\n• See totals across the project\n\nThis data supports realistic planning, helps justify decisions, and provides transparency for stakeholders. It is integrated into your PDF exports.',
+        description: 'How the project evolved over time.',
+        details: 'The timeline shows framing, exploration, artifacts, and decisions in sequence.\n\nIt reveals shifts, learning moments, and patterns.\n\nUse it to understand the story of the work.',
       },
     ],
   },
