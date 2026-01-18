@@ -1161,7 +1161,6 @@ export default function ExplorationLoopScreen() {
   if (!project || !loop) {
     return (
       <View style={styles.container}>
-        <Stack.Screen options={{ title: '', headerShown: true, headerStyle: { backgroundColor: '#FFF6D8' } }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading...</Text>
         </View>
@@ -1176,10 +1175,7 @@ export default function ExplorationLoopScreen() {
     <View style={styles.container}>
       <Stack.Screen 
         options={{ 
-          title: '',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#FFF6D8' },
-          headerTintColor: colors.text,
+          title: 'Exploration:',
         }} 
       />
       
@@ -2401,7 +2397,7 @@ export default function ExplorationLoopScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF6D8',
+    backgroundColor: colors.background,
   },
   scrollContent: {
     padding: 16,

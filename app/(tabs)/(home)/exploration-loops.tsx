@@ -291,9 +291,6 @@ export default function ExplorationLoopsScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          headerStyle: {
-            backgroundColor: '#FFF6D8',
-          },
           headerRight: () => (
             <TouchableOpacity
               style={styles.headerFilterButton}
@@ -364,7 +361,7 @@ export default function ExplorationLoopsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF6D8',
+    backgroundColor: colors.background,
   },
   headerFilterButton: {
     padding: 8,
