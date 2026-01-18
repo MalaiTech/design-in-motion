@@ -6,8 +6,8 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
-export default function GuideLayout() {
-  console.log('GuideLayout rendered - initialRouteName: index');
+export default function ManualLayout() {
+  console.log('ManualLayout rendered - initialRouteName: index');
   
   return (
     <Stack

@@ -26,7 +26,7 @@ const navigationCards: NavigationCard[] = [
     id: 'method',
     title: 'Method',
     subtitle: 'How Design in Motion works',
-    route: '/(tabs)/(guide)/method',
+    route: '/(tabs)/(manual)/method',
     iosIcon: 'point.bottomleft.forward.to.arrow.triangle.uturn.scurvepath',
     androidIcon: 'timeline',
   },
@@ -34,7 +34,7 @@ const navigationCards: NavigationCard[] = [
     id: 'phases',
     title: 'Phases',
     subtitle: 'What to focus on at each stage',
-    route: '/(tabs)/(guide)/phases',
+    route: '/(tabs)/(manual)/phases',
     iosIcon: 'circle.grid.cross.left.filled',
     androidIcon: 'grid-on',
   },
@@ -42,16 +42,16 @@ const navigationCards: NavigationCard[] = [
     id: 'tools',
     title: 'Tools',
     subtitle: 'Practical supports inside the app',
-    route: '/(tabs)/(guide)/tools',
+    route: '/(tabs)/(manual)/tools',
     iosIcon: 'slider.horizontal.2.arrow.trianglehead.counterclockwise',
     androidIcon: 'tune',
   },
 ];
 
-export default function GuideHomeScreen() {
+export default function ManualHomeScreen() {
   const router = useRouter();
 
-  console.log('Guide Home Screen rendered');
+  console.log('Manual Home Screen rendered');
 
   return (
     <View style={styles.container}>
@@ -137,17 +137,17 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 0, // Explicitly set to 0 to remove any extra space below image
+    marginBottom: 0,
   },
   conceptImage: {
     width: '100%',
     height: undefined,
-    aspectRatio: 1920 / 1080, // Adjust this ratio to match your actual image dimensions
-    marginBottom: 0, // Explicitly set to 0 to remove any extra space below image
+    aspectRatio: 1920 / 1080,
+    marginBottom: 0,
   },
   intentBlock: {
     paddingHorizontal: 24,
-    paddingTop: 4, // Reduced from 16 to 4 (75% reduction - more than 50%)
+    paddingTop: 4,
     paddingBottom: 32,
   },
   headline: {

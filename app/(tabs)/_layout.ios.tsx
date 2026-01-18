@@ -25,10 +25,10 @@ export default function TabLayout() {
         label: 'Projects',
       },
       {
-        name: '(guide)',
-        route: '/(tabs)/(guide)/',
+        name: '(manual)',
+        route: '/(tabs)/(manual)/',
         icon: 'menu-book',
-        label: 'Guide',
+        label: 'Manual',
       },
     ];
 
@@ -49,7 +49,7 @@ export default function TabLayout() {
             }}
           />
           <Stack.Screen 
-            name="(guide)" 
+            name="(manual)" 
             options={{
               headerShown: false,
             }}
@@ -68,9 +68,9 @@ export default function TabLayout() {
         <Icon sf="house.fill" />
         <Label>Projects</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(guide)">
+      <NativeTabs.Trigger name="(manual)">
         <Icon sf="book.closed.fill" />
-        <Label>Guide</Label>
+        <Label>Manual</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
