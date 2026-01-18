@@ -10,6 +10,8 @@ export const unstable_settings = {
 };
 
 export default function TabLayout() {
+  console.log('TabLayout iOS rendered - initialRouteName: (home)');
+  
   // Check if device is iPad
   const isIPad = Platform.OS === 'ios' && Platform.isPad;
 
@@ -37,24 +39,35 @@ export default function TabLayout() {
             headerShown: false,
             animation: 'none',
           }}
-          initialRouteName="(home)"
         >
-          <Stack.Screen key="home" name="(home)" />
-          <Stack.Screen key="guide" name="(guide)" />
+          {/* Explicitly set (home) as first screen to ensure it loads first */}
+          <Stack.Screen 
+            name="(home)" 
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen 
+            name="(guide)" 
+            options={{
+              headerShown: false,
+            }}
+          />
         </Stack>
         <FloatingTabBar tabs={tabs} />
       </>
     );
   }
 
-  // On iPhone, use native tabs
+  // On iPhone, use native tabs with explicit initialRouteName
   return (
-    <NativeTabs initialRouteName="(home)">
-      <NativeTabs.Trigger key="home" name="(home)">
+    <NativeTabs>
+      {/* Explicitly set (home) as first tab to ensure it loads first */}
+      <NativeTabs.Trigger name="(home)">
         <Icon sf="house.fill" />
         <Label>Projects</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger key="guide" name="(guide)">
+      <NativeTabs.Trigger name="(guide)">
         <Icon sf="book.closed.fill" />
         <Label>Guide</Label>
       </NativeTabs.Trigger>

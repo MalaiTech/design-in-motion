@@ -7,7 +7,13 @@ import { colors } from '@/styles/commonStyles';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function HomeLayout() {
+  console.log('HomeLayout rendered - initialRouteName: index');
+  
   const params = useLocalSearchParams();
   const pathname = usePathname();
   const projectId = params.id as string;

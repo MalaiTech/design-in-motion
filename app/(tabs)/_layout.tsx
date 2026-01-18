@@ -8,6 +8,8 @@ export const unstable_settings = {
 };
 
 export default function TabLayout() {
+  console.log('TabLayout rendered - initialRouteName: (home)');
+  
   // Two tabs configuration - Projects and Guide
   const tabs: TabBarItem[] = [
     {
@@ -31,10 +33,20 @@ export default function TabLayout() {
           headerShown: false,
           animation: 'none',
         }}
-        initialRouteName="(home)"
       >
-        <Stack.Screen key="home" name="(home)" />
-        <Stack.Screen key="guide" name="(guide)" />
+        {/* Explicitly set (home) as first screen to ensure it loads first */}
+        <Stack.Screen 
+          name="(home)" 
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen 
+          name="(guide)" 
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
       <FloatingTabBar tabs={tabs} />
     </>
