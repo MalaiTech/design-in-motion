@@ -29,6 +29,7 @@ export default function TabLayout() {
   return (
     <>
       <Stack
+        initialRouteName="(home)"
         screenOptions={{
           headerShown: false,
           animation: 'none',

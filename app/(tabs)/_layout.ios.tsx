@@ -35,6 +35,7 @@ export default function TabLayout() {
     return (
       <>
         <Stack
+          initialRouteName="(home)"
           screenOptions={{
             headerShown: false,
             animation: 'none',
@@ -61,7 +62,7 @@ export default function TabLayout() {
 
   // On iPhone, use native tabs with explicit initialRouteName
   return (
-    <NativeTabs>
+    <NativeTabs initialRouteName="(home)">
       {/* Explicitly set (home) as first tab to ensure it loads first */}
       <NativeTabs.Trigger name="(home)">
         <Icon sf="house.fill" />
