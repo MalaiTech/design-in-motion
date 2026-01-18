@@ -1,15 +1,24 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface Tool {
   name: string;
@@ -110,7 +119,74 @@ const toolCategories: ToolCategory[] = [
   },
 ];
 
+interface ToolCardProps {
+  tool: Tool;
+  categoryTitle: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+function ToolCard({ tool, categoryTitle, isExpanded, onToggle }: ToolCardProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    console.log('Tool card animation triggered:', tool.name, 'expanded:', isExpanded);
+    Animated.timing(fadeAnim, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isExpanded, fadeAnim, tool.name]);
+
+  return (
+    <TouchableOpacity
+      style={styles.toolCard}
+      onPress={onToggle}
+      activeOpacity={0.7}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${tool.name}. ${tool.description}. ${isExpanded ? 'Expanded. Tap to collapse.' : 'Collapsed. Tap to expand.'}`}
+      accessibilityHint={isExpanded ? 'Double tap to collapse details' : 'Double tap to expand details'}
+    >
+      <View style={styles.toolHeader}>
+        <View style={styles.toolTextContainer}>
+          <Text style={styles.toolName}>{tool.name}</Text>
+          <Text style={styles.toolDescription}>{tool.description}</Text>
+        </View>
+        <IconSymbol
+          ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
+          android_material_icon_name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={24}
+          color={colors.textSecondary}
+        />
+      </View>
+      
+      {isExpanded && (
+        <Animated.View 
+          style={[
+            styles.toolDetails,
+            {
+              opacity: fadeAnim,
+            }
+          ]}
+          accessible={true}
+          accessibilityLabel={`Details: ${tool.details}`}
+        >
+          <Text 
+            style={styles.toolDetailsText}
+            selectable={true}
+            accessible={true}
+          >
+            {tool.details}
+          </Text>
+        </Animated.View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function ToolsScreen() {
+  // State is not persisted - resets on app restart
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
 
   console.log('ToolsScreen rendered');
@@ -118,6 +194,11 @@ export default function ToolsScreen() {
   const handleToggleTool = (categoryTitle: string, toolName: string) => {
     const key = `${categoryTitle}-${toolName}`;
     console.log('User tapped tool card:', toolName, 'in category:', categoryTitle);
+    
+    // Configure smooth animation for layout changes
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    // Collapse if already expanded, expand if collapsed
     setExpandedTool(expandedTool === key ? null : key);
   };
 
@@ -138,6 +219,7 @@ export default function ToolsScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={false}
       >
         <View style={styles.content}>
           {toolCategories.map((category, categoryIndex) => (
@@ -151,30 +233,12 @@ export default function ToolsScreen() {
                   
                   return (
                     <React.Fragment key={tool.name}>
-                      <TouchableOpacity
-                        style={styles.toolCard}
-                        onPress={() => handleToggleTool(category.title, tool.name)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.toolHeader}>
-                          <View style={styles.toolTextContainer}>
-                            <Text style={styles.toolName}>{tool.name}</Text>
-                            <Text style={styles.toolDescription}>{tool.description}</Text>
-                          </View>
-                          <IconSymbol
-                            ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
-                            android_material_icon_name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                            size={24}
-                            color={colors.textSecondary}
-                          />
-                        </View>
-                        
-                        {isExpanded && (
-                          <View style={styles.toolDetails}>
-                            <Text style={styles.toolDetailsText}>{tool.details}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
+                      <ToolCard
+                        tool={tool}
+                        categoryTitle={category.title}
+                        isExpanded={isExpanded}
+                        onToggle={() => handleToggleTool(category.title, tool.name)}
+                      />
                       
                       {toolIndex < category.tools.length - 1 && (
                         <View style={styles.cardDivider} />
