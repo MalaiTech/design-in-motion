@@ -37,7 +37,7 @@ const phases: Phase[] = [
     color: '#555555',
     surface: '#EEF2F5',
     focus: 'Testing your designs under realistic conditions',
-    description: 'In Pilot, exploration loops become more constrained. You use them to validate whether a direction holds up when exposed to real-world constraints.\n\nThe work shifts from 'what could be' to 'does this still make sense' when tested.',
+    description: 'In Pilot, exploration loops become more constrained. You use them to validate whether a direction holds up when exposed to real-world constraints.\n\nThe work shifts from "what could be" to "does this still make sense" when tested.',
   },
   {
     name: 'Delivery',
