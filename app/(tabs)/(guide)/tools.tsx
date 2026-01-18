@@ -27,6 +27,26 @@ const toolCategories: ToolCategory[] = [
     title: 'Thinking & Framing Tools',
     tools: [
       {
+        name: 'Opportunity Origin',
+        description: 'What triggered this project?',
+        details: 'The opportunity origin captures what initiated the project. This might be a problem, an observation, a question, or an external signal.\n\nWriting this down anchors the work and prevents drifting away from the original intent.\n\nUse this before defining solutions or directions.',
+      },
+      {
+        name: 'Purpose',
+        description: 'What are we trying to achieve and for whom?',
+        details: 'Purpose defines the intended outcome without describing how to achieve it.\n\nIt helps evaluate ideas and decisions later.\n\nKeep it short, human-centered, and focused on impact.',
+      },
+      {
+        name: 'Known / Assumed / Unknown',
+        description: 'What do we know, believe, or need to learn?',
+        details: 'This tool separates facts from assumptions and open questions.\n\nIt reveals where exploration has the highest value.\n\nRevisit it as learning progresses.',
+      },
+      {
+        name: 'Design Space & Constraints',
+        description: 'What boundaries shape the work?',
+        details: 'Design space and constraints describe conditions such as time, budget, technology, ethics, or context.\n\nConstraints focus exploration and prevent unrealistic directions.\n\nThey enable more meaningful creativity.',
+      },
+      {
         name: 'Design Framing',
         description: 'Map certainties, uncertainties, and exploration questions',
         details: 'Design Framing helps you clarify intent and context before solving. It structures your understanding into three areas:\n\n• What you know (certainties)\n• What you don\'t know (uncertainties)\n• What you need to explore (questions)\n\nFraming is not about finding answers immediately. It\'s about identifying the right questions to explore. Use this tool at the start of a project to define your exploration space and throughout to refine your understanding.',
