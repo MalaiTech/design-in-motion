@@ -16,7 +16,7 @@ import {
   Keyboard,
   Linking,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -563,13 +563,6 @@ export default function FramingScreen() {
   if (!project) {
     return (
       <View style={styles.container}>
-        <Stack.Screen 
-          options={{
-            headerStyle: {
-              backgroundColor: colors.surfaceFraming,
-            },
-          }}
-        />
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Loading project...</Text>
         </View>
@@ -597,13 +590,6 @@ export default function FramingScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{
-          headerStyle: {
-            backgroundColor: colors.surfaceFraming,
-          },
-        }}
-      />
       <ScrollView 
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
