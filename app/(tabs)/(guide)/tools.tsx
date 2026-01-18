@@ -87,19 +87,24 @@ const toolCategories: ToolCategory[] = [
     title: 'Supporting Tools (Outside the App)',
     tools: [
       {
-        name: 'PDF Export',
-        description: 'Generate professional project reports',
-        details: 'PDF Export creates formatted reports from your project data:\n\n• Executive Overview: Summary, phase, key decisions\n• Design Process: Framing, loops, and learning\n• Timeline: Visual history of your work\n• Costs: Time and expense breakdown\n\nExports are designed for stakeholder communication, documentation, and archiving. They translate your process into a clear narrative.',
+        name: 'Sketching',
+        description: 'Fast visual thinking.',
+        details: 'Sketching helps explore ideas before they are fully formed.\n\nIts value lies in speed and openness, not quality.\n\nUse sketching early and often.',
       },
       {
-        name: 'Sketching & Prototyping',
-        description: 'External tools for building and testing',
-        details: 'Design in Motion does not replace your design tools—it structures how you use them:\n\n• Sketch on paper or in Figma\n• Build prototypes in code or no-code tools\n• Test with users in person or remotely\n\nThe app captures artifacts and decisions from these activities. Your external tools remain your workspace; the app is your process layer.',
+        name: 'Prototyping',
+        description: 'Testing assumptions through making.',
+        details: 'Prototypes turn ideas into something that can be explored or tested.\n\nThey can be rough or incomplete.\n\nTheir purpose is learning, not validation.',
       },
       {
-        name: 'Collaboration & Feedback',
-        description: 'External channels for team input and critique',
-        details: 'Collaboration happens outside the app:\n\n• Share artifacts via Files or iCloud\n• Discuss with your team in person or online\n• Gather feedback through your preferred channels\n\nThe app is designed for individual reflection and documentation. It supports collaboration by creating clear records you can share, but it is not a real-time collaboration platform.',
+        name: 'Conversations',
+        description: 'Learning through dialogue.',
+        details: 'Conversations introduce perspectives you cannot generate alone.\n\nThey surface assumptions and blind spots.\n\nCapture insights as questions, not conclusions.',
+      },
+      {
+        name: 'Reflection',
+        description: 'Turning activity into insight.',
+        details: 'Reflection makes sense of what was learned.\n\nWithout reflection, exploration remains activity without direction.\n\nUse it at the end of loops, phases, and projects.',
       },
     ],
   },
