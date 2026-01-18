@@ -294,8 +294,11 @@ export default function ExplorationLoopsScreen() {
         options={{
           headerRight: () => (
             <TouchableOpacity
-              style={styles.headerFilterButton}
-              onPress={() => setFilterModalVisible(true)}
+              style={styles.filterButton}
+              onPress={() => {
+                console.log('Exploration Loops: Opening filter modal');
+                setFilterModalVisible(true);
+              }}
             >
               <IconSymbol
                 ios_icon_name="line.3.horizontal.decrease.circle"
@@ -365,7 +368,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  headerFilterButton: {
+  filterButton: {
     padding: 8,
     marginRight: 8,
   },
