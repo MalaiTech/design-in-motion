@@ -29,12 +29,12 @@ const toolCategories: ToolCategory[] = [
       {
         name: 'Design Framing',
         description: 'Map certainties, uncertainties, and exploration questions',
-        details: 'Design Framing helps you clarify intent and context before solving. It structures your understanding into three areas:\n\n• What you know (certainties)\n• What you don't know (uncertainties)\n• What you need to explore (questions)\n\nFraming is not about finding answers immediately. It's about identifying the right questions to explore. Use this tool at the start of a project to define your exploration space and throughout to refine your understanding.',
+        details: 'Design Framing helps you clarify intent and context before solving. It structures your understanding into three areas:\n\n• What you know (certainties)\n• What you don\'t know (uncertainties)\n• What you need to explore (questions)\n\nFraming is not about finding answers immediately. It\'s about identifying the right questions to explore. Use this tool at the start of a project to define your exploration space and throughout to refine your understanding.',
       },
       {
         name: 'Exploration Questions',
         description: 'Define focused questions that guide your loops',
-        details: 'Exploration Questions are the engine of your process. Each question should be:\n\n• Specific enough to explore in one loop\n• Open enough to allow multiple directions\n• Testable through building and checking\n\nGood questions focus on learning, not proving. They help you discover what you don't know rather than confirm what you already believe. Questions evolve as you learn—refine them after each loop.',
+        details: 'Exploration Questions are the engine of your process. Each question should be:\n\n• Specific enough to explore in one loop\n• Open enough to allow multiple directions\n• Testable through building and checking\n\nGood questions focus on learning, not proving. They help you discover what you don\'t know rather than confirm what you already believe. Questions evolve as you learn—refine them after each loop.',
       },
     ],
   },
@@ -59,17 +59,17 @@ const toolCategories: ToolCategory[] = [
       {
         name: 'Decisions Log',
         description: 'Document key choices with context and rationale',
-        details: 'The Decisions Log captures why you made specific choices:\n\n• What was decided\n• Why it was decided\n• What alternatives were considered\n• Supporting artifacts\n\nDecisions are not just outcomes—they're learning moments. Documenting them helps you understand your process, communicate with stakeholders, and reflect on what worked.',
+        details: 'The Decisions Log captures why you made specific choices:\n\n• What was decided\n• Why it was decided\n• What alternatives were considered\n• Supporting artifacts\n\nDecisions are not just outcomes—they\'re learning moments. Documenting them helps you understand your process, communicate with stakeholders, and reflect on what worked.',
       },
       {
         name: 'Timeline',
-        description: 'Visual history of your project's evolution',
-        details: 'The Timeline shows your project's journey:\n\n• Phase changes and transitions\n• Exploration loops and their outcomes\n• Key decisions and when they were made\n• Artifacts created along the way\n\nThe timeline helps you see patterns, understand pacing, and communicate progress. It's a narrative tool that shows how learning accumulated over time.',
+        description: 'Visual history of your project\'s evolution',
+        details: 'The Timeline shows your project\'s journey:\n\n• Phase changes and transitions\n• Exploration loops and their outcomes\n• Key decisions and when they were made\n• Artifacts created along the way\n\nThe timeline helps you see patterns, understand pacing, and communicate progress. It\'s a narrative tool that shows how learning accumulated over time.',
       },
       {
         name: 'Time & Cost Tracking',
         description: 'Track hours and expenses within each loop',
-        details: 'Time and Cost Tracking helps you understand resource investment:\n\n• Log hours spent on each loop\n• Record costs and expenses\n• See totals across the project\n\nThis data supports realistic planning, helps justify decisions, and provides transparency for stakeholders. It's integrated into your PDF exports.',
+        details: 'Time and Cost Tracking helps you understand resource investment:\n\n• Log hours spent on each loop\n• Record costs and expenses\n• See totals across the project\n\nThis data supports realistic planning, helps justify decisions, and provides transparency for stakeholders. It\'s integrated into your PDF exports.',
       },
     ],
   },
@@ -84,12 +84,12 @@ const toolCategories: ToolCategory[] = [
       {
         name: 'Sketching & Prototyping',
         description: 'External tools for building and testing',
-        details: 'Design in Motion doesn't replace your design tools—it structures how you use them:\n\n• Sketch on paper or in Figma\n• Build prototypes in code or no-code tools\n• Test with users in person or remotely\n\nThe app captures artifacts and decisions from these activities. Your external tools remain your workspace; the app is your process layer.',
+        details: 'Design in Motion doesn\'t replace your design tools—it structures how you use them:\n\n• Sketch on paper or in Figma\n• Build prototypes in code or no-code tools\n• Test with users in person or remotely\n\nThe app captures artifacts and decisions from these activities. Your external tools remain your workspace; the app is your process layer.',
       },
       {
         name: 'Collaboration & Feedback',
         description: 'External channels for team input and critique',
-        details: 'Collaboration happens outside the app:\n\n• Share artifacts via Files or iCloud\n• Discuss with your team in person or online\n• Gather feedback through your preferred channels\n\nThe app is designed for individual reflection and documentation. It supports collaboration by creating clear records you can share, but it's not a real-time collaboration platform.',
+        details: 'Collaboration happens outside the app:\n\n• Share artifacts via Files or iCloud\n• Discuss with your team in person or online\n• Gather feedback through your preferred channels\n\nThe app is designed for individual reflection and documentation. It supports collaboration by creating clear records you can share, but it\'s not a real-time collaboration platform.',
       },
     ],
   },
