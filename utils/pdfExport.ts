@@ -3,6 +3,7 @@ import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
 import { colors } from '@/styles/commonStyles';
 import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent, TimeEntry, CostEntry, calculateProjectTotals } from './storage';
+import { getPersonalInfo, PersonalInfo } from './profileStorage';
 
 export type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
 
@@ -166,6 +167,7 @@ const getBaseHTML = (title: string, content: string): string => {
     
     .section {
       margin-bottom: 32px;
+      page-break-inside: avoid;
     }
     
     .list-item {
@@ -192,6 +194,7 @@ const getBaseHTML = (title: string, content: string): string => {
       padding: 16px;
       margin: 16px 0;
       border-left: 4px solid #1E4DD8;
+      page-break-inside: avoid;
     }
     
     .cost-table {
@@ -233,6 +236,7 @@ const getBaseHTML = (title: string, content: string): string => {
       padding-left: 24px;
       border-left: 3px solid #DDDDDD;
       position: relative;
+      page-break-inside: avoid;
     }
     
     .timeline-event:before {
@@ -273,11 +277,23 @@ const getBaseHTML = (title: string, content: string): string => {
       line-height: 2;
     }
     
+    .cover-personal-info {
+      margin-top: 48px;
+      font-size: 11pt;
+      color: #555555;
+      line-height: 1.8;
+    }
+    
+    .cover-personal-info p {
+      margin-bottom: 6px;
+    }
+    
     .artifact-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 16px;
       margin: 16px 0 24px 0;
+      page-break-inside: avoid;
     }
     
     .artifact-item {
@@ -324,6 +340,15 @@ const getBaseHTML = (title: string, content: string): string => {
       color: #555555;
       font-weight: 600;
     }
+    
+    .loop-section {
+      page-break-inside: avoid;
+    }
+    
+    .segment-section {
+      page-break-inside: avoid;
+      margin-bottom: 24px;
+    }
   </style>
 </head>
 <body>
@@ -333,8 +358,31 @@ const getBaseHTML = (title: string, content: string): string => {
   `;
 };
 
-// Generate Cover Page
-const generateCoverPage = (project: Project, formatTitle: string): string => {
+// Generate Cover Page with Personal & Business Details
+const generateCoverPage = async (project: Project, formatTitle: string): Promise<string> => {
+  const personalInfo = await getPersonalInfo();
+  
+  // Build personal info section - only show fields with content
+  let personalInfoHTML = '';
+  if (personalInfo) {
+    const infoLines: string[] = [];
+    
+    if (personalInfo.name) infoLines.push(`<p>${personalInfo.name}</p>`);
+    if (personalInfo.email) infoLines.push(`<p>${personalInfo.email}</p>`);
+    if (personalInfo.phone) infoLines.push(`<p>${personalInfo.phone}</p>`);
+    if (personalInfo.businessName) infoLines.push(`<p><strong>${personalInfo.businessName}</strong></p>`);
+    if (personalInfo.businessAddress) infoLines.push(`<p>${personalInfo.businessAddress}</p>`);
+    if (personalInfo.website) infoLines.push(`<p>${personalInfo.website}</p>`);
+    
+    if (infoLines.length > 0) {
+      personalInfoHTML = `
+        <div class="cover-personal-info">
+          ${infoLines.join('\n')}
+        </div>
+      `;
+    }
+  }
+  
   return `
     <div class="page cover-page">
       <h1 class="cover-title">${project.title}</h1>
@@ -344,13 +392,14 @@ const generateCoverPage = (project: Project, formatTitle: string): string => {
         <p><strong>Project Started:</strong> ${formatDate(project.startDate)}</p>
         <p><strong>Export Date:</strong> ${formatDate(new Date().toISOString())}</p>
       </div>
+      ${personalInfoHTML}
     </div>
   `;
 };
 
 // Generate Executive Overview
-const generateExecutiveOverview = (project: Project): string => {
-  const coverPage = generateCoverPage(project, 'Executive Overview');
+const generateExecutiveOverview = async (project: Project): Promise<string> => {
+  const coverPage = await generateCoverPage(project, 'Executive Overview');
   
   // Calculate project totals
   const { totalHours, totalCosts } = calculateProjectTotals(project);
@@ -492,7 +541,7 @@ const renderArtifactsInline = async (artifactIds: string[], allArtifacts: Artifa
 // Generate Design Process Report
 const generateDesignProcessReport = async (project: Project): Promise<string> => {
   console.log('PDF Export: Generating Design Process Report');
-  const coverPage = generateCoverPage(project, 'Design Process Report');
+  const coverPage = await generateCoverPage(project, 'Design Process Report');
   
   // 2nd Page: Design Framing (with inline artifacts directly below Purpose)
   let framingSection = '';
@@ -513,68 +562,80 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
         <div class="divider"></div>
         
         ${project.opportunityOrigin ? `
-          <h3>Opportunity Origin</h3>
-          <p>${project.opportunityOrigin}</p>
+          <div class="section">
+            <h3>Opportunity Origin</h3>
+            <p>${project.opportunityOrigin}</p>
+          </div>
         ` : ''}
         
         ${project.purpose ? `
-          <h3>Purpose</h3>
-          <p>${project.purpose}</p>
-          ${framingArtifactsHTML}
-        ` : framingArtifactsHTML}
+          <div class="section">
+            <h3>Purpose</h3>
+            <p>${project.purpose}</p>
+            ${framingArtifactsHTML}
+          </div>
+        ` : framingArtifactsHTML ? `<div class="section">${framingArtifactsHTML}</div>` : ''}
         
         ${project.certaintyItems && project.certaintyItems.length > 0 ? `
-          <h3>Certainty Mapping</h3>
-          ${project.certaintyItems.filter(c => c.category === 'known').length > 0 ? `
-            <h4>Known</h4>
-            ${project.certaintyItems.filter(c => c.category === 'known').map(c => `
-              <div class="list-item">${c.text}</div>
-            `).join('')}
-          ` : ''}
-          ${project.certaintyItems.filter(c => c.category === 'assumed').length > 0 ? `
-            <h4>Assumed</h4>
-            ${project.certaintyItems.filter(c => c.category === 'assumed').map(c => `
-              <div class="list-item">${c.text}</div>
-            `).join('')}
-          ` : ''}
-          ${project.certaintyItems.filter(c => c.category === 'unknown').length > 0 ? `
-            <h4>Unknown</h4>
-            ${project.certaintyItems.filter(c => c.category === 'unknown').map(c => `
-              <div class="list-item">${c.text}</div>
-            `).join('')}
-          ` : ''}
+          <div class="section">
+            <h3>Certainty Mapping</h3>
+            ${project.certaintyItems.filter(c => c.category === 'known').length > 0 ? `
+              <h4>Known</h4>
+              ${project.certaintyItems.filter(c => c.category === 'known').map(c => `
+                <div class="list-item">${c.text}</div>
+              `).join('')}
+            ` : ''}
+            ${project.certaintyItems.filter(c => c.category === 'assumed').length > 0 ? `
+              <h4>Assumed</h4>
+              ${project.certaintyItems.filter(c => c.category === 'assumed').map(c => `
+                <div class="list-item">${c.text}</div>
+              `).join('')}
+            ` : ''}
+            ${project.certaintyItems.filter(c => c.category === 'unknown').length > 0 ? `
+              <h4>Unknown</h4>
+              ${project.certaintyItems.filter(c => c.category === 'unknown').map(c => `
+                <div class="list-item">${c.text}</div>
+              `).join('')}
+            ` : ''}
+          </div>
         ` : ''}
         
         ${project.designSpaceItems && project.designSpaceItems.length > 0 ? `
-          <h3>Design Space</h3>
-          ${project.designSpaceItems.map(d => `
-            <div class="list-item">${d.text}</div>
-          `).join('')}
+          <div class="section">
+            <h3>Design Space</h3>
+            ${project.designSpaceItems.map(d => `
+              <div class="list-item">${d.text}</div>
+            `).join('')}
+          </div>
         ` : ''}
         
         ${project.explorationQuestions && project.explorationQuestions.length > 0 ? `
-          <h3>First Exploration Questions</h3>
-          ${project.explorationQuestions.map(q => `
-            <div class="list-item">
-              ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
-            </div>
-          `).join('')}
+          <div class="section">
+            <h3>First Exploration Questions</h3>
+            ${project.explorationQuestions.map(q => `
+              <div class="list-item">
+                ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
+              </div>
+            `).join('')}
+          </div>
         ` : ''}
         
         ${project.framingDecisions && project.framingDecisions.length > 0 ? `
-          <h3>Framing Decisions</h3>
-          ${project.framingDecisions.map(d => `
-            <div class="decision-box">
-              <p class="meta">${formatDate(d.timestamp)}</p>
-              <p>${d.summary}</p>
-            </div>
-          `).join('')}
+          <div class="section">
+            <h3>Framing Decisions</h3>
+            ${project.framingDecisions.map(d => `
+              <div class="decision-box">
+                <p class="meta">${formatDate(d.timestamp)}</p>
+                <p>${d.summary}</p>
+              </div>
+            `).join('')}
+          </div>
         ` : ''}
       </div>
     `;
   }
   
-  // Next Pages: Exploration Loops (with inline artifacts below each segment)
+  // Next Pages: Exploration Loops (each loop on its own page, segments prevent page breaks)
   let explorationSection = '';
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     const loopSections = await Promise.all(
@@ -595,63 +656,75 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
             <p class="meta">Status: ${loop.status} • Started: ${formatDate(loop.startDate)}</p>
             
             ${loop.exploreItems && loop.exploreItems.length > 0 ? `
-              <h3>Explore</h3>
-              ${loop.exploreItems.map(item => `
-                <div class="list-item">
-                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-                </div>
-              `).join('')}
-              ${exploreArtifactsHTML}
+              <div class="segment-section">
+                <h3>Explore</h3>
+                ${loop.exploreItems.map(item => `
+                  <div class="list-item">
+                    ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                  </div>
+                `).join('')}
+                ${exploreArtifactsHTML}
+              </div>
             ` : ''}
             
             ${loop.buildItems && loop.buildItems.length > 0 ? `
-              <h3>Build</h3>
-              ${loop.buildItems.map(item => `
-                <div class="list-item">
-                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-                </div>
-              `).join('')}
-              ${buildArtifactsHTML}
+              <div class="segment-section">
+                <h3>Build</h3>
+                ${loop.buildItems.map(item => `
+                  <div class="list-item">
+                    ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                  </div>
+                `).join('')}
+                ${buildArtifactsHTML}
+              </div>
             ` : ''}
             
             ${loop.checkItems && loop.checkItems.length > 0 ? `
-              <h3>Check</h3>
-              ${loop.checkItems.map(item => `
-                <div class="list-item">
-                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-                </div>
-              `).join('')}
-              ${checkArtifactsHTML}
+              <div class="segment-section">
+                <h3>Check</h3>
+                ${loop.checkItems.map(item => `
+                  <div class="list-item">
+                    ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                  </div>
+                `).join('')}
+                ${checkArtifactsHTML}
+              </div>
             ` : ''}
             
             ${loop.adaptItems && loop.adaptItems.length > 0 ? `
-              <h3>Adapt</h3>
-              ${loop.adaptItems.map(item => `
-                <div class="list-item">
-                  ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
-                </div>
-              `).join('')}
-              ${adaptArtifactsHTML}
+              <div class="segment-section">
+                <h3>Adapt</h3>
+                ${loop.adaptItems.map(item => `
+                  <div class="list-item">
+                    ${item.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${item.text}
+                  </div>
+                `).join('')}
+                ${adaptArtifactsHTML}
+              </div>
             ` : ''}
             
             ${loop.explorationDecisions && loop.explorationDecisions.length > 0 ? `
-              <h3>Decisions</h3>
-              ${loop.explorationDecisions.map(d => `
-                <div class="decision-box">
-                  <p class="meta">${formatDate(d.timestamp)}</p>
-                  <p>${d.summary}</p>
-                </div>
-              `).join('')}
-              ${decisionsArtifactsHTML}
+              <div class="segment-section">
+                <h3>Decisions</h3>
+                ${loop.explorationDecisions.map(d => `
+                  <div class="decision-box">
+                    <p class="meta">${formatDate(d.timestamp)}</p>
+                    <p>${d.summary}</p>
+                  </div>
+                `).join('')}
+                ${decisionsArtifactsHTML}
+              </div>
             ` : ''}
             
             ${loop.nextExplorationQuestions && loop.nextExplorationQuestions.length > 0 ? `
-              <h3>Next Exploration Questions</h3>
-              ${loop.nextExplorationQuestions.map(q => `
-                <div class="list-item">
-                  ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
-                </div>
-              `).join('')}
+              <div class="segment-section">
+                <h3>Next Exploration Questions</h3>
+                ${loop.nextExplorationQuestions.map(q => `
+                  <div class="list-item">
+                    ${q.isFavorite ? '<span class="favorite-marker">★</span> ' : ''}${q.text}
+                  </div>
+                `).join('')}
+              </div>
             ` : ''}
           </div>
         `;
@@ -666,8 +739,8 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
 };
 
 // Generate Timeline Report
-const generateTimelineReport = (project: Project): string => {
-  const coverPage = generateCoverPage(project, 'Timeline');
+const generateTimelineReport = async (project: Project): Promise<string> => {
+  const coverPage = await generateCoverPage(project, 'Timeline');
   
   // Build timeline events
   const timelineEvents: {timestamp: string, type: string, content: string, artifacts?: Artifact[]}[] = [];
@@ -782,8 +855,8 @@ const generateTimelineReport = (project: Project): string => {
 };
 
 // Generate Costs & Hours Report
-const generateCostsReport = (project: Project): string => {
-  const coverPage = generateCoverPage(project, 'Costs & Hours Report');
+const generateCostsReport = async (project: Project): Promise<string> => {
+  const coverPage = await generateCoverPage(project, 'Costs & Hours Report');
   
   // Calculate project totals
   const { totalHours, totalCosts } = calculateProjectTotals(project);
@@ -923,7 +996,7 @@ export const exportProjectToPDF = async (
   
   switch (format) {
     case 'executive':
-      htmlContent = generateExecutiveOverview(project);
+      htmlContent = await generateExecutiveOverview(project);
       fileName = `${project.title}_Executive_Overview`;
       break;
     case 'process':
@@ -932,11 +1005,11 @@ export const exportProjectToPDF = async (
       fileName = `${project.title}_Design_Process`;
       break;
     case 'timeline':
-      htmlContent = generateTimelineReport(project);
+      htmlContent = await generateTimelineReport(project);
       fileName = `${project.title}_Timeline`;
       break;
     case 'costs':
-      htmlContent = generateCostsReport(project);
+      htmlContent = await generateCostsReport(project);
       fileName = `${project.title}_Costs_Hours`;
       break;
     default:
