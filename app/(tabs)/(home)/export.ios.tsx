@@ -78,12 +78,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
-  },
   subtitle: {
     fontSize: 18,
     color: colors.textSecondary,
@@ -254,7 +248,6 @@ export default function ExportScreen() {
         style={{ backgroundColor: screenBackgroundColor }}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Export Project</Text>
           <Text style={styles.subtitle}>{project.title}</Text>
           <Text style={styles.description}>
             Choose a format to export your project as a PDF document
