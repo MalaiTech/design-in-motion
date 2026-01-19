@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.surfaceFraming,
+    backgroundColor: 'transparent',
   },
   formatContent: {
     flex: 1,
