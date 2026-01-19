@@ -1176,7 +1176,7 @@ export default function ExplorationLoopScreen() {
     <View style={[styles.container, { backgroundColor: explorationBackgroundColor }]}>
       <Stack.Screen 
         options={{ 
-          title: 'Exploration:',
+          title: 'Exploration',
         }} 
       />
       
