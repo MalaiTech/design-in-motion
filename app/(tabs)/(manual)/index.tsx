@@ -7,10 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface NavigationCard {
   id: string;
@@ -50,6 +52,7 @@ const navigationCards: NavigationCard[] = [
 
 export default function ManualHomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   console.log('Manual Home Screen rendered');
 
@@ -57,7 +60,10 @@ export default function ManualHomeScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top || (Platform.OS === 'ios' ? 44 : 24) }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Conceptual Image Block - Scales with screen width, maintains aspect ratio */}

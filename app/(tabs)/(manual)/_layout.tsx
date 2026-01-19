@@ -28,6 +28,7 @@ export default function ManualLayout() {
       <Stack.Screen
         name="index"
         options={{
+          headerShown: false, // Remove Stack header for main Manual screen
           title: 'Manual',
         }}
       />
