@@ -39,7 +39,7 @@ export default function CreateProjectScreen() {
   const handleAddVisuals = () => {
     const options = Platform.OS === 'web' 
       ? ['Cancel', 'Photos', 'Add URL']
-      : ['Cancel', 'Camera', 'Photos', 'Documents', 'Add URL'];
+      : ['Cancel', 'Camera', 'Photos', 'PDF Documents', 'Add URL'];
     
     const cancelIndex = 0;
 
@@ -50,13 +50,14 @@ export default function CreateProjectScreen() {
           cancelButtonIndex: cancelIndex,
         },
         async (buttonIndex) => {
+          console.log('User selected option:', buttonIndex);
           if (Platform.OS === 'web') {
             if (buttonIndex === 1) await openPhotos();
             else if (buttonIndex === 2) openURLInput();
           } else {
             if (buttonIndex === 1) await openCamera();
             else if (buttonIndex === 2) await openPhotos();
-            else if (buttonIndex === 3) await openDocuments();
+            else if (buttonIndex === 3) await openPDFDocuments();
             else if (buttonIndex === 4) openURLInput();
           }
         }
@@ -71,7 +72,7 @@ export default function CreateProjectScreen() {
         : [
             { text: 'Camera', onPress: openCamera },
             { text: 'Photos', onPress: openPhotos },
-            { text: 'Documents', onPress: openDocuments },
+            { text: 'PDF Documents', onPress: openPDFDocuments },
             { text: 'Add URL', onPress: openURLInput },
             { text: 'Cancel', style: 'cancel' as const },
           ];
@@ -86,6 +87,7 @@ export default function CreateProjectScreen() {
       return;
     }
 
+    console.log('Opening camera');
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission Required', 'Camera permission is needed to take photos.');
@@ -98,11 +100,13 @@ export default function CreateProjectScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
+      console.log('Camera photo captured:', result.assets[0].uri);
       addArtifact('image', result.assets[0].uri);
     }
   };
 
   const openPhotos = async () => {
+    console.log('Opening photo library');
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission Required', 'Photo library permission is needed to select photos.');
@@ -125,30 +129,38 @@ export default function CreateProjectScreen() {
     }
   };
 
-  const openDocuments = async () => {
+  const openPDFDocuments = async () => {
     if (Platform.OS === 'web') {
       Alert.alert('Not Available', 'Document picker is not available on web.');
       return;
     }
 
+    console.log('Opening PDF document picker');
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
+        type: 'application/pdf',
         multiple: true,
       });
 
       if (!result.canceled) {
-        result.assets.forEach((asset: any) => addArtifact('document', asset.uri, asset.name));
+        console.log('Selected PDF documents:', result.assets.length);
+        result.assets.forEach((asset: any) => {
+          console.log('Adding PDF document:', asset.name);
+          addArtifact('document', asset.uri, asset.name);
+        });
       }
     } catch (error) {
-      console.error('Error picking document:', error);
+      console.error('Error picking PDF document:', error);
+      Alert.alert('Error', 'Failed to pick PDF document');
     }
   };
 
   const openURLInput = () => {
+    console.log('Opening URL input');
     if (Platform.OS === 'ios') {
       Alert.prompt('Add URL', 'Enter a URL', (url) => {
         if (url && url.trim()) {
+          console.log('Adding URL:', url.trim());
           addArtifact('url', url.trim());
         }
       });
@@ -159,6 +171,7 @@ export default function CreateProjectScreen() {
 
   const handleUrlSubmit = () => {
     if (urlValue.trim()) {
+      console.log('Adding URL:', urlValue.trim());
       addArtifact('url', urlValue.trim());
       setUrlValue('');
       setShowUrlInput(false);
@@ -177,6 +190,7 @@ export default function CreateProjectScreen() {
   };
 
   const removeArtifact = (id: string) => {
+    console.log('Removing artifact:', id);
     setArtifacts(artifacts.filter(a => a.id !== id));
   };
 
@@ -196,8 +210,9 @@ export default function CreateProjectScreen() {
     };
 
     try {
+      console.log('Saving project:', newProject);
       await saveProject(newProject);
-      console.log('Project saved successfully:', newProject);
+      console.log('Project saved successfully');
       router.back();
     } catch (error) {
       console.error('Error saving project:', error);
@@ -206,6 +221,7 @@ export default function CreateProjectScreen() {
   };
 
   const handleCancel = () => {
+    console.log('User cancelled project creation');
     router.back();
   };
 
@@ -258,7 +274,7 @@ export default function CreateProjectScreen() {
           <View style={styles.section}>
             <Text style={styles.label}>Add Visuals (optional)</Text>
             <Text style={styles.helper}>
-              Add photos, sketches, links, or documents to begin shaping the project.
+              Add photos, sketches, links, or PDF documents to begin shaping the project.
             </Text>
             
             <TouchableOpacity style={styles.addButton} onPress={handleAddVisuals}>
