@@ -371,6 +371,7 @@ const styles = StyleSheet.create({
   filterButton: {
     padding: 8,
     marginRight: 8,
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     padding: 16,
