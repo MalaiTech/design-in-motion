@@ -7,15 +7,21 @@ export default function ProfileLayout() {
   return (
     <Stack
       screenOptions={{
+        // Same minimal navigation style as Manual and Project screens
+        headerShown: true,
+        headerTitleAlign: 'center',
+        headerTransparent: false,
+        headerShadowVisible: false,
+        headerBackTitleVisible: false, // Hide "Back" text
+        headerBackTitle: '', // No back title
+        headerBackButtonDisplayMode: 'minimal', // Critical for iOS chevron-only
+        headerTintColor: colors.text,
         headerStyle: {
           backgroundColor: colors.background,
         },
-        headerTintColor: colors.text,
         headerTitleStyle: {
           fontWeight: '600',
         },
-        headerShadowVisible: false,
-        headerBackTitle: 'Back',
       }}
     >
       <Stack.Screen
