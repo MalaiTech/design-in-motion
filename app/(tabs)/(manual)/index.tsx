@@ -69,7 +69,7 @@ export default function ManualHomeScreen() {
         {/* Conceptual Image Block - Scales with screen width, maintains aspect ratio */}
         <View style={styles.imageContainer}>
           <Image
-            source={require('@/assets/images/22bfbd00-a22b-415c-869e-36ca5e149254.png')}
+            source={require('@/assets/images/0ee355f1-2e5d-4e05-a093-07a54e5a2e67.png')}
             style={styles.conceptImage}
             resizeMode="contain"
           />
