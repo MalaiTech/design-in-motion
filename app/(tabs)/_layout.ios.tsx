@@ -30,6 +30,12 @@ export default function TabLayout() {
         icon: 'menu-book',
         label: 'Manual',
       },
+      {
+        name: '(profile)',
+        route: '/(tabs)/(profile)/',
+        icon: 'person',
+        label: 'Profile',
+      },
     ];
 
     return (
@@ -54,6 +60,12 @@ export default function TabLayout() {
               headerShown: false,
             }}
           />
+          <Stack.Screen 
+            name="(profile)" 
+            options={{
+              headerShown: false,
+            }}
+          />
         </Stack>
         <FloatingTabBar tabs={tabs} />
       </>
@@ -71,6 +83,10 @@ export default function TabLayout() {
       <NativeTabs.Trigger name="(manual)">
         <Icon sf="book.closed.fill" />
         <Label>Manual</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(profile)">
+        <Icon sf="person.fill" />
+        <Label>Profile</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

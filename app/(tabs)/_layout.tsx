@@ -10,7 +10,7 @@ export const unstable_settings = {
 export default function TabLayout() {
   console.log('TabLayout rendered - initialRouteName: (home)');
   
-  // Two tabs configuration - Projects and Manual
+  // Three tabs configuration - Projects, Manual, and Profile
   const tabs: TabBarItem[] = [
     {
       name: '(home)',
@@ -23,6 +23,12 @@ export default function TabLayout() {
       route: '/(tabs)/(manual)/',
       icon: 'menu-book',
       label: 'Manual',
+    },
+    {
+      name: '(profile)',
+      route: '/(tabs)/(profile)/',
+      icon: 'person',
+      label: 'Profile',
     },
   ];
 
@@ -44,6 +50,12 @@ export default function TabLayout() {
         />
         <Stack.Screen 
           name="(manual)" 
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen 
+          name="(profile)" 
           options={{
             headerShown: false,
           }}
