@@ -253,39 +253,85 @@ const getBaseHTML = (title: string, content: string): string => {
     .cover-page {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      justify-content: space-between;
       min-height: 800px;
+      padding: 80px 60px;
+    }
+    
+    .cover-header {
+      flex: 0;
+    }
+    
+    .cover-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
       text-align: center;
     }
     
+    .cover-footer {
+      flex: 0;
+      border-top: 2px solid #DDDDDD;
+      padding-top: 24px;
+    }
+    
     .cover-title {
-      font-size: 36pt;
+      font-size: 42pt;
       font-weight: 700;
       margin-bottom: 24px;
+      line-height: 1.2;
+      letter-spacing: -1px;
     }
     
     .cover-subtitle {
-      font-size: 18pt;
+      font-size: 20pt;
       color: #555555;
       margin-bottom: 48px;
+      font-weight: 400;
     }
     
     .cover-meta {
       font-size: 12pt;
       color: #555555;
       line-height: 2;
+      margin-top: 32px;
+    }
+    
+    .cover-meta-item {
+      margin-bottom: 8px;
+    }
+    
+    .cover-meta-label {
+      font-weight: 600;
+      color: #111111;
+      display: inline-block;
+      min-width: 140px;
     }
     
     .cover-personal-info {
-      margin-top: 48px;
       font-size: 11pt;
       color: #555555;
       line-height: 1.8;
     }
     
     .cover-personal-info p {
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+    }
+    
+    .cover-business-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #EEEEEE;
+    }
+    
+    .cover-info-label {
+      font-weight: 600;
+      color: #111111;
+      font-size: 10pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
     }
     
     .artifact-grid {
@@ -360,24 +406,51 @@ const getBaseHTML = (title: string, content: string): string => {
 
 // Generate Cover Page with Personal & Business Details
 const generateCoverPage = async (project: Project, formatTitle: string): Promise<string> => {
+  console.log('PDF Export: Generating cover page with personal info');
   const personalInfo = await getPersonalInfo();
   
   // Build personal info section - only show fields with content
   let personalInfoHTML = '';
   if (personalInfo) {
-    const infoLines: string[] = [];
+    const personalLines: string[] = [];
+    const businessLines: string[] = [];
     
-    if (personalInfo.name) infoLines.push(`<p>${personalInfo.name}</p>`);
-    if (personalInfo.email) infoLines.push(`<p>${personalInfo.email}</p>`);
-    if (personalInfo.phone) infoLines.push(`<p>${personalInfo.phone}</p>`);
-    if (personalInfo.businessName) infoLines.push(`<p><strong>${personalInfo.businessName}</strong></p>`);
-    if (personalInfo.businessAddress) infoLines.push(`<p>${personalInfo.businessAddress}</p>`);
-    if (personalInfo.website) infoLines.push(`<p>${personalInfo.website}</p>`);
+    // Personal details
+    if (personalInfo.name) personalLines.push(`<p>${personalInfo.name}</p>`);
+    if (personalInfo.email) personalLines.push(`<p>${personalInfo.email}</p>`);
+    if (personalInfo.phone) personalLines.push(`<p>${personalInfo.phone}</p>`);
     
-    if (infoLines.length > 0) {
+    // Business details
+    if (personalInfo.businessName) businessLines.push(`<p><strong>${personalInfo.businessName}</strong></p>`);
+    if (personalInfo.businessAddress) businessLines.push(`<p>${personalInfo.businessAddress}</p>`);
+    if (personalInfo.website) businessLines.push(`<p>${personalInfo.website}</p>`);
+    
+    // Build the HTML sections
+    let personalSection = '';
+    let businessSection = '';
+    
+    if (personalLines.length > 0) {
+      personalSection = `
+        <div style="margin-bottom: 16px;">
+          <div class="cover-info-label">Prepared By</div>
+          ${personalLines.join('\n')}
+        </div>
+      `;
+    }
+    
+    if (businessLines.length > 0) {
+      businessSection = `
+        <div class="cover-business-section">
+          ${businessLines.join('\n')}
+        </div>
+      `;
+    }
+    
+    if (personalSection || businessSection) {
       personalInfoHTML = `
         <div class="cover-personal-info">
-          ${infoLines.join('\n')}
+          ${personalSection}
+          ${businessSection}
         </div>
       `;
     }
@@ -385,14 +458,33 @@ const generateCoverPage = async (project: Project, formatTitle: string): Promise
   
   return `
     <div class="page cover-page">
-      <h1 class="cover-title">${project.title}</h1>
-      <p class="cover-subtitle">${formatTitle}</p>
-      <div class="cover-meta">
-        <p><strong>Phase:</strong> ${project.phase}</p>
-        <p><strong>Project Started:</strong> ${formatDate(project.startDate)}</p>
-        <p><strong>Export Date:</strong> ${formatDate(new Date().toISOString())}</p>
+      <div class="cover-header">
+        <!-- Reserved for future logo or branding -->
       </div>
-      ${personalInfoHTML}
+      
+      <div class="cover-center">
+        <h1 class="cover-title">${project.title}</h1>
+        <p class="cover-subtitle">${formatTitle}</p>
+        
+        <div class="cover-meta">
+          <div class="cover-meta-item">
+            <span class="cover-meta-label">Project Phase:</span>
+            <span>${project.phase}</span>
+          </div>
+          <div class="cover-meta-item">
+            <span class="cover-meta-label">Project Started:</span>
+            <span>${formatDate(project.startDate)}</span>
+          </div>
+          <div class="cover-meta-item">
+            <span class="cover-meta-label">Export Date:</span>
+            <span>${formatDate(new Date().toISOString())}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="cover-footer">
+        ${personalInfoHTML}
+      </div>
     </div>
   `;
 };
