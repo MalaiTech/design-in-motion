@@ -83,9 +83,9 @@ export default function HomeScreen() {
     return sorted;
   };
 
-  // FIXED: Get artifacts to display - matches project-overview.tsx logic
-  // Logic: Show ONLY initial artifact if no framing favorites exist
-  //        Show ONLY framing favorites if they exist (hide initial artifact)
+  // FIXED: Get artifacts to display - show ALL initial artifacts OR framing favorites
+  // Logic: Show ALL initial artifacts (excluding URLs for display) if no framing favorites exist
+  //        Show ONLY framing favorites if they exist (hide initial artifacts)
   const getDisplayArtifacts = (project: Project) => {
     if (!project.artifacts || project.artifacts.length === 0) {
       console.log('Home Screen (iOS): No artifacts in project', project.title);
@@ -105,20 +105,20 @@ export default function HomeScreen() {
     
     console.log('Home Screen (iOS): Framing favorite artifacts (non-URL):', framingFavoriteArtifacts.length);
     
-    // 2. If there are framing favorites, show ONLY those (hide initial artifact)
+    // 2. If there are framing favorites, show ONLY those (hide initial artifacts)
     if (framingFavoriteArtifacts.length > 0) {
       console.log('Home Screen (iOS): Displaying ONLY', framingFavoriteArtifacts.length, 'framing favorite artifacts');
       return framingFavoriteArtifacts;
     }
     
-    // 3. Otherwise, show ONLY the initial artifact (first artifact NOT in framingArtifactIds, excluding URLs)
-    const initialArtifact = project.artifacts.find(
+    // 3. Otherwise, show ALL initial artifacts (artifacts NOT in framingArtifactIds, excluding URLs)
+    const initialArtifacts = project.artifacts.filter(
       artifact => !framingArtifactIds.includes(artifact.id) && artifact.type !== 'url'
     );
     
-    if (initialArtifact) {
-      console.log('Home Screen (iOS): Displaying ONLY initial artifact:', initialArtifact.id);
-      return [initialArtifact];
+    if (initialArtifacts.length > 0) {
+      console.log('Home Screen (iOS): Displaying ALL', initialArtifacts.length, 'initial artifacts');
+      return initialArtifacts;
     }
     
     console.log('Home Screen (iOS): No artifacts to display');

@@ -271,9 +271,9 @@ export default function ProjectOverviewScreen() {
     );
   };
 
-  // FIXED: Get artifacts to display in Project Overview
-  // Logic: Show ONLY initial artifact if no framing favorites exist
-  //        Show ONLY framing favorites if they exist (hide initial artifact)
+  // FIXED: Get artifacts to display in Project Overview - show ALL initial artifacts OR framing favorites
+  // Logic: Show ALL initial artifacts if no framing favorites exist
+  //        Show ONLY framing favorites if they exist (hide initial artifacts)
   const getDisplayArtifacts = (): Artifact[] => {
     if (!project || !project.artifacts || project.artifacts.length === 0) {
       console.log('Project Overview: No artifacts in project');
@@ -292,17 +292,17 @@ export default function ProjectOverviewScreen() {
     
     console.log('Project Overview: Framing favorite artifacts:', framingFavoriteArtifacts.length);
     
-    // 2. If there are framing favorites, show ONLY those (hide initial artifact)
+    // 2. If there are framing favorites, show ONLY those (hide initial artifacts)
     if (framingFavoriteArtifacts.length > 0) {
       console.log('Project Overview: Displaying ONLY', framingFavoriteArtifacts.length, 'framing favorite artifacts');
       return framingFavoriteArtifacts;
     }
     
-    // 3. Otherwise, show ONLY the initial artifact (first artifact NOT in framingArtifactIds)
-    const initialArtifact = project.artifacts.find(artifact => !framingArtifactIds.includes(artifact.id));
-    if (initialArtifact) {
-      console.log('Project Overview: Displaying ONLY initial artifact:', initialArtifact.id);
-      return [initialArtifact];
+    // 3. Otherwise, show ALL initial artifacts (artifacts NOT in framingArtifactIds)
+    const initialArtifacts = project.artifacts.filter(artifact => !framingArtifactIds.includes(artifact.id));
+    if (initialArtifacts.length > 0) {
+      console.log('Project Overview: Displaying ALL', initialArtifacts.length, 'initial artifacts');
+      return initialArtifacts;
     }
     
     console.log('Project Overview: No artifacts to display');
@@ -321,7 +321,7 @@ export default function ProjectOverviewScreen() {
 
   const phases: ProjectPhase[] = ['Framing', 'Exploration', 'Pilot', 'Delivery', 'Finish'];
   
-  // Get artifacts to display (initial OR framing favorites only)
+  // Get artifacts to display (ALL initial artifacts OR framing favorites only)
   const displayArtifacts = getDisplayArtifacts();
 
   // Determine background color based on project phase
@@ -380,14 +380,14 @@ export default function ProjectOverviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* FIXED: Visuals (Artifacts) - Only initial artifact OR framing favorites */}
+          {/* FIXED: Visuals (Artifacts) - ALL initial artifacts OR framing favorites */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Visuals</Text>
             <Text style={styles.helperText}>
               {displayArtifacts.length > 0 && project.framingArtifactIds && 
                project.artifacts.some(a => project.framingArtifactIds!.includes(a.id) && a.isFavorite)
                 ? 'Favorite visuals from Framing'
-                : 'Initial project visual'}
+                : 'Initial project visuals'}
             </Text>
             
             {displayArtifacts.length > 0 ? (
