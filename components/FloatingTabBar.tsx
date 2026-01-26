@@ -8,7 +8,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { useRouter, usePathname, useLocalSearchParams } from 'expo-router';
+import { useRouter, usePathname, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
@@ -49,35 +49,45 @@ export default function FloatingTabBar({
 }: FloatingTabBarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useLocalSearchParams();
+  const segments = useSegments();
   const animatedValue = useSharedValue(0);
 
   console.log('FloatingTabBar: Current pathname:', pathname);
+  console.log('FloatingTabBar: Current segments:', segments);
 
-  // Get projectId from params if not provided
-  const currentProjectId = projectId || (params.id as string);
-
-  // Improved active tab detection - check if pathname contains the tab route segment
+  // Improved active tab detection using segments
+  // segments will be like: ['(tabs)', '(home)', 'index'] or ['(tabs)', '(manual)', 'index']
   const activeTabIndex = React.useMemo(() => {
-    // Extract the main tab segment from pathname
-    // e.g., "/(tabs)/(home)/..." -> "(home)"
-    // e.g., "/(tabs)/(manual)/..." -> "(manual)"
-    // e.g., "/(tabs)/(profile)/..." -> "(profile)"
+    let detectedIndex = 0; // Default to first tab (home)
     
-    let detectedIndex = 0; // Default to first tab
-    
-    for (let i = 0; i < tabs.length; i++) {
-      const tab = tabs[i];
-      // Check if pathname contains the tab name (e.g., "(home)", "(manual)", "(profile)")
-      if (pathname.includes(`/(tabs)/${tab.name}/`) || pathname.includes(`/(tabs)/${tab.name}`)) {
-        detectedIndex = i;
-        console.log(`FloatingTabBar: Active tab detected - ${tab.name} (index ${i})`);
-        break;
+    // Check segments for tab group names
+    if (segments && segments.length > 0) {
+      for (let i = 0; i < tabs.length; i++) {
+        const tab = tabs[i];
+        // Check if segments contain the tab name (e.g., "(home)", "(manual)", "(profile)")
+        if (segments.includes(tab.name)) {
+          detectedIndex = i;
+          console.log(`FloatingTabBar: Active tab detected via segments - ${tab.name} (index ${i})`);
+          break;
+        }
       }
     }
     
+    // Fallback: check pathname
+    if (detectedIndex === 0 && pathname !== '/') {
+      for (let i = 0; i < tabs.length; i++) {
+        const tab = tabs[i];
+        if (pathname.includes(tab.name)) {
+          detectedIndex = i;
+          console.log(`FloatingTabBar: Active tab detected via pathname - ${tab.name} (index ${i})`);
+          break;
+        }
+      }
+    }
+    
+    console.log(`FloatingTabBar: Final active tab index: ${detectedIndex}`);
     return detectedIndex;
-  }, [pathname, tabs]);
+  }, [pathname, segments, tabs]);
 
   // Update animation when active tab changes
   React.useEffect(() => {
@@ -89,9 +99,9 @@ export default function FloatingTabBar({
     });
   }, [activeTabIndex, animatedValue]);
 
-  const handleTabPress = (route: Href | ((projectId?: string) => Href), tabName: string) => {
-    const targetRoute = typeof route === 'function' ? route(currentProjectId) : route;
-    console.log(`FloatingTabBar: Tab ${tabName} pressed, navigating to:`, targetRoute);
+  const handleTabPress = (route: Href | ((projectId?: string) => Href), tabName: string, index: number) => {
+    const targetRoute = typeof route === 'function' ? route(projectId) : route;
+    console.log(`FloatingTabBar: Tab ${tabName} (index ${index}) pressed, navigating to:`, targetRoute);
     router.push(targetRoute);
   };
 
@@ -112,36 +122,29 @@ export default function FloatingTabBar({
     };
   });
 
-  // Force light mode styling on iOS for readability
-  // Use solid white background with slight transparency for glass effect
+  // Force light mode styling - solid opaque background for maximum readability
   const dynamicStyles = {
     blurContainer: {
       ...styles.blurContainer,
-      borderWidth: 1.2,
+      borderWidth: 1.5,
+      // Solid light background - no transparency issues
+      backgroundColor: colors.background, // #FAFAF7 - fully opaque
+      borderColor: colors.divider, // #DDDDDD
       ...Platform.select({
-        ios: {
-          // Solid white background for iOS to ensure readability in dark mode
-          backgroundColor: 'rgba(250, 250, 247, 0.95)', // Use app background color with high opacity
-          borderColor: 'rgba(221, 221, 221, 0.8)', // Light border
-        },
-        android: {
-          backgroundColor: 'rgba(250, 250, 247, 0.95)',
-          borderColor: 'rgba(221, 221, 221, 0.8)',
-        },
         web: {
-          backgroundColor: 'rgba(250, 250, 247, 0.95)',
-          borderColor: 'rgba(221, 221, 221, 0.8)',
           backdropFilter: 'blur(10px)',
         },
       }),
     },
     background: {
       ...styles.background,
+      backgroundColor: 'transparent', // Let the container background show through
     },
     indicator: {
       ...styles.indicator,
-      // Light gray indicator that's visible on light background
-      backgroundColor: 'rgba(29, 106, 137, 0.08)', // Primary color with low opacity
+      // Visible indicator with primary color
+      backgroundColor: colors.primary, // #1d6a89 with opacity
+      opacity: 0.12,
       width: `${tabWidthPercent}%` as `${number}%`,
     },
   };
@@ -169,7 +172,7 @@ export default function FloatingTabBar({
                 <React.Fragment key={index}>
                 <TouchableOpacity
                   style={styles.tab}
-                  onPress={() => handleTabPress(tab.route, tab.name)}
+                  onPress={() => handleTabPress(tab.route, tab.name, index)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.tabContent}>
