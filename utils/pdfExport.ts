@@ -231,6 +231,46 @@ const getBaseHTML = (title: string, content: string): string => {
       text-align: right;
     }
     
+    .cost-table-loop {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      table-layout: fixed;
+    }
+    
+    .cost-table-loop th,
+    .cost-table-loop td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #DDDDDD;
+    }
+    
+    .cost-table-loop th {
+      font-weight: 600;
+      background: #F5F5F5;
+    }
+    
+    .cost-table-loop tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .cost-table-loop th:first-child,
+    .cost-table-loop td:first-child {
+      width: 50%;
+    }
+    
+    .cost-table-loop th:nth-child(2),
+    .cost-table-loop td:nth-child(2) {
+      width: 25%;
+      text-align: right;
+    }
+    
+    .cost-table-loop th:nth-child(3),
+    .cost-table-loop td:nth-child(3) {
+      width: 25%;
+      text-align: right;
+    }
+    
     .timeline-event {
       margin-bottom: 24px;
       padding-left: 24px;
@@ -514,15 +554,20 @@ const generateExecutiveOverview = async (project: Project): Promise<string> => {
       ${project.explorationLoops.map(loop => {
         const loopHours = loop.timeSpent || 0;
         const loopCosts = loop.costs || 0;
+        const hoursDisplay = Math.round(loopHours);
+        const costsDisplay = Math.round(loopCosts);
         return `
           <div style="margin-bottom: 16px;">
             <p><strong>${loop.question}</strong></p>
-            <p class="meta">Status: ${loop.status} • Hours: ${loopHours.toFixed(1)} • Costs: ${currencySymbol}${loopCosts.toFixed(2)}</p>
+            <p class="meta">Status: ${loop.status} • Hours: ${hoursDisplay} h • Costs: ${currencySymbol}${costsDisplay}</p>
           </div>
         `;
       }).join('')}
     `;
   }
+  
+  const totalHoursDisplay = Math.round(totalHours);
+  const totalCostsDisplay = Math.round(totalCosts);
   
   summarySection = `
     <div class="page">
@@ -541,11 +586,11 @@ const generateExecutiveOverview = async (project: Project): Promise<string> => {
         </tr>
         <tr>
           <td>Total Hours</td>
-          <td>${totalHours.toFixed(1)} hours</td>
+          <td>${totalHoursDisplay} h</td>
         </tr>
         <tr>
           <td>Total Costs</td>
-          <td>${currencySymbol}${totalCosts.toFixed(2)}</td>
+          <td>${currencySymbol}${totalCostsDisplay}</td>
         </tr>
       </table>
     </div>
@@ -954,7 +999,7 @@ const generateTimelineReport = async (project: Project): Promise<string> => {
   return getBaseHTML(`${project.title} - Timeline`, content);
 };
 
-// Generate Costs & Hours Report - FIXED: Use currency symbol
+// Generate Costs & Hours Report - FIXED: No decimals, use "h" instead of "hours", wider columns for per-loop table
 const generateCostsReport = async (project: Project): Promise<string> => {
   console.log('PDF Export: Generating Costs & Hours Report');
   
@@ -991,6 +1036,10 @@ const generateCostsReport = async (project: Project): Promise<string> => {
     return getBaseHTML(`${project.title} - Costs & Hours Report`, content);
   }
   
+  // Round all values to remove decimals
+  const totalHoursDisplay = Math.round(totalHours);
+  const totalCostsDisplay = Math.round(totalCosts);
+  
   // 2nd Page: Total Cost & Total Time Overview (Overall + Per Loop)
   const overviewSection = `
     <div class="page">
@@ -1005,29 +1054,33 @@ const generateCostsReport = async (project: Project): Promise<string> => {
         </tr>
         <tr>
           <td>Total Hours</td>
-          <td>${totalHours.toFixed(1)} hours</td>
+          <td>${totalHoursDisplay} h</td>
         </tr>
         <tr>
           <td>Total Costs</td>
-          <td>${currencySymbol}${totalCosts.toFixed(2)}</td>
+          <td>${currencySymbol}${totalCostsDisplay}</td>
         </tr>
       </table>
       
       ${loopTotals.length > 0 ? `
         <h3>Per Exploration Loop</h3>
-        <table class="cost-table">
+        <table class="cost-table-loop">
           <tr>
             <th>Loop</th>
             <th>Hours</th>
             <th>Costs</th>
           </tr>
-          ${loopTotals.map(loop => `
-            <tr>
-              <td>${loop.question}</td>
-              <td>${loop.hours.toFixed(1)} hours</td>
-              <td>${currencySymbol}${loop.costs.toFixed(2)}</td>
-            </tr>
-          `).join('')}
+          ${loopTotals.map(loop => {
+            const loopHoursDisplay = Math.round(loop.hours);
+            const loopCostsDisplay = Math.round(loop.costs);
+            return `
+              <tr>
+                <td>${loop.question}</td>
+                <td>${loopHoursDisplay} h</td>
+                <td>${currencySymbol}${loopCostsDisplay}</td>
+              </tr>
+            `;
+          }).join('')}
         </table>
       ` : ''}
     </div>
@@ -1058,12 +1111,15 @@ const generateCostsReport = async (project: Project): Promise<string> => {
                 <th>Description</th>
                 <th>Hours</th>
               </tr>
-              ${timeEntries.map((entry: TimeEntry) => `
-                <tr>
-                  <td>${entry.reason}</td>
-                  <td>${entry.hours.toFixed(1)} hours</td>
-                </tr>
-              `).join('')}
+              ${timeEntries.map((entry: TimeEntry) => {
+                const entryHoursDisplay = Math.round(entry.hours);
+                return `
+                  <tr>
+                    <td>${entry.reason}</td>
+                    <td>${entryHoursDisplay} h</td>
+                  </tr>
+                `;
+              }).join('')}
             </table>
           ` : ''}
           
@@ -1074,12 +1130,15 @@ const generateCostsReport = async (project: Project): Promise<string> => {
                 <th>Description</th>
                 <th>Amount</th>
               </tr>
-              ${costEntries.map((entry: CostEntry) => `
-                <tr>
-                  <td>${entry.reason}</td>
-                  <td>${currencySymbol}${entry.amount.toFixed(2)}</td>
-                </tr>
-              `).join('')}
+              ${costEntries.map((entry: CostEntry) => {
+                const entryAmountDisplay = Math.round(entry.amount);
+                return `
+                  <tr>
+                    <td>${entry.reason}</td>
+                    <td>${currencySymbol}${entryAmountDisplay}</td>
+                  </tr>
+                `;
+              }).join('')}
             </table>
           ` : ''}
         </div>
