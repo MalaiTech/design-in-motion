@@ -73,15 +73,15 @@ export default function PersonalInfoScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}
+        contentInsetAdjustmentBehavior="automatic"
       >
         <View style={styles.content}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
@@ -101,6 +101,7 @@ export default function PersonalInfoScreen() {
                 onChangeText={(text) => updateField('name', text)}
                 placeholder="Enter your full name"
                 placeholderTextColor={colors.textSecondary}
+                returnKeyType="next"
               />
             </View>
 
@@ -114,6 +115,7 @@ export default function PersonalInfoScreen() {
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                returnKeyType="next"
               />
             </View>
 
@@ -126,6 +128,7 @@ export default function PersonalInfoScreen() {
                 placeholder="+1 (555) 123-4567"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="phone-pad"
+                returnKeyType="next"
               />
             </View>
           </View>
@@ -142,6 +145,7 @@ export default function PersonalInfoScreen() {
                 onChangeText={(text) => updateField('businessName', text)}
                 placeholder="Your company or studio name"
                 placeholderTextColor={colors.textSecondary}
+                returnKeyType="next"
               />
             </View>
 
@@ -155,6 +159,8 @@ export default function PersonalInfoScreen() {
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={3}
+                returnKeyType="done"
+                blurOnSubmit={true}
               />
             </View>
 
@@ -168,6 +174,7 @@ export default function PersonalInfoScreen() {
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="url"
                 autoCapitalize="none"
+                returnKeyType="done"
               />
             </View>
           </View>
@@ -195,7 +202,7 @@ export default function PersonalInfoScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
