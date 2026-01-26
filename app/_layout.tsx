@@ -6,7 +6,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme, Alert } from "react-native";
+import { useColorScheme, Alert, Platform } from "react-native";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -78,18 +78,22 @@ export default function RootLayout() {
     },
   };
 
+  // Force light mode on iOS, respect system theme on other platforms
+  const effectiveColorScheme = Platform.OS === 'ios' ? 'light' : colorScheme;
+
   return (
     <>
-      <StatusBar style="auto" animated />
+      {/* Force dark content (black text/icons) on iOS for light backgrounds */}
+      <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} animated />
       <ThemeProvider
-        value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
+        value={effectiveColorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
       >
         <WidgetProvider>
           <GestureHandlerRootView>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             </Stack>
-            <SystemBars style={"auto"} />
+            <SystemBars style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
           </GestureHandlerRootView>
         </WidgetProvider>
       </ThemeProvider>

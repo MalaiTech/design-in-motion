@@ -133,7 +133,10 @@ export default function FloatingTabBar({
     };
   });
 
-  // Dynamic styles based on theme
+  // Force light mode styling on iOS, respect theme on other platforms
+  const isLightMode = Platform.OS === 'ios' ? true : !theme.dark;
+
+  // Dynamic styles based on theme (forced light on iOS)
   const dynamicStyles = {
     blurContainer: {
       ...styles.blurContainer,
@@ -141,19 +144,18 @@ export default function FloatingTabBar({
       borderColor: 'rgba(255, 255, 255, 1)',
       ...Platform.select({
         ios: {
-          backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.8)'
-            : 'rgba(255, 255, 255, 0.6)',
+          // Always use light mode styling on iOS
+          backgroundColor: 'rgba(255, 255, 255, 0.6)',
         },
         android: {
-          backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.95)'
-            : 'rgba(255, 255, 255, 0.6)',
+          backgroundColor: isLightMode
+            ? 'rgba(255, 255, 255, 0.6)'
+            : 'rgba(28, 28, 30, 0.95)',
         },
         web: {
-          backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.95)'
-            : 'rgba(255, 255, 255, 0.6)',
+          backgroundColor: isLightMode
+            ? 'rgba(255, 255, 255, 0.6)'
+            : 'rgba(28, 28, 30, 0.95)',
           backdropFilter: 'blur(10px)',
         },
       }),
@@ -163,9 +165,10 @@ export default function FloatingTabBar({
     },
     indicator: {
       ...styles.indicator,
-      backgroundColor: theme.dark
-        ? 'rgba(255, 255, 255, 0.08)'
-        : 'rgba(0, 0, 0, 0.04)',
+      // Always use light mode indicator on iOS
+      backgroundColor: isLightMode
+        ? 'rgba(0, 0, 0, 0.04)'
+        : 'rgba(255, 255, 255, 0.08)',
       width: `${tabWidthPercent}%` as `${number}%`,
     },
   };

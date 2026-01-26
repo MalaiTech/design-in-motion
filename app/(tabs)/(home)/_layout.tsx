@@ -29,25 +29,29 @@ export default function HomeLayout() {
     {
       name: 'framing',
       route: (id?: string) => `/(tabs)/(home)/framing?id=${id}` as any,
-      icon: 'dashboard',
+      iosIcon: 'square.grid.2x2',
+      androidIcon: 'dashboard',
       label: 'Framing',
     },
     {
       name: 'exploration',
       route: (id?: string) => `/(tabs)/(home)/exploration-loops?id=${id}` as any,
-      icon: 'refresh',
+      iosIcon: 'arrow.triangle.2.circlepath',
+      androidIcon: 'refresh',
       label: 'Exploration',
     },
     {
       name: 'timeline',
       route: (id?: string) => `/(tabs)/(home)/timeline?id=${id}` as any,
-      icon: 'calendar-today',
+      iosIcon: 'calendar',
+      androidIcon: 'calendar-today',
       label: 'Timeline',
     },
     {
       name: 'export',
       route: (id?: string) => `/(tabs)/(home)/project-overview?id=${id}` as any,
-      icon: 'download',
+      iosIcon: 'arrow.down.circle',
+      androidIcon: 'download',
       label: 'Export',
     },
   ];
@@ -56,7 +60,7 @@ export default function HomeLayout() {
     <>
       <Stack
         screenOptions={{
-          // Default options for ALL project screens
+          // Default options for ALL project screens - force light mode on iOS
           headerShown: true,
           headerTitleAlign: 'center',
           headerTransparent: false,
@@ -65,7 +69,9 @@ export default function HomeLayout() {
           headerBackTitle: '',
           headerBackButtonDisplayMode: 'minimal', // Critical for iOS chevron-only
           headerTintColor: '#111111',
-          headerStyle: { backgroundColor: 'transparent' },
+          headerStyle: { 
+            backgroundColor: Platform.OS === 'ios' ? colors.background : 'transparent' 
+          },
         }}
       >
         <Stack.Screen
@@ -95,36 +101,42 @@ export default function HomeLayout() {
           name="project-overview"
           options={{
             title: 'Project Overview',
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen
           name="framing"
           options={{
             title: 'Framing',
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen
           name="exploration-loops"
           options={{
             title: 'Exploration Loops',
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen
           name="exploration-loop"
           options={{
             title: 'Exploration Loop',
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen
           name="timeline"
           options={{
             title: 'Timeline',
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen
           name="export"
           options={{
             title: 'Export',
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
       </Stack>
