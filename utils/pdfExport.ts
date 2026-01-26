@@ -926,15 +926,42 @@ const generateTimelineReport = async (project: Project): Promise<string> => {
     });
   }
   
-  // Framing decisions - marked as Framing category
-  if (project.framingDecisions && project.framingDecisions.length > 0) {
-    project.framingDecisions.forEach(d => {
-      timelineEvents.push({
-        timestamp: d.timestamp,
-        type: 'Framing Decision',
-        content: d.summary,
-        category: 'framing'
+  // Framing card - consolidated Framing phase event (if framing data exists)
+  if (project.opportunityOrigin || project.purpose || 
+      (project.framingDecisions && project.framingDecisions.length > 0) ||
+      (project.certaintyItems && project.certaintyItems.length > 0) ||
+      (project.designSpaceItems && project.designSpaceItems.length > 0) ||
+      (project.explorationQuestions && project.explorationQuestions.length > 0)) {
+    
+    // Build Framing content
+    let framingContent = '<strong>Framing Phase</strong><br/>';
+    
+    if (project.purpose) {
+      framingContent += `<br/><em>Purpose:</em> ${project.purpose}<br/>`;
+    }
+    
+    // Add favorite first exploration questions
+    const favoriteQuestions = (project.explorationQuestions || []).filter(q => q.isFavorite);
+    if (favoriteQuestions.length > 0) {
+      framingContent += '<br/><em>First Explorations:</em><br/>';
+      favoriteQuestions.forEach(q => {
+        framingContent += `• ${q.text}<br/>`;
       });
+    }
+    
+    // Add framing decisions
+    if (project.framingDecisions && project.framingDecisions.length > 0) {
+      framingContent += '<br/><em>Decisions:</em><br/>';
+      project.framingDecisions.forEach(d => {
+        framingContent += `• ${d.summary} (${formatDate(d.timestamp)})<br/>`;
+      });
+    }
+    
+    timelineEvents.push({
+      timestamp: project.startDate,
+      type: 'Framing',
+      content: framingContent,
+      category: 'framing'
     });
   }
   
