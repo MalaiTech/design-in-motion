@@ -22,6 +22,7 @@ import {
   ExplorationLoop,
   Artifact,
 } from '@/utils/storage';
+import { getDefaultCurrency } from '@/utils/profileStorage';
 import ExplorationLoopFilterSortModal, { 
   LoopStatus, 
   LoopSortOption, 
@@ -36,10 +37,18 @@ export default function ExplorationLoopsScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [loops, setLoops] = useState<ExplorationLoop[]>([]);
+  const [currencySymbol, setCurrencySymbol] = useState('$');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedStatuses, setSelectedStatuses] = useState<LoopStatus[]>([]);
   const [sortOption, setSortOption] = useState<LoopSortOption>('startDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const loadCurrency = useCallback(async () => {
+    console.log('Exploration Loops: Loading currency');
+    const currency = await getDefaultCurrency();
+    setCurrencySymbol(currency.symbol);
+    console.log('Exploration Loops: Currency loaded:', currency.symbol);
+  }, []);
 
   const loadProject = useCallback(async () => {
     console.log('Exploration Loops: Loading project', projectId);
@@ -58,7 +67,8 @@ export default function ExplorationLoopsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadProject();
-    }, [loadProject])
+      loadCurrency();
+    }, [loadProject, loadCurrency])
   );
 
   const handleCreateLoop = () => {
@@ -193,6 +203,9 @@ export default function ExplorationLoopsScreen() {
     const totalCosts = Math.floor(loop.costs || 0);
     const startDate = loop.startDate || loop.updatedDate;
     
+    // Format currency display
+    const totalCostsDisplay = `${currencySymbol}${totalCosts}`;
+    
     return (
       <TouchableOpacity
         key={loop.id}
@@ -226,7 +239,7 @@ export default function ExplorationLoopsScreen() {
         </View>
 
         <View style={styles.loopStats}>
-          <Text style={styles.statsText}>Total Costs: €{totalCosts}</Text>
+          <Text style={styles.statsText}>Total Costs: {totalCostsDisplay}</Text>
           <Text style={styles.metaSeparator}>•</Text>
           <Text style={styles.statsText}>Total Hours: {totalHours}h</Text>
         </View>
