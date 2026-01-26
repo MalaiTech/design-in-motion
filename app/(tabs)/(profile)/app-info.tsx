@@ -90,8 +90,6 @@ export default function AppInfoScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>App Information</Text>
-
           {/* Version Info */}
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
@@ -318,13 +316,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     paddingTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 24,
-    letterSpacing: -0.5,
   },
   infoCard: {
     backgroundColor: '#FFFFFF',

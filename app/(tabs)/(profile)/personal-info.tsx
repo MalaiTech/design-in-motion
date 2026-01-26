@@ -84,7 +84,6 @@ export default function PersonalInfoScreen() {
         contentInsetAdjustmentBehavior="automatic"
       >
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
           <Text style={styles.sectionDescription}>
             This information will be used in export cover pages and project documentation.
           </Text>
@@ -220,13 +219,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     paddingTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 12,
-    letterSpacing: -0.5,
   },
   sectionDescription: {
     fontSize: 14,
