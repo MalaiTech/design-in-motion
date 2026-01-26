@@ -290,6 +290,22 @@ const getBaseHTML = (title: string, content: string): string => {
       background: #1d6a89;
     }
     
+    .timeline-event-framing {
+      border-left-color: #1E4DD8;
+    }
+    
+    .timeline-event-framing:before {
+      background: #1E4DD8;
+    }
+    
+    .timeline-event-exploration {
+      border-left-color: #F2C94C;
+    }
+    
+    .timeline-event-exploration:before {
+      background: #F2C94C;
+    }
+    
     .cover-page {
       display: flex;
       flex-direction: column;
@@ -882,19 +898,20 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
   return getBaseHTML(`${project.title} - Design Process Report`, content);
 };
 
-// Generate Timeline Report
+// Generate Timeline Report - UPDATED: Remove images, add color coding for Framing vs Exploration
 const generateTimelineReport = async (project: Project): Promise<string> => {
   console.log('PDF Export: Generating Timeline Report');
   const coverPage = await generateCoverPage(project, 'Timeline');
   
   // Build timeline events
-  const timelineEvents: {timestamp: string, type: string, content: string, artifacts?: Artifact[]}[] = [];
+  const timelineEvents: {timestamp: string, type: string, content: string, category: 'framing' | 'exploration' | 'other'}[] = [];
   
   // Project created
   timelineEvents.push({
     timestamp: project.startDate,
     type: 'Project Created',
-    content: `Project "${project.title}" was created`
+    content: `Project "${project.title}" was created`,
+    category: 'other'
   });
   
   // Phase changes
@@ -903,54 +920,42 @@ const generateTimelineReport = async (project: Project): Promise<string> => {
       timelineEvents.push({
         timestamp: event.timestamp,
         type: 'Phase Change',
-        content: `Phase changed to ${event.phase}`
+        content: `Phase changed to ${event.phase}`,
+        category: 'other'
       });
     });
   }
   
-  // Framing decisions
+  // Framing decisions - marked as Framing category
   if (project.framingDecisions && project.framingDecisions.length > 0) {
     project.framingDecisions.forEach(d => {
-      const artifacts = project.artifacts.filter(a => d.artifacts.includes(a.id) && a.isFavorite);
       timelineEvents.push({
         timestamp: d.timestamp,
         type: 'Framing Decision',
         content: d.summary,
-        artifacts: artifacts.length > 0 ? artifacts : undefined
+        category: 'framing'
       });
     });
   }
   
-  // Exploration loops
+  // Exploration loops - marked as Exploration category
   if (project.explorationLoops && project.explorationLoops.length > 0) {
     project.explorationLoops.forEach(loop => {
-      // Collect artifacts from all segment arrays for timeline
-      const loopArtifacts = project.artifacts.filter(a => {
-        if (!a.isFavorite) return false;
-        return (
-          (loop.exploreArtifactIds && loop.exploreArtifactIds.includes(a.id)) ||
-          (loop.buildArtifactIds && loop.buildArtifactIds.includes(a.id)) ||
-          (loop.checkArtifactIds && loop.checkArtifactIds.includes(a.id)) ||
-          (loop.adaptArtifactIds && loop.adaptArtifactIds.includes(a.id)) ||
-          (loop.decisionsArtifactIds && loop.decisionsArtifactIds.includes(a.id)) ||
-          (loop.invoicesArtifactIds && loop.invoicesArtifactIds.includes(a.id))
-        );
-      });
-      
       timelineEvents.push({
         timestamp: loop.startDate,
         type: 'Exploration Loop',
         content: `Started exploration: ${loop.question}`,
-        artifacts: loopArtifacts.length > 0 ? loopArtifacts : undefined
+        category: 'exploration'
       });
       
-      // Loop decisions
+      // Loop decisions - also marked as Exploration category
       if (loop.explorationDecisions && loop.explorationDecisions.length > 0) {
         loop.explorationDecisions.forEach(d => {
           timelineEvents.push({
             timestamp: d.timestamp,
             type: 'Exploration Decision',
-            content: d.summary
+            content: d.summary,
+            category: 'exploration'
           });
         });
       }
@@ -960,12 +965,11 @@ const generateTimelineReport = async (project: Project): Promise<string> => {
   // Project decisions
   if (project.decisions && project.decisions.length > 0) {
     project.decisions.forEach(d => {
-      const artifacts = project.artifacts.filter(a => d.artifacts.includes(a.id) && a.isFavorite);
       timelineEvents.push({
         timestamp: d.timestamp,
         type: 'Project Decision',
         content: d.summary,
-        artifacts: artifacts.length > 0 ? artifacts : undefined
+        category: 'other'
       });
     });
   }
@@ -977,21 +981,21 @@ const generateTimelineReport = async (project: Project): Promise<string> => {
     <div class="page">
       <h2>Project Timeline</h2>
       <div class="divider"></div>
-      ${timelineEvents.map(event => `
-        <div class="timeline-event">
-          <p class="meta">${event.type} • ${formatDate(event.timestamp)}</p>
-          <p>${event.content}</p>
-          ${event.artifacts && event.artifacts.length > 0 ? `
-            <div style="margin-top: 8px;">
-              ${event.artifacts.map(a => `
-                <div class="list-item">
-                  <span class="favorite-marker">★</span> ${a.name || a.uri}
-                </div>
-              `).join('')}
-            </div>
-          ` : ''}
-        </div>
-      `).join('')}
+      ${timelineEvents.map(event => {
+        // Determine CSS class based on category
+        const categoryClass = event.category === 'framing' 
+          ? 'timeline-event-framing' 
+          : event.category === 'exploration' 
+            ? 'timeline-event-exploration' 
+            : '';
+        
+        return `
+          <div class="timeline-event ${categoryClass}">
+            <p class="meta">${event.type} • ${formatDate(event.timestamp)}</p>
+            <p>${event.content}</p>
+          </div>
+        `;
+      }).join('')}
     </div>
   ` : '<div class="page"><p>No timeline events recorded.</p></div>';
   
