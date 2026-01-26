@@ -28,6 +28,7 @@ import {
   Decision,
   PhaseChangeEvent,
 } from '@/utils/storage';
+import { getDefaultCurrency, Currency } from '@/utils/profileStorage';
 import * as Sharing from 'expo-sharing';
 
 export default function ProjectOverviewScreen() {
@@ -38,6 +39,7 @@ export default function ProjectOverviewScreen() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [currency, setCurrency] = useState<Currency>({ code: 'USD', symbol: '$', name: 'US Dollar' });
   
   // Overlays
   const [showPhaseMenu, setShowPhaseMenu] = useState(false);
@@ -65,10 +67,18 @@ export default function ProjectOverviewScreen() {
     }
   }, [projectId, router]);
 
+  const loadCurrency = useCallback(async () => {
+    console.log('Project Overview: Loading currency');
+    const savedCurrency = await getDefaultCurrency();
+    setCurrency(savedCurrency);
+    console.log('Project Overview: Currency loaded:', savedCurrency.symbol);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadProject();
-    }, [loadProject])
+      loadCurrency();
+    }, [loadProject, loadCurrency])
   );
 
   const getPhaseColor = (phase: ProjectPhase): string => {
@@ -133,6 +143,10 @@ export default function ProjectOverviewScreen() {
   };
 
   const { totalCosts, totalHours } = calculateTotals();
+  
+  // Format currency display
+  const currencySymbol = currency.symbol;
+  const totalCostsDisplay = `${currencySymbol}${totalCosts.toFixed(2)}`;
 
   // Handle opening artifacts (URLs, PDFs, images)
   const handleOpenArtifact = async (artifact: Artifact) => {
@@ -339,7 +353,7 @@ export default function ProjectOverviewScreen() {
               </View>
               <View style={styles.infoItem}>
                 <Text style={styles.secondaryLabel}>Total Costs</Text>
-                <Text style={styles.secondaryValue}>${totalCosts.toFixed(2)}</Text>
+                <Text style={styles.secondaryValue}>{totalCostsDisplay}</Text>
               </View>
               <View style={styles.infoItem}>
                 <Text style={styles.secondaryLabel}>Total Hours</Text>
