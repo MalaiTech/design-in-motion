@@ -80,7 +80,6 @@ export default function AppInfoScreen() {
   };
 
   const appVersion = Constants.expoConfig?.version || '1.0.0';
-  const buildNumber = Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || '1';
 
   return (
     <View style={styles.container}>
@@ -102,7 +101,7 @@ export default function AppInfoScreen() {
                 />
                 <Text style={styles.infoTitle}>Version</Text>
               </View>
-              <Text style={styles.infoValue}>{appVersion} ({buildNumber})</Text>
+              <Text style={styles.infoValue}>{appVersion}</Text>
             </View>
           </View>
 
