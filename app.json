@@ -5,18 +5,18 @@
     "slug": "Design In Motion",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/11931187-2b92-4ba5-8778-35891a1377b7.png",
+    "icon": "./assets/images/f2e44735-4023-4f53-a4fa-51dd9eb9783d.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/11931187-2b92-4ba5-8778-35891a1377b7.png",
+      "image": "./assets/images/f2e44735-4023-4f53-a4fa-51dd9eb9783d.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAFAF7"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.designinmotion.app",
-      "icon": "./assets/images/11931187-2b92-4ba5-8778-35891a1377b7.png",
+      "icon": "./assets/images/f2e44735-4023-4f53-a4fa-51dd9eb9783d.png",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -24,14 +24,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/11931187-2b92-4ba5-8778-35891a1377b7.png",
+        "foregroundImage": "./assets/images/f2e44735-4023-4f53-a4fa-51dd9eb9783d.png",
         "backgroundColor": "#FAFAF7"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.designinmotion.app"
     },
     "web": {
-      "favicon": "./assets/images/11931187-2b92-4ba5-8778-35891a1377b7.png",
+      "favicon": "./assets/images/f2e44735-4023-4f53-a4fa-51dd9eb9783d.png",
       "bundler": "metro"
     },
     "plugins": [
