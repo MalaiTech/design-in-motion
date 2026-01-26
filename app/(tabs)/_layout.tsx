@@ -11,23 +11,24 @@ export default function TabLayout() {
   console.log('TabLayout rendered - initialRouteName: (home)');
   
   // Three tabs configuration - Projects, Manual, and Profile
+  // Using valid Material icon names for Android/Web/iPad
   const tabs: TabBarItem[] = [
     {
       name: '(home)',
       route: '/(tabs)/(home)/',
-      icon: 'home',
+      icon: 'home', // Valid Material icon
       label: 'Projects',
     },
     {
       name: '(manual)',
       route: '/(tabs)/(manual)/',
-      icon: 'menu-book',
+      icon: 'menu-book', // Valid Material icon
       label: 'Manual',
     },
     {
       name: '(profile)',
       route: '/(tabs)/(profile)/',
-      icon: 'person',
+      icon: 'account-circle', // Valid Material icon (changed from 'person')
       label: 'Profile',
     },
   ];

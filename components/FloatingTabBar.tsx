@@ -53,6 +53,8 @@ export default function FloatingTabBar({
   const theme = useTheme();
   const animatedValue = useSharedValue(0);
 
+  console.log('FloatingTabBar rendered with tabs:', tabs.map(t => ({ name: t.name, icon: t.icon })));
+
   // Get projectId from params if not provided
   const currentProjectId = projectId || (params.id as string);
 
@@ -105,6 +107,7 @@ export default function FloatingTabBar({
 
   const handleTabPress = (route: Href | ((projectId?: string) => Href)) => {
     const targetRoute = typeof route === 'function' ? route(currentProjectId) : route;
+    console.log('FloatingTabBar: Tab pressed, navigating to:', targetRoute);
     router.push(targetRoute);
   };
 

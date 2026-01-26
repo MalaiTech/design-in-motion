@@ -21,19 +21,19 @@ export default function TabLayout() {
       {
         name: '(home)',
         route: '/(tabs)/(home)/',
-        icon: 'home',
+        icon: 'home', // Valid Material icon name
         label: 'Projects',
       },
       {
         name: '(manual)',
         route: '/(tabs)/(manual)/',
-        icon: 'menu-book',
+        icon: 'menu-book', // Valid Material icon name
         label: 'Manual',
       },
       {
         name: '(profile)',
         route: '/(tabs)/(profile)/',
-        icon: 'person',
+        icon: 'account-circle', // Valid Material icon name (changed from 'person')
         label: 'Profile',
       },
     ];
