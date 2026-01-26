@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Design In Motion",
@@ -15,6 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.designinmotion.app",
+      "icon": "./assets/images/11931187-2b92-4ba5-8778-35891a1377b7.png",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
