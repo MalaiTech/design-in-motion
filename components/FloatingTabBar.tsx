@@ -12,7 +12,6 @@ import { useRouter, usePathname, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
-import { useTheme } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
 import Animated, {
   useAnimatedStyle,
@@ -51,68 +50,48 @@ export default function FloatingTabBar({
   const router = useRouter();
   const pathname = usePathname();
   const params = useLocalSearchParams();
-  const theme = useTheme();
   const animatedValue = useSharedValue(0);
 
-  console.log('FloatingTabBar rendered with tabs:', tabs.map(t => ({ 
-    name: t.name, 
-    iosIcon: t.iosIcon, 
-    androidIcon: t.androidIcon 
-  })));
+  console.log('FloatingTabBar: Current pathname:', pathname);
 
   // Get projectId from params if not provided
   const currentProjectId = projectId || (params.id as string);
 
-  // Improved active tab detection with better path matching
+  // Improved active tab detection - check if pathname contains the tab route segment
   const activeTabIndex = React.useMemo(() => {
-    // Find the best matching tab based on the current pathname
-    let bestMatch = -1;
-    let bestMatchScore = 0;
-
-    tabs.forEach((tab, index) => {
-      let score = 0;
-      const tabRoute = typeof tab.route === 'function' ? tab.route(currentProjectId) : tab.route;
-
-      // Exact route match gets highest score
-      if (pathname === tabRoute) {
-        score = 100;
+    // Extract the main tab segment from pathname
+    // e.g., "/(tabs)/(home)/..." -> "(home)"
+    // e.g., "/(tabs)/(manual)/..." -> "(manual)"
+    // e.g., "/(tabs)/(profile)/..." -> "(profile)"
+    
+    let detectedIndex = 0; // Default to first tab
+    
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
+      // Check if pathname contains the tab name (e.g., "(home)", "(manual)", "(profile)")
+      if (pathname.includes(`/(tabs)/${tab.name}/`) || pathname.includes(`/(tabs)/${tab.name}`)) {
+        detectedIndex = i;
+        console.log(`FloatingTabBar: Active tab detected - ${tab.name} (index ${i})`);
+        break;
       }
-      // Check if pathname starts with tab route (for nested routes)
-      else if (pathname.startsWith(tabRoute as string)) {
-        score = 80;
-      }
-      // Check if pathname contains the tab name
-      else if (pathname.includes(tab.name)) {
-        score = 60;
-      }
-      // Check for partial matches in the route
-      else if (tabRoute.includes('/(tabs)/') && pathname.includes(tabRoute.split('/(tabs)/')[1])) {
-        score = 40;
-      }
-
-      if (score > bestMatchScore) {
-        bestMatchScore = score;
-        bestMatch = index;
-      }
-    });
-
-    // Default to first tab if no match found
-    return bestMatch >= 0 ? bestMatch : 0;
-  }, [pathname, tabs, currentProjectId]);
-
-  React.useEffect(() => {
-    if (activeTabIndex >= 0) {
-      animatedValue.value = withSpring(activeTabIndex, {
-        damping: 20,
-        stiffness: 120,
-        mass: 1,
-      });
     }
+    
+    return detectedIndex;
+  }, [pathname, tabs]);
+
+  // Update animation when active tab changes
+  React.useEffect(() => {
+    console.log('FloatingTabBar: Animating to tab index:', activeTabIndex);
+    animatedValue.value = withSpring(activeTabIndex, {
+      damping: 20,
+      stiffness: 120,
+      mass: 1,
+    });
   }, [activeTabIndex, animatedValue]);
 
-  const handleTabPress = (route: Href | ((projectId?: string) => Href)) => {
+  const handleTabPress = (route: Href | ((projectId?: string) => Href), tabName: string) => {
     const targetRoute = typeof route === 'function' ? route(currentProjectId) : route;
-    console.log('FloatingTabBar: Tab pressed, navigating to:', targetRoute);
+    console.log(`FloatingTabBar: Tab ${tabName} pressed, navigating to:`, targetRoute);
     router.push(targetRoute);
   };
 
@@ -133,29 +112,25 @@ export default function FloatingTabBar({
     };
   });
 
-  // Force light mode styling on iOS, respect theme on other platforms
-  const isLightMode = Platform.OS === 'ios' ? true : !theme.dark;
-
-  // Dynamic styles based on theme (forced light on iOS)
+  // Force light mode styling on iOS for readability
+  // Use solid white background with slight transparency for glass effect
   const dynamicStyles = {
     blurContainer: {
       ...styles.blurContainer,
       borderWidth: 1.2,
-      borderColor: 'rgba(255, 255, 255, 1)',
       ...Platform.select({
         ios: {
-          // Always use light mode styling on iOS
-          backgroundColor: 'rgba(255, 255, 255, 0.6)',
+          // Solid white background for iOS to ensure readability in dark mode
+          backgroundColor: 'rgba(250, 250, 247, 0.95)', // Use app background color with high opacity
+          borderColor: 'rgba(221, 221, 221, 0.8)', // Light border
         },
         android: {
-          backgroundColor: isLightMode
-            ? 'rgba(255, 255, 255, 0.6)'
-            : 'rgba(28, 28, 30, 0.95)',
+          backgroundColor: 'rgba(250, 250, 247, 0.95)',
+          borderColor: 'rgba(221, 221, 221, 0.8)',
         },
         web: {
-          backgroundColor: isLightMode
-            ? 'rgba(255, 255, 255, 0.6)'
-            : 'rgba(28, 28, 30, 0.95)',
+          backgroundColor: 'rgba(250, 250, 247, 0.95)',
+          borderColor: 'rgba(221, 221, 221, 0.8)',
           backdropFilter: 'blur(10px)',
         },
       }),
@@ -165,10 +140,8 @@ export default function FloatingTabBar({
     },
     indicator: {
       ...styles.indicator,
-      // Always use light mode indicator on iOS
-      backgroundColor: isLightMode
-        ? 'rgba(0, 0, 0, 0.04)'
-        : 'rgba(255, 255, 255, 0.08)',
+      // Light gray indicator that's visible on light background
+      backgroundColor: 'rgba(29, 106, 137, 0.08)', // Primary color with low opacity
       width: `${tabWidthPercent}%` as `${number}%`,
     },
   };
@@ -196,7 +169,7 @@ export default function FloatingTabBar({
                 <React.Fragment key={index}>
                 <TouchableOpacity
                   style={styles.tab}
-                  onPress={() => handleTabPress(tab.route)}
+                  onPress={() => handleTabPress(tab.route, tab.name)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.tabContent}>
