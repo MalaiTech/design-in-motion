@@ -1,8 +1,7 @@
-
 {
   "expo": {
-    "name": "Design In Motion",
-    "slug": "Design In Motion",
+    "name": "DeVine",
+    "slug": "DeVine",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/f2e44735-4023-4f53-a4fa-51dd9eb9783d.png",
@@ -48,5 +47,5 @@
       "backendUrl": "https://un2ktywfpsumfhm7gwd254bkw5em39kt.app.specular.dev"
     }
   },
-  "scheme": "Design In Motion"
+  "scheme": "DeVine"
 }

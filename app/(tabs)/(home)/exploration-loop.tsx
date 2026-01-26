@@ -33,6 +33,7 @@ import {
   ExplorationDecision,
   ExplorationQuestion,
 } from '@/utils/storage';
+import { getDefaultCurrency } from '@/utils/profileStorage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -66,6 +67,9 @@ export default function ExplorationLoopScreen() {
   // SIMPLIFIED: Single source of truth for project data
   const [project, setProject] = useState<Project | null>(null);
   const [loop, setLoop] = useState<ExplorationLoop | null>(null);
+  
+  // NEW: Currency state
+  const [currencySymbol, setCurrencySymbol] = useState('$');
   
   // FIXED: Track if loop has been saved to prevent duplicate creation
   const [hasBeenSaved, setHasBeenSaved] = useState(false);
@@ -120,6 +124,14 @@ export default function ExplorationLoopScreen() {
   const [timeEntryHours, setTimeEntryHours] = useState('');
   const [costEntryReason, setCostEntryReason] = useState('');
   const [costEntryAmount, setCostEntryAmount] = useState('');
+
+  // NEW: Load currency on mount
+  const loadCurrency = useCallback(async () => {
+    console.log('Exploration Loop: Loading currency');
+    const currency = await getDefaultCurrency();
+    setCurrencySymbol(currency.symbol);
+    console.log('Exploration Loop: Currency loaded:', currency.symbol);
+  }, []);
 
   const loadProject = useCallback(async () => {
     console.log('Exploration Loop: Loading project', projectId, loopId);
@@ -190,7 +202,8 @@ export default function ExplorationLoopScreen() {
   useFocusEffect(
     useCallback(() => {
       loadProject();
-    }, [loadProject])
+      loadCurrency();
+    }, [loadProject, loadCurrency])
   );
 
   // FIXED: Atomic update function - updates both project and loop in one operation
@@ -1171,6 +1184,10 @@ export default function ExplorationLoopScreen() {
   const timeEntries = (loop as any).timeEntries || [];
   const costEntries = (loop as any).costEntries || [];
   const explorationBackgroundColor = '#FFF6D8';
+  
+  // NEW: Format currency display
+  const totalHoursDisplay = getTotalHours().toFixed(1);
+  const totalCostsDisplay = `${currencySymbol}${getTotalCosts().toFixed(2)}`;
 
   return (
     <View style={[styles.container, { backgroundColor: explorationBackgroundColor }]}>
@@ -1827,14 +1844,14 @@ export default function ExplorationLoopScreen() {
             )}
           </View>
 
-          {/* 9. Time and Costs */}
+          {/* 9. Time and Costs - FIXED: Use currency symbol */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Time and Costs</Text>
             
             <View style={styles.trackingSection}>
               <View style={styles.trackingHeader}>
                 <Text style={styles.trackingTitle}>Hours</Text>
-                <Text style={styles.trackingTotal}>{getTotalHours().toFixed(1)} hrs</Text>
+                <Text style={styles.trackingTotal}>{totalHoursDisplay} hrs</Text>
               </View>
               
               <TouchableOpacity 
@@ -1875,7 +1892,7 @@ export default function ExplorationLoopScreen() {
             <View style={styles.trackingSection}>
               <View style={styles.trackingHeader}>
                 <Text style={styles.trackingTitle}>Costs</Text>
-                <Text style={styles.trackingTotal}>${getTotalCosts().toFixed(2)}</Text>
+                <Text style={styles.trackingTotal}>{totalCostsDisplay}</Text>
               </View>
               
               <TouchableOpacity 
@@ -1897,7 +1914,7 @@ export default function ExplorationLoopScreen() {
                     <View key={entry.id} style={styles.trackingItem}>
                       <View style={styles.trackingItemContent}>
                         <Text style={styles.trackingItemReason}>{entry.reason}</Text>
-                        <Text style={styles.trackingItemValue}>${entry.amount.toFixed(2)}</Text>
+                        <Text style={styles.trackingItemValue}>{currencySymbol}{entry.amount.toFixed(2)}</Text>
                       </View>
                       <TouchableOpacity onPress={() => handleDeleteCostEntry(entry.id)}>
                         <IconSymbol 
@@ -2331,7 +2348,7 @@ export default function ExplorationLoopScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Cost Entry Overlay */}
+      {/* Add Cost Entry Overlay - FIXED: Use currency symbol in placeholder */}
       <Modal
         visible={showCostEntryOverlay}
         transparent
@@ -2359,7 +2376,7 @@ export default function ExplorationLoopScreen() {
                 onChangeText={setCostEntryReason}
               />
               
-              <Text style={styles.inputLabel}>Amount ($)</Text>
+              <Text style={styles.inputLabel}>Amount ({currencySymbol})</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0.00"

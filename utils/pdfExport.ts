@@ -3,7 +3,7 @@ import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
 import { colors } from '@/styles/commonStyles';
 import { Project, ExplorationLoop, Artifact, Decision, FramingDecision, ExplorationDecision, PhaseChangeEvent, TimeEntry, CostEntry, calculateProjectTotals } from './storage';
-import { getPersonalInfo, PersonalInfo } from './profileStorage';
+import { getPersonalInfo, PersonalInfo, getDefaultCurrency } from './profileStorage';
 
 export type ExportFormat = 'executive' | 'process' | 'timeline' | 'costs';
 
@@ -491,6 +491,13 @@ const generateCoverPage = async (project: Project, formatTitle: string): Promise
 
 // Generate Executive Overview
 const generateExecutiveOverview = async (project: Project): Promise<string> => {
+  console.log('PDF Export: Generating Executive Overview');
+  
+  // NEW: Load currency
+  const currency = await getDefaultCurrency();
+  const currencySymbol = currency.symbol;
+  console.log('PDF Export: Using currency symbol:', currencySymbol);
+  
   const coverPage = await generateCoverPage(project, 'Executive Overview');
   
   // Calculate project totals
@@ -510,7 +517,7 @@ const generateExecutiveOverview = async (project: Project): Promise<string> => {
         return `
           <div style="margin-bottom: 16px;">
             <p><strong>${loop.question}</strong></p>
-            <p class="meta">Status: ${loop.status} • Hours: ${loopHours.toFixed(1)} • Costs: $${loopCosts.toFixed(2)}</p>
+            <p class="meta">Status: ${loop.status} • Hours: ${loopHours.toFixed(1)} • Costs: ${currencySymbol}${loopCosts.toFixed(2)}</p>
           </div>
         `;
       }).join('')}
@@ -538,7 +545,7 @@ const generateExecutiveOverview = async (project: Project): Promise<string> => {
         </tr>
         <tr>
           <td>Total Costs</td>
-          <td>$${totalCosts.toFixed(2)}</td>
+          <td>${currencySymbol}${totalCosts.toFixed(2)}</td>
         </tr>
       </table>
     </div>
@@ -832,6 +839,7 @@ const generateDesignProcessReport = async (project: Project): Promise<string> =>
 
 // Generate Timeline Report
 const generateTimelineReport = async (project: Project): Promise<string> => {
+  console.log('PDF Export: Generating Timeline Report');
   const coverPage = await generateCoverPage(project, 'Timeline');
   
   // Build timeline events
@@ -946,8 +954,15 @@ const generateTimelineReport = async (project: Project): Promise<string> => {
   return getBaseHTML(`${project.title} - Timeline`, content);
 };
 
-// Generate Costs & Hours Report
+// Generate Costs & Hours Report - FIXED: Use currency symbol
 const generateCostsReport = async (project: Project): Promise<string> => {
+  console.log('PDF Export: Generating Costs & Hours Report');
+  
+  // NEW: Load currency
+  const currency = await getDefaultCurrency();
+  const currencySymbol = currency.symbol;
+  console.log('PDF Export: Using currency symbol for costs report:', currencySymbol);
+  
   const coverPage = await generateCoverPage(project, 'Costs & Hours Report');
   
   // Calculate project totals
@@ -994,7 +1009,7 @@ const generateCostsReport = async (project: Project): Promise<string> => {
         </tr>
         <tr>
           <td>Total Costs</td>
-          <td>$${totalCosts.toFixed(2)}</td>
+          <td>${currencySymbol}${totalCosts.toFixed(2)}</td>
         </tr>
       </table>
       
@@ -1010,7 +1025,7 @@ const generateCostsReport = async (project: Project): Promise<string> => {
             <tr>
               <td>${loop.question}</td>
               <td>${loop.hours.toFixed(1)} hours</td>
-              <td>$${loop.costs.toFixed(2)}</td>
+              <td>${currencySymbol}${loop.costs.toFixed(2)}</td>
             </tr>
           `).join('')}
         </table>
@@ -1062,7 +1077,7 @@ const generateCostsReport = async (project: Project): Promise<string> => {
               ${costEntries.map((entry: CostEntry) => `
                 <tr>
                   <td>${entry.reason}</td>
-                  <td>$${entry.amount.toFixed(2)}</td>
+                  <td>${currencySymbol}${entry.amount.toFixed(2)}</td>
                 </tr>
               `).join('')}
             </table>
