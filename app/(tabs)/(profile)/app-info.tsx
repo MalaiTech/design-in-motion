@@ -165,17 +165,6 @@ export default function AppInfoScreen() {
               Design in Motion is a local-first app. Your data never leaves your device.
             </Text>
           </View>
-
-          {/* About */}
-          <View style={styles.aboutSection}>
-            <Text style={styles.aboutTitle}>About Design in Motion</Text>
-            <Text style={styles.aboutText}>
-              A visual thinking and project management app for creative designers and developers using an explorative development process.
-            </Text>
-            <Text style={styles.aboutText}>
-              Built with privacy and local-first principles. No accounts, no tracking, no cloud sync.
-            </Text>
-          </View>
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -371,25 +360,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#D32F2F',
-  },
-  aboutSection: {
-    marginTop: 16,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
-  aboutTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
-    letterSpacing: -0.2,
-  },
-  aboutText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textSecondary,
-    marginBottom: 12,
   },
   bottomSpacer: {
     height: 40,
