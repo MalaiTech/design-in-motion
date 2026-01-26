@@ -122,29 +122,34 @@ export default function FloatingTabBar({
     };
   });
 
-  // Force light mode styling - solid opaque background for maximum readability
+  // Translucent frosted glass styling
   const dynamicStyles = {
     blurContainer: {
       ...styles.blurContainer,
-      borderWidth: 1.5,
-      // Solid light background - no transparency issues
-      backgroundColor: colors.background, // #FAFAF7 - fully opaque
-      borderColor: colors.divider, // #DDDDDD
+      // Translucent background with subtle tint
+      backgroundColor: Platform.select({
+        ios: 'rgba(250, 250, 247, 0.75)', // 75% opacity for frosted effect
+        android: 'rgba(250, 250, 247, 0.85)', // Slightly more opaque on Android
+        web: 'rgba(250, 250, 247, 0.75)',
+      }),
+      // Very subtle border - no heavy borders
+      borderWidth: 0.5,
+      borderColor: 'rgba(221, 221, 221, 0.3)', // Semi-transparent divider color
       ...Platform.select({
         web: {
-          backdropFilter: 'blur(10px)',
+          backdropFilter: 'blur(20px)', // Stronger blur on web
         },
       }),
     },
     background: {
       ...styles.background,
-      backgroundColor: 'transparent', // Let the container background show through
+      backgroundColor: 'transparent',
     },
     indicator: {
       ...styles.indicator,
-      // Visible indicator with primary color
-      backgroundColor: colors.primary, // #1d6a89 with opacity
-      opacity: 0.12,
+      // Subtle indicator with primary color
+      backgroundColor: colors.primary,
+      opacity: 0.15,
       width: `${tabWidthPercent}%` as `${number}%`,
     },
   };
@@ -159,7 +164,8 @@ export default function FloatingTabBar({
         }
       ]}>
         <BlurView
-          intensity={80}
+          intensity={Platform.select({ ios: 60, android: 80, default: 60 })}
+          tint="light"
           style={[dynamicStyles.blurContainer, { borderRadius }]}
         >
           <View style={dynamicStyles.background} />
@@ -185,7 +191,7 @@ export default function FloatingTabBar({
                     <Text
                       style={[
                         styles.tabLabel,
-                        { color: colors.textSecondary },
+                        { color: colors.text }, // High contrast - use main text color
                         isActive && { color: colors.primary, fontWeight: '600' },
                       ]}
                     >
@@ -215,9 +221,11 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 20,
     alignSelf: 'center',
+    // No shadow - keeping it clean
   },
   blurContainer: {
     overflow: 'hidden',
+    // No shadow properties - clean and minimal
   },
   background: {
     ...StyleSheet.absoluteFillObject,
