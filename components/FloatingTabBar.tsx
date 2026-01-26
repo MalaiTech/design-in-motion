@@ -28,7 +28,8 @@ const { width: screenWidth } = Dimensions.get('window');
 export interface TabBarItem {
   name: string;
   route: Href | ((projectId?: string) => Href);
-  icon: keyof typeof MaterialIcons.glyphMap;
+  iosIcon: string; // SF Symbol name for iOS
+  androidIcon: keyof typeof MaterialIcons.glyphMap; // Material icon name for Android
   label: string;
 }
 
@@ -53,7 +54,11 @@ export default function FloatingTabBar({
   const theme = useTheme();
   const animatedValue = useSharedValue(0);
 
-  console.log('FloatingTabBar rendered with tabs:', tabs.map(t => ({ name: t.name, icon: t.icon })));
+  console.log('FloatingTabBar rendered with tabs:', tabs.map(t => ({ 
+    name: t.name, 
+    iosIcon: t.iosIcon, 
+    androidIcon: t.androidIcon 
+  })));
 
   // Get projectId from params if not provided
   const currentProjectId = projectId || (params.id as string);
@@ -193,8 +198,8 @@ export default function FloatingTabBar({
                 >
                   <View style={styles.tabContent}>
                     <IconSymbol
-                      android_material_icon_name={tab.icon}
-                      ios_icon_name={tab.icon}
+                      ios_icon_name={tab.iosIcon}
+                      android_material_icon_name={tab.androidIcon}
                       size={24}
                       color={isActive ? colors.primary : colors.text}
                     />

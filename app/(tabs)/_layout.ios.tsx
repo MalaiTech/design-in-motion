@@ -15,25 +15,28 @@ export default function TabLayout() {
   // Check if device is iPad
   const isIPad = Platform.OS === 'ios' && Platform.isPad;
 
-  // On iPad, use FloatingTabBar (same as Android/Web)
+  // On iPad, use FloatingTabBar with proper iOS SF Symbol names
   if (isIPad) {
     const tabs: TabBarItem[] = [
       {
         name: '(home)',
         route: '/(tabs)/(home)/',
-        icon: 'home', // Valid Material icon name
+        iosIcon: 'house.fill', // SF Symbol for iOS
+        androidIcon: 'home', // Material icon for Android (not used on iPad but required by type)
         label: 'Projects',
       },
       {
         name: '(manual)',
         route: '/(tabs)/(manual)/',
-        icon: 'menu-book', // Valid Material icon name
+        iosIcon: 'books.vertical.fill', // SF Symbol for iOS
+        androidIcon: 'menu-book', // Material icon for Android (not used on iPad but required by type)
         label: 'Manual',
       },
       {
         name: '(profile)',
         route: '/(tabs)/(profile)/',
-        icon: 'account-circle', // Valid Material icon name (changed from 'person')
+        iosIcon: 'person.crop.circle.badge.ellipsis.fill', // SF Symbol for iOS
+        androidIcon: 'account-circle', // Material icon for Android (not used on iPad but required by type)
         label: 'Profile',
       },
     ];

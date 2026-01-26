@@ -11,24 +11,27 @@ export default function TabLayout() {
   console.log('TabLayout rendered - initialRouteName: (home)');
   
   // Three tabs configuration - Projects, Manual, and Profile
-  // Using valid Material icon names for Android/Web/iPad
+  // Using SF Symbols for iOS and Material icons for Android/Web
   const tabs: TabBarItem[] = [
     {
       name: '(home)',
       route: '/(tabs)/(home)/',
-      icon: 'home', // Valid Material icon
+      iosIcon: 'house.fill', // SF Symbol for iOS
+      androidIcon: 'home', // Material icon for Android/Web
       label: 'Projects',
     },
     {
       name: '(manual)',
       route: '/(tabs)/(manual)/',
-      icon: 'menu-book', // Valid Material icon
+      iosIcon: 'books.vertical.fill', // SF Symbol for iOS
+      androidIcon: 'menu-book', // Material icon for Android/Web
       label: 'Manual',
     },
     {
       name: '(profile)',
       route: '/(tabs)/(profile)/',
-      icon: 'account-circle', // Valid Material icon (changed from 'person')
+      iosIcon: 'person.crop.circle.badge.ellipsis.fill', // SF Symbol for iOS
+      androidIcon: 'account-circle', // Material icon for Android/Web
       label: 'Profile',
     },
   ];
