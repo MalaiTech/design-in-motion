@@ -72,20 +72,22 @@ export default function TabLayout() {
     );
   }
 
-  // On iPhone, use native tabs with explicit initialRouteName
+  // On iPhone, use native tabs with SF Symbols
   return (
     <NativeTabs initialRouteName="(home)">
-      {/* Explicitly set (home) as first tab to ensure it loads first */}
+      {/* Projects tab with house.fill SF Symbol */}
       <NativeTabs.Trigger name="(home)">
         <Icon sf="house.fill" />
         <Label>Projects</Label>
       </NativeTabs.Trigger>
+      {/* Manual tab with books.vertical.fill SF Symbol */}
       <NativeTabs.Trigger name="(manual)">
-        <Icon sf="book.closed.fill" />
+        <Icon sf="books.vertical.fill" />
         <Label>Manual</Label>
       </NativeTabs.Trigger>
+      {/* Profile tab with person.crop.circle.badge.ellipsis.fill SF Symbol */}
       <NativeTabs.Trigger name="(profile)">
-        <Icon sf="person.fill" />
+        <Icon sf="person.crop.circle.badge.ellipsis.fill" />
         <Label>Profile</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
