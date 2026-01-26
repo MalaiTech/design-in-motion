@@ -144,9 +144,9 @@ export default function ProjectOverviewScreen() {
 
   const { totalCosts, totalHours } = calculateTotals();
   
-  // Format currency display
+  // Format currency display - remove decimals using Math.round()
   const currencySymbol = currency.symbol;
-  const totalCostsDisplay = `${currencySymbol}${totalCosts.toFixed(2)}`;
+  const totalCostsDisplay = `${currencySymbol}${Math.round(totalCosts)}`;
 
   // Handle opening artifacts (URLs, PDFs, images)
   const handleOpenArtifact = async (artifact: Artifact) => {
